@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { Map, Loader2, Sparkles, Navigation } from 'lucide-react';
+import { Map, Loader2, Sparkles, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { cn } from './SearchBar';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FeedItem {
   id: string;
@@ -13,13 +14,14 @@ interface FeedItem {
   category: string;
   description: string;
   created_at: string;
+  metadata?: Record<string, unknown>;
 }
 
-export function WalkerFeed() {
+export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [showIllustration, setShowIllustration] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Fetch initial feed and subscribe
   useEffect(() => {
@@ -38,10 +40,6 @@ export function WalkerFeed() {
         if (mounted && data) {
           setItems(data);
           setIsLoading(false);
-          // Start the illustration reveal sequence for the first item
-          setTimeout(() => {
-            if (mounted) setShowIllustration(true);
-          }, 2000);
         }
       } catch (error) {
         console.error('Error loading feed:', error);
@@ -51,7 +49,6 @@ export function WalkerFeed() {
 
     loadFeed();
 
-    // Subscribe to new items
     const subscription = supabase
       .channel('public:postalpeek_feed')
       .on(
@@ -60,13 +57,8 @@ export function WalkerFeed() {
         (payload) => {
           if (mounted) {
             const newItem = payload.new as FeedItem;
-            // Add new item to the top of the list, move user to it
             setItems(prev => [newItem, ...prev]);
-            setCurrentIndex(0);
-            setShowIllustration(false);
-            setTimeout(() => {
-              if (mounted) setShowIllustration(true);
-            }, 2000);
+            setCurrentIndex(0); // Jump to newest
           }
         }
       )
@@ -78,27 +70,17 @@ export function WalkerFeed() {
     };
   }, []);
 
-  // Set up the carousel loop
+  // Carousel loop
   useEffect(() => {
-    if (items.length <= 1) return;
+    if (items.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
-      setShowIllustration(false); // hide illustration
-      
-      setTimeout(() => {
-        // Move to next item after illustration hides
-        setCurrentIndex(prev => (prev + 1) % items.length);
-        
-        // Show next illustration after a delay
-        setTimeout(() => {
-          setShowIllustration(true);
-        }, 2000);
-      }, 1000);
-
-    }, 15000); // Spend 15 seconds per item
+      // Move to NEXT older item (currentIndex + 1)
+      setCurrentIndex(prev => (prev + 1) % items.length);
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [items.length]);
+  }, [items.length, isPaused]);
 
   if (isLoading) {
     return (
@@ -122,63 +104,118 @@ export function WalkerFeed() {
 
   const currentItem = items[currentIndex];
 
-  return (
-    <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px]'>
-      
-      {/* Header Status */}
-      <div className='mb-6 h-8 flex items-center justify-center transition-all duration-300'>
-        {!showIllustration ? (
-          <div className='flex items-center gap-2 text-indigo-300 animate-pulse'>
-            <Navigation className='w-4 h-4' />
-            <span className='font-light tracking-widest text-sm uppercase'>Observing environment...</span>
-          </div>
-        ) : (
-          <div className='flex items-center gap-2 text-emerald-300 animate-fade-in'>
-            <Sparkles className='w-4 h-4' />
-            <span className='font-medium tracking-widest text-sm uppercase'>{currentItem.category}</span>
-          </div>
-        )}
-      </div>
+  const goNext = () => {
+    setIsPaused(true);
+    setCurrentIndex(prev => (prev + 1) % items.length);
+  };
 
-      {/* Main Visual Container */}
-      <div className='w-full relative rounded-3xl overflow-hidden glass-panel shadow-[0_32px_64px_rgba(0,0,0,0.5)] bg-black/40 aspect-[4/3] md:aspect-video transition-all duration-700 ease-in-out hover:scale-[1.01]'>
-        
-        {/* Generated Illustration (Always visible, no original photo swap) */}
-        <img
-          key={`illus-${currentItem.id}`}
+  const goPrev = () => {
+    setIsPaused(true);
+    setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
+  };
+
+  return (
+    <div className='w-full h-full flex flex-col items-center justify-center relative overflow-hidden'>
+      
+      {/* 1. THE DYNAMIC FRAME (Pasepartout) */}
+      <AnimatePresence mode="popLayout">
+        <motion.img
+          key={`bg-${currentItem.id}`}
           src={currentItem.illustration_url}
-          alt="Generated Art"
-          className={cn(
-            'absolute inset-0 w-full h-full object-cover transition-opacity duration-1000',
-            showIllustration ? 'opacity-100' : 'opacity-0'
-          )}
+          alt=""
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.8 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 2.5, ease: "easeInOut" }}
+          className="fixed inset-0 w-full h-full object-cover blur-[80px] scale-110 brightness-50 saturate-150 pointer-events-none z-[-1]"
         />
+      </AnimatePresence>
+
+      {/* 2. MAIN ARTWORK CONTAINER */}
+      <div className='absolute inset-0 w-full h-full group'>
+        
+        {/* Cinematic Image Crossfade */}
+        <AnimatePresence mode="popLayout">
+          <motion.img
+            key={`img-${currentItem.id}`}
+            src={currentItem.illustration_url}
+            alt="Generated Art"
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 2, ease: "easeInOut" }}
+            className="absolute inset-0 w-full h-full object-cover drop-shadow-2xl"
+          />
+        </AnimatePresence>
 
         {/* Global Dark Gradient Overlay for text readability */}
-        <div className='absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none' />
+        <div className={cn(
+          'absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none transition-opacity duration-1000 z-10',
+          isIdle ? 'opacity-0' : 'opacity-100'
+        )} />
 
-        {/* Information Overlay */}
-        <div className='absolute bottom-0 left-0 right-0 p-6 flex flex-col items-start justify-end pointer-events-none'>
-          
-          {/* Poetic Description (Only shown when REVEALED) */}
-          <div className={cn(
-            'transition-all duration-1000 delay-500 transform max-w-lg mb-1',
-            showIllustration ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-          )}>
-            <p className='text-[11px] md:text-xs font-light text-white/70 leading-relaxed drop-shadow-md text-left'>
-              "{currentItem.description}"
-            </p>
+        {/* 3. NAVIGATION CONTROLS (Fades on idle) */}
+        <div className={cn(
+          'absolute inset-y-0 left-0 flex items-center px-4 md:px-8 pointer-events-none transition-opacity duration-1000 z-20',
+          isIdle ? 'opacity-0' : 'opacity-100'
+        )}>
+           <button onClick={goPrev} disabled={items.length <= 1} className="pointer-events-auto p-3 rounded-full bg-black/40 text-white/50 hover:bg-white/20 hover:text-white hover:scale-110 transition-all backdrop-blur-md">
+             <ChevronLeft className="w-8 h-8" />
+           </button>
+        </div>
+        <div className={cn(
+          'absolute inset-y-0 right-0 flex items-center px-4 md:px-8 pointer-events-none transition-opacity duration-1000 z-20',
+          isIdle ? 'opacity-0' : 'opacity-100'
+        )}>
+           <button onClick={goNext} disabled={items.length <= 1} className="pointer-events-auto p-3 rounded-full bg-black/40 text-white/50 hover:bg-white/20 hover:text-white hover:scale-110 transition-all backdrop-blur-md">
+             <ChevronRight className="w-8 h-8" />
+           </button>
+        </div>
+
+        {/* Play/Pause control (bottom right corner) */}
+        <div className={cn(
+          'absolute bottom-10 right-6 md:right-10 pointer-events-none transition-opacity duration-1000 z-20',
+          isIdle ? 'opacity-0' : 'opacity-100'
+        )}>
+          <button onClick={() => setIsPaused(!isPaused)} className="pointer-events-auto p-3 rounded-full bg-black/40 text-white/50 hover:bg-white/20 hover:text-white transition-all backdrop-blur-md border border-white/5">
+            {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+          </button>
+        </div>
+
+        {/* Information HUD (Fades on idle) */}
+        <div className={cn(
+          'absolute bottom-0 left-0 right-0 p-8 pb-12 md:pb-16 md:p-12 flex flex-col items-start justify-end pointer-events-none transition-all duration-1000 transform z-20',
+          isIdle ? 'opacity-0 translate-y-8' : 'opacity-100 translate-y-0'
+        )}>
+           {/* Header Status */}
+          <div className='flex items-center gap-3 text-emerald-300 glass-panel px-4 py-1.5 rounded-full bg-black/40 border border-white/10 mb-5 shadow-xl backdrop-blur-md'>
+            <Sparkles className='w-4 h-4' />
+            <span className='font-medium tracking-widest text-xs uppercase drop-shadow-md'>{currentItem.category}</span>
+            {isPaused && <span className="text-white/50 text-[10px] ml-1 tracking-wide font-normal">(PAUSED)</span>}
           </div>
 
-          {/* Location details */}
-          <div className={cn(
-            'transition-all duration-1000 transform translate-y-0 opacity-100'
-          )}>
-            <p className='text-white/40 text-[8px] md:text-[9px] uppercase tracking-widest font-medium flex items-center gap-1.5 text-left'>
-              <Map className='w-2.5 h-2.5 text-indigo-400/50' />
-              {currentItem.location_name}
-            </p>
-          </div>
+          {/* Clickable Location Link */}
+          <a 
+            href={`https://www.google.com/maps/search/?api=1&query=${currentItem.lat},${currentItem.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className='pointer-events-auto block transition-all hover:scale-[1.01] hover:text-indigo-200'
+          >
+            {/* Poetic Description */}
+            <div className='max-w-2xl mb-4'>
+              <p className='text-base md:text-xl font-light text-white/95 leading-relaxed drop-shadow-2xl text-left'>
+                "{currentItem.description}"
+              </p>
+            </div>
+
+            {/* Location details */}
+            <div className='flex items-center gap-2'>
+              <Map className='w-4 h-4 text-indigo-400 drop-shadow-md' />
+              <p className='text-white/80 text-xs md:text-sm uppercase tracking-widest font-semibold text-left drop-shadow-xl'>
+                {currentItem.location_name}
+              </p>
+            </div>
+          </a>
         </div>
       </div>
     </div>
