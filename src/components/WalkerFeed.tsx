@@ -22,6 +22,10 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [isHoveringHUD, setIsHoveringHUD] = useState(false);
+
+  // We no longer hide the HUD automatically based on time
+  const isHUDHidden = false;
 
   // Fetch initial feed and subscribe
   useEffect(() => {
@@ -77,7 +81,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     const interval = setInterval(() => {
       // Move to NEXT older item (currentIndex + 1)
       setCurrentIndex(prev => (prev + 1) % items.length);
-    }, 15000);
+    }, 25000);
 
     return () => clearInterval(interval);
   }, [items.length, isPaused]);
@@ -118,40 +122,46 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     <div className='w-full h-full flex flex-col items-center justify-center relative overflow-hidden'>
       
       {/* 1. THE DYNAMIC FRAME (Pasepartout) */}
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="popLayout" initial={false}>
         <motion.img
           key={`bg-${currentItem.id}`}
           src={currentItem.illustration_url}
           alt=""
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.8 }}
+          initial={{ opacity: 0, scale: 1 }}
+          animate={{ opacity: 0.8, scale: 1.1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 2.5, ease: "easeInOut" }}
-          className="fixed inset-0 w-full h-full object-cover blur-[80px] scale-110 brightness-50 saturate-150 pointer-events-none z-[-1]"
+          transition={{ 
+            opacity: { duration: 2.5, ease: "easeInOut" },
+            scale: { duration: 30, ease: "linear" }
+          }}
+          className="fixed inset-0 w-full h-full object-cover blur-[80px] brightness-50 saturate-150 pointer-events-none z-[-1] will-change-transform"
         />
       </AnimatePresence>
 
       {/* 2. MAIN ARTWORK CONTAINER */}
       <div className='absolute inset-0 w-full h-full group'>
         
-        {/* Cinematic Image Crossfade */}
-        <AnimatePresence mode="popLayout">
+        {/* Cinematic Image Crossfade & Zoom (Ken Burns Effect) */}
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.img
             key={`img-${currentItem.id}`}
             src={currentItem.illustration_url}
             alt="Generated Art"
-            initial={{ opacity: 0, scale: 1.05 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 1 }}
+            animate={{ opacity: 1, scale: 1.08 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 2, ease: "easeInOut" }}
-            className="absolute inset-0 w-full h-full object-cover drop-shadow-2xl"
+            transition={{ 
+              opacity: { duration: 2, ease: "easeInOut" },
+              scale: { duration: 30, ease: "linear" }
+            }}
+            className="absolute inset-0 w-full h-full object-cover drop-shadow-2xl will-change-transform [backface-visibility:hidden]"
           />
         </AnimatePresence>
 
         {/* Global Dark Gradient Overlay for text readability */}
         <div className={cn(
           'absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent pointer-events-none transition-opacity duration-1000 z-10',
-          isIdle ? 'opacity-0' : 'opacity-100'
+          isIdle || isHUDHidden ? 'opacity-0' : 'opacity-100'
         )} />
 
         {/* 3. NAVIGATION CONTROLS (Fades on idle) */}
@@ -183,10 +193,14 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         </div>
 
         {/* Information HUD (Fades on idle) */}
-        <div className={cn(
-          'absolute bottom-0 left-0 right-0 p-8 pb-12 md:pb-16 md:p-12 flex flex-col items-start justify-end pointer-events-none transition-all duration-1000 transform z-20',
-          isIdle ? 'opacity-0 translate-y-8' : 'opacity-100 translate-y-0'
-        )}>
+        <div 
+          onMouseEnter={() => setIsHoveringHUD(true)}
+          onMouseLeave={() => setIsHoveringHUD(false)}
+          className={cn(
+            'absolute bottom-0 left-0 right-0 p-8 pb-12 md:pb-16 md:p-12 flex flex-col items-start justify-end transition-all duration-1000 transform z-20',
+            (isIdle || isHUDHidden) && !isHoveringHUD ? 'opacity-0 translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0 pointer-events-auto'
+          )}
+        >
            {/* Header Status */}
           <div className='flex items-center gap-3 text-emerald-300 glass-panel px-4 py-1.5 rounded-full bg-black/40 border border-white/10 mb-5 shadow-xl backdrop-blur-md'>
             <Sparkles className='w-4 h-4' />
@@ -202,10 +216,16 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
             className='pointer-events-auto block transition-all hover:scale-[1.01] hover:text-indigo-200'
           >
             {/* Poetic Description */}
-            <div className='max-w-2xl mb-4'>
-              <p className='text-base md:text-xl font-light text-white/95 leading-relaxed drop-shadow-2xl text-left'>
+            <div className='max-w-3xl mb-4'>
+              <motion.p 
+                key={`desc-${currentItem.id}`}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.5 }}
+                className='text-xl md:text-3xl font-story italic text-white/95 leading-relaxed drop-shadow-2xl text-left'
+              >
                 "{currentItem.description}"
-              </p>
+              </motion.p>
             </div>
 
             {/* Location details */}
