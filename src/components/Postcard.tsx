@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Navigation } from 'lucide-react';
+import { MapPin, Navigation, ArrowUpRight, Info } from 'lucide-react';
 import { cn } from './SearchBar';
 
-// Using the FeedItem interface implicitly or moving it to a shared types file would be ideal,
-// but for now we'll duplicate it or pass the item directly as any/unknown if needed.
-// We'll define it here for strong typing within this component.
 export interface FeedItem {
   id: string;
-  location_name: string;
+  country: string;
+  city: string;
+  location_name?: string;
   lat: number;
   lng: number;
   original_image_url: string;
@@ -16,7 +15,8 @@ export interface FeedItem {
   category: string;
   description: string;
   created_at: string;
-  metadata?: Record<string, unknown>;
+  streetview_pov?: any;
+  generation_metadata?: any;
 }
 
 interface PostcardProps {
@@ -38,19 +38,6 @@ export function Postcard({ item, isActive }: PostcardProps) {
     setIsFlipped(!isFlipped);
   };
 
-  // Format date for the postmark
-  const dateObj = new Date(item.created_at);
-  const formattedDate = dateObj.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).toUpperCase();
-
-  const formattedTime = dateObj.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
   return (
     <div className={cn(
       "w-[90vw] max-w-[600px] md:max-w-none md:w-[80vh] xl:w-[85vh] aspect-square perspective-1000 cursor-pointer transition-all duration-700 ease-in-out mx-auto",
@@ -63,20 +50,49 @@ export function Postcard({ item, isActive }: PostcardProps) {
         transition={{ duration: 0.8, type: "spring", stiffness: 60, damping: 15 }}
       >
         {/* FRONT FACE (Pure Art - Subtle & Minimalist) */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md">
+        <div className="absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50">
            {/* The Illustration */}
-          <img 
-            src={item.illustration_url} 
-            alt={item.location_name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-          {/* Extremely subtle location attribution, like a tiny watermark */}
-          <div className="absolute bottom-4 left-5 pointer-events-none opacity-50 mix-blend-overlay hidden md:block">
-            <span className="font-sans text-[10px] uppercase tracking-[0.3em] font-medium text-white drop-shadow-md">
-              {item.location_name.split(',')[0]}
-            </span>
-          </div>
+           <div className="flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner">
+             <img 
+               src={item.illustration_url} 
+               alt={item.category}
+               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+             />
+             {/* Stamp overlay effect */}
+             <div className="absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none">
+                <span className="text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12">
+                  POST
+                </span>
+                <span className="text-[8px] md:text-[10px] text-white/90 font-mono mt-1 drop-shadow-md">
+                  {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric'})}
+                </span>
+             </div>
+           </div>
+           
+           {/* Bottom margin (Title & Location) */}
+           <div className="mt-3 md:mt-4 px-2 flex justify-between items-end">
+             <div>
+               <h3 className="font-serif text-lg md:text-xl text-stone-800 tracking-tight leading-none mb-1">
+                 {item.category.replace(/[\u{1F300}-\u{1F9FF}]/u, '').trim()}
+               </h3>
+               <div className="flex items-center gap-1.5 min-w-0">
+                 <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                 <p className="text-sm md:text-base text-stone-500 tracking-wide font-light truncate">
+                   {item.city}, {item.country}
+                 </p>
+               </div>
+             </div>
+             
+             <button 
+               className="p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors"
+               onClick={(e) => {
+                 e.stopPropagation();
+                 setIsFlipped(true);
+               }}
+             >
+               <Info className="w-4 h-4 md:w-5 md:h-5" />
+             </button>
+           </div>
         </div>
 
         {/* BACK FACE (Text, Stamp, Coordinates) */}
@@ -87,79 +103,72 @@ export function Postcard({ item, isActive }: PostcardProps) {
                style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/cream-paper.png")' }}></div>
           
           {/* Main content split */}
-          <div className="relative flex flex-col sm:flex-row w-full h-full text-black/80">
+          <div className="relative flex flex-col sm:flex-row w-full h-full text-black/80 gap-6">
             
             {/* Left Side: The Story */}
-            <div className="flex-[1.3] sm:pr-6 md:pr-10 flex flex-col pt-2 sm:border-r border-black/10 relative order-2 sm:order-1 mt-4 sm:mt-0 overflow-y-auto sm:overflow-visible">
-              <h3 className="font-handwriting text-2xl md:text-4xl font-bold mb-2 md:mb-6 rotate-[-2deg] text-indigo-950/80">
-                The {item.category}...
-              </h3>
-              <p className="font-handwriting text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-relaxed text-slate-800 flex-1 whitespace-pre-wrap">
+            <div className="flex-1 flex flex-col pt-2 sm:border-r border-black/10 relative mt-4 sm:mt-0 overflow-y-auto sm:overflow-visible pr-6">
+              <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs md:text-sm font-medium rounded-full mb-4 md:mb-6 tracking-wide uppercase w-fit">
+                {item.category}
+              </span>
+              
+              <p className="font-handwriting text-xl sm:text-2xl md:text-3xl leading-relaxed text-slate-800 whitespace-pre-wrap">
                 "{item.description}"
               </p>
               
-              <div className="mt-auto pt-4 md:pt-6 text-slate-400 font-sans text-[10px] md:text-xs flex items-center gap-1.5 opacity-80">
-                <Navigation className="w-3 h-3 md:w-4 md:h-4" />
-                <span>Captured {formattedTime}</span>
+              <div className="mt-auto border-t border-stone-300/50 pt-4 flex flex-col gap-2 font-mono text-[10px] md:text-xs text-stone-400">
+                <p>Generation Strategy: <span className="text-stone-600 font-semibold">{item.generation_metadata?.strategy || 'Random Exploration'}</span></p>
+                <p>Photographic Lens: <span className="text-stone-600 font-semibold">{item.streetview_pov?.lens || 'Standard 90° FOV'}</span></p>
+                <p>Date: {new Date(item.created_at).toLocaleString()}</p>
+                <p>UID: {item.id}</p>
               </div>
             </div>
 
-            {/* Right Side: Address & Stamp */}
-            <div className="flex-[0.7] sm:pl-6 md:pl-10 flex flex-col relative w-full sm:w-auto shrink-0 order-1 sm:order-2 h-[200px] sm:h-auto overflow-hidden sm:overflow-visible">
+            {/* Right Side: Address & Photo */}
+            <div className="w-[40%] flex flex-col relative shrink-0">
               
-              {/* Stamp Area (Top Right) */}
-              <div className="absolute top-0 right-0 w-16 h-20 sm:w-20 sm:h-24 md:w-24 md:h-28 bg-red-50 border-2 border-dashed border-red-200/50 p-1 md:p-1.5 rotate-[4deg] shadow-sm flex flex-col items-center justify-between z-10">
-                 <div className="w-full h-full border border-red-200 bg-white flex flex-col items-center justify-center overflow-hidden relative">
-                   {/* Fake stamp imagery */}
-                   <MapPin className="w-5 h-5 md:w-8 md:h-8 text-red-500/50 mb-1" />
-                   <span className="text-[8px] md:text-[10px] font-bold text-red-900/40 tracking-wider">POSTAGE</span>
-                   <span className="text-[10px] md:text-xs font-bold text-red-900/60 leading-none">PAID</span>
-                   
-                   {/* Fake cancellation mark overlaying the stamp */}
-                   <div className="absolute -left-10 md:-left-12 top-1/2 w-40 md:w-56 h-[1.5px] bg-black/30 rotate-[-15deg] pointer-events-none mix-blend-multiply" />
-                   <div className="absolute -left-10 md:-left-12 top-1/2 w-40 md:w-56 h-[1.5px] bg-black/30 rotate-[-25deg] pointer-events-none mix-blend-multiply mt-1.5" />
-                 </div>
-              </div>
-
-              {/* Digital Postmark (Circular) */}
-              <div className="absolute top-4 sm:top-14 md:top-20 right-20 sm:right-16 md:right-24 w-20 h-20 sm:w-28 sm:h-28 md:w-36 md:h-36 rounded-full border border-black/20 rotate-[-12deg] flex items-center justify-center mix-blend-multiply pointer-events-none z-0">
-                <div className="w-[72px] h-[72px] sm:w-[104px] sm:h-[104px] md:w-[136px] md:h-[136px] rounded-full border border-black/10 flex flex-col items-center justify-center text-center p-1 md:p-2">
-                  <span className="uppercase text-[6px] sm:text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] text-black/50 font-bold mb-1 w-full truncate">POSTAL PEEK</span>
-                  <span className="text-[10px] sm:text-xs md:text-sm font-bold text-black/70">{formattedDate}</span>
-                  <span className="text-[6px] sm:text-[8px] md:text-[9px] tracking-[0.1em] text-black/40 mt-1 md:mt-2">AI GENERATED</span>
-                </div>
+              <div className="w-20 h-24 border border-stone-300 rounded shrink-0 relative flex float-right bg-stone-100 items-center justify-center rotate-3 shadow-sm self-end mb-8">
+                  <span className="text-[10px] text-stone-400 font-mono tracking-widest -rotate-45 block">
+                    STAMP<br/>HERE
+                  </span>
               </div>
 
               {/* Address Lines */}
-              <div className="mt-auto mb-4 md:mb-8 w-full flex flex-col gap-4 md:gap-8 pt-20 sm:pt-0">
-                <div className="w-full border-b border-black/15 relative">
-                  <span className="absolute -bottom-2 md:-bottom-4 font-handwriting text-xl sm:text-2xl md:text-4xl lg:text-5xl text-slate-800 rotate-[-1deg] w-full truncate block px-1">
-                    {item.location_name}
+              <div className="w-full flex flex-col gap-6 md:gap-8 opacity-40 mb-8">
+                <div className="w-full border-b border-black/30 relative">
+                  <span className="absolute -bottom-2 md:-bottom-4 font-handwriting text-xl md:text-3xl text-slate-800 rotate-[-1deg] w-full truncate px-1">
+                    {item.location_name || `${item.city}, ${item.country}`}
                   </span>
                 </div>
-                <div className="w-full border-b border-black/15 relative">
-                  <span className="absolute -bottom-1 md:-bottom-2 font-sans text-[10px] sm:text-xs md:text-sm text-slate-600 font-mono tracking-widest block pb-1">
-                    {item.lat.toFixed(6)}° N
+                <div className="w-full border-b border-black/30 relative">
+                  <span className="absolute -bottom-1 md:-bottom-2 font-sans text-[10px] md:text-xs text-slate-600 font-mono tracking-widest block pb-1">
+                    LAT: {item.lat.toFixed(6)}° N
                   </span>
                 </div>
-                <div className="w-full border-b border-black/15 relative">
-                   <span className="absolute -bottom-1 md:-bottom-2 font-sans text-[10px] sm:text-xs md:text-sm text-slate-600 font-mono tracking-widest block pb-1">
-                    {Math.abs(item.lng).toFixed(6)}° {item.lng >= 0 ? 'E' : 'W'}
+                <div className="w-full border-b border-black/30 relative">
+                   <span className="absolute -bottom-1 md:-bottom-2 font-sans text-[10px] md:text-xs text-slate-600 font-mono tracking-widest block pb-1">
+                    LNG: {Math.abs(item.lng).toFixed(6)}° {item.lng >= 0 ? 'E' : 'W'}
                   </span>
                 </div>
               </div>
 
-              {/* View on Map Link */}
-               <a 
-                href={`https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()} // Prevent card flip when clicking link
-                className="mt-auto pt-2 text-[10px] sm:text-xs md:text-sm font-sans uppercase tracking-[0.2em] font-bold text-indigo-500 hover:text-indigo-700 transition-colors flex items-center gap-1 group w-max"
-              >
-                <span>Explore Map</span>
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
-              </a>
+              {/* The "Polaroid" Snapshot */}
+              <div className="relative mt-auto p-1.5 pb-6 bg-white shadow-md rounded-sm rotate-[-2deg] hover:rotate-0 transition-all hover:scale-105 z-10 group/photo cursor-pointer w-[80%] self-center"
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${item.lat},${item.lng}&heading=${item.streetview_pov?.heading || 0}&pitch=${item.streetview_pov?.pitch || 0}&fov=${item.streetview_pov?.fov || 90}`, '_blank');
+                   }}>
+                <div className="relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200">
+                  <img src={item.original_image_url} alt="Original reality" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                    <span className="flex items-center gap-1.5 text-white text-xs font-semibold tracking-wide bg-black/60 px-3 py-1.5 rounded-full">
+                       Inspect <ArrowUpRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+                <p className="absolute bottom-1.5 left-0 right-0 text-center text-[10px] text-stone-500 font-mono tracking-wider uppercase">
+                   Source Image
+                </p>
+              </div>
 
             </div>
           </div>
