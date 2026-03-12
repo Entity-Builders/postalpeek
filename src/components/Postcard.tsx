@@ -40,7 +40,7 @@ export function Postcard({ item, isActive }: PostcardProps) {
 
   return (
     <div className={cn(
-      "w-[90vw] max-w-[600px] md:max-w-none md:w-[80vh] xl:w-[85vh] aspect-square perspective-1000 cursor-pointer transition-all duration-700 ease-in-out mx-auto",
+      "w-[90vw] max-w-[480px] h-full max-h-[85vh] aspect-square perspective-1000 cursor-pointer transition-all duration-700 mx-auto ease-in-out",
       isActive ? "scale-100 opacity-100" : "scale-[0.85] opacity-40 pointer-events-none"
     )}
     onClick={handleFlip}>

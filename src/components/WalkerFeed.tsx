@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { Map, Loader2, ChevronLeft, ChevronRight, Pause, Play, MapPin } from 'lucide-react';
+import { Map, Loader2, MapPin } from 'lucide-react';
 import { cn } from './SearchBar';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Postcard, FeedItem } from './Postcard';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -17,9 +16,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
   
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -27,9 +24,16 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const oldestDateRef = useRef<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Separate ref for the vertical feed container
+  const feedContainerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
   const [isDraggingMenu, setIsDraggingMenu] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Default block size
+  const PAGE_SIZE = 10;
 
   // Fetch unique locations and extract just the countries for the filter menu
   useEffect(() => {
@@ -54,7 +58,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         .from('postalpeek_postcards')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(PAGE_SIZE);
 
       if (country) {
         query = query.eq('country', country);
@@ -67,7 +71,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       if (data && data.length > 0) {
         oldestDateRef.current = data[data.length - 1].created_at;
         setItems(shuffleArray(data));
-        setHasMore(data.length === 20);
+        setHasMore(data.length === PAGE_SIZE);
       } else {
         setItems([]);
         setHasMore(false);
@@ -76,7 +80,10 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       console.error('Error loading initial feed:', error);
     } finally {
       setIsLoading(false);
-      setCurrentIndex(0);
+      // Reset scroll to top when filter changes
+      if (feedContainerRef.current) {
+        feedContainerRef.current.scrollTop = 0;
+      }
     }
   }, []);
 
@@ -90,7 +97,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         .select('*')
         .order('created_at', { ascending: false })
         .lt('created_at', oldestDateRef.current)
-        .limit(20);
+        .limit(PAGE_SIZE);
 
       if (selectedCountry) {
         query = query.eq('country', selectedCountry);
@@ -104,7 +111,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         oldestDateRef.current = data[data.length - 1].created_at;
         // Shuffle the newly fetched block so the feed remains unpredictable
         setItems(prev => [...prev, ...shuffleArray(data)]);
-        setHasMore(data.length === 20);
+        setHasMore(data.length === PAGE_SIZE);
       } else {
         setHasMore(false);
       }
@@ -135,7 +142,6 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
             // Only prepend if it matches the current country filter (or no filter is set)
             if (!selectedCountry || newItem.country === selectedCountry) {
               setItems(prev => [newItem, ...prev]);
-              setCurrentIndex(0); // Jump back to the brand new postcard
             }
           }
         }
@@ -148,33 +154,22 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
   }, [selectedCountry]);
 
-  // Carousel auto-advance
-  useEffect(() => {
-    if (items.length <= 1 || isPaused) return;
+  // Intersection Observer to trigger fetchMoreFeed
+  const lastItemRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isFetchingMore) return;
+      if (observerRef.current) observerRef.current.disconnect();
 
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % items.length);
-    }, 25000);
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          fetchMoreFeed();
+        }
+      });
 
-    return () => clearInterval(interval);
-  }, [items.length, isPaused]);
-
-  // Trigger paginated fetch when approaching end
-  useEffect(() => {
-    if (items.length > 0 && currentIndex >= items.length - 4 && hasMore && !isFetchingMore) {
-      fetchMoreFeed();
-    }
-  }, [currentIndex, items.length, hasMore, isFetchingMore, fetchMoreFeed]);
-
-  const goNext = () => {
-    setIsPaused(true);
-    setCurrentIndex(prev => (prev + 1) % items.length);
-  };
-
-  const goPrev = () => {
-    setIsPaused(true);
-    setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
-  };
+      if (node) observerRef.current.observe(node);
+    },
+    [isFetchingMore, hasMore, fetchMoreFeed]
+  );
 
   // Drag-to-scroll handlers for the horizontal menu on desktop
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -200,14 +195,12 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     scrollContainerRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  const currentItem = items[currentIndex];
-
   return (
-    <div className='w-full h-full flex flex-col items-center justify-center relative overflow-hidden bg-[#e6e2da]'>
+    <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
       
       {/* FILTER MENU: Horizontal scrolling glassmorphic pills */}
       <div className={cn(
-        "absolute top-6 left-0 right-0 z-40 px-4 md:px-8 transition-opacity duration-1000",
+        "absolute top-6 left-0 right-0 z-50 px-4 md:px-8 transition-opacity duration-1000",
         isIdle ? 'opacity-0' : 'opacity-100'
       )}>
         <div 
@@ -253,99 +246,55 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       </div>
 
       {isLoading ? (
-        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] gap-4 z-20'>
+        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-4 z-20'>
           <Loader2 className='w-8 h-8 text-indigo-400 animate-spin' />
           <p className='text-indigo-200 font-light tracking-widest text-sm uppercase animate-pulse'>Synching with Serendipitous Post...</p>
         </div>
       ) : items.length === 0 ? (
-        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] text-white/50 gap-4 glass-panel rounded-3xl bg-black/40 z-20'>
+        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full text-white/50 gap-4 glass-panel rounded-3xl bg-black/40 z-20'>
           <Map className='w-12 h-12 mb-2 text-white/30' />
           <p className='font-light tracking-wide text-center px-4'>
             The Postmaster hasn't dispatched any mail for this region yet.<br/>Please try another country or clear the filter.
           </p>
         </div>
       ) : (
-        <>
-          {/* 1. THE ENVIRONMENT LIGHTING (Soft Background) */}
-          <AnimatePresence mode="popLayout" initial={false}>
-            {currentItem && (
-              <motion.img
-                key={`bg-${currentItem.id}`}
-                src={currentItem.illustration_url}
-                alt=""
-                initial={{ opacity: 0, scale: 1.1 }}
-                animate={{ opacity: 0.15, scale: 1.25 }}
-                exit={{ opacity: 0 }}
-                transition={{ 
-                  opacity: { duration: 1.5, ease: "easeInOut" },
-                  scale: { duration: 40, ease: "linear" }
-                }}
-                className="fixed inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 transform-gpu"
-              />
-            )}
-          </AnimatePresence>
+        <div 
+          ref={feedContainerRef}
+          className="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden snap-y snap-mandatory no-scrollbar"
+        >
+           {items.map((item, index) => {
+             const isLastItem = index === items.length - 1;
 
-          {/* Soft light burst in center behind cards */}
-          <div className="absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80" />
-
-          {/* 2. THE POSTCARDS CONTAINER (Horizontal Scroll simulation) */}
-          <div className='absolute inset-0 flex items-center justify-center w-full h-full perspective-1000 z-10'>
-             {items.map((item, index) => {
-               const offset = index - currentIndex;
-               // Limit rendering overhead
-               if (Math.abs(offset) > 2) return null;
-
-               const isActive = offset === 0;
-
-               return (
-                 <motion.div
-                   key={item.id}
-                   className="absolute flex items-center justify-center w-full h-full pt-12" // Add padding top to account for filter menu
-                   initial={false}
-                   animate={{
-                     x: `${offset * 110}%`,
-                     scale: isActive ? 1 : 0.85,
-                     opacity: isActive ? 1 : 0.3,
-                     zIndex: isActive ? 10 : 5 - Math.abs(offset),
-                     rotateY: offset * -15 // Give a little cover-flow angle
-                   }}
-                   transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                 >
-                    <Postcard item={item} isActive={isActive} />
-                 </motion.div>
-               );
-             })}
-          </div>
-
-           {/* 3. NAVIGATION CONTROLS (Fades on idle) */}
-          <div className={cn(
-            'absolute inset-y-0 left-0 w-24 flex items-center justify-center pointer-events-none transition-opacity duration-1000 z-20',
-            isIdle ? 'opacity-0' : 'opacity-100'
-          )}>
-             <button onClick={goPrev} disabled={items.length <= 1} className="pointer-events-auto p-4 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white hover:scale-110 transition-all backdrop-blur-md border border-white/10 shadow-2xl">
-                <ChevronLeft className="w-8 h-8 md:w-10 md:h-10" />
-             </button>
-          </div>
-
-          <div className={cn(
-            'absolute inset-y-0 right-0 w-24 flex items-center justify-center pointer-events-none transition-opacity duration-1000 z-20',
-            isIdle ? 'opacity-0' : 'opacity-100'
-          )}>
-             <button onClick={goNext} disabled={items.length <= 1} className="pointer-events-auto p-4 rounded-full bg-white/5 text-white/50 hover:bg-white/10 hover:text-white hover:scale-110 transition-all backdrop-blur-md border border-white/10 shadow-2xl">
-                <ChevronRight className="w-8 h-8 md:w-10 md:h-10" />
-             </button>
-          </div>
-
-          {/* Play/Pause control (bottom right corner) */}
-          <div className={cn(
-            'absolute bottom-10 right-10 pointer-events-none transition-opacity duration-1000 z-20',
-            isIdle ? 'opacity-0' : 'opacity-100'
-          )}>
-            <button onClick={() => setIsPaused(!isPaused)} className="pointer-events-auto p-3 rounded-full bg-black/40 text-white/50 hover:bg-white/20 hover:text-white transition-all backdrop-blur-md border border-white/5 disabled:opacity-50">
-              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-            </button>
-          </div>
-        </>
+             return (
+               <div
+                 key={`${item.id}-${index}`}     
+                 ref={isLastItem ? lastItemRef : null}
+                 className="w-full h-full shrink-0 flex items-center justify-center snap-always snap-center relative"
+               >
+                 {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
+                 <img
+                    src={item.illustration_url}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu"
+                 />
+                 {/* Soft light burst in center behind card */}
+                 <div className="absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80" />
+                 
+                 {/* 2. THE POSTCARD */}
+                 <div className="z-10 w-full h-full flex items-center justify-center pt-8">
+                   <Postcard item={item} isActive={true} />
+                 </div>
+               </div>
+             );
+           })}
+           
+           {/* Loading indicator at bottom */}
+           {isFetchingMore && (
+             <div className="w-full h-32 flex items-center justify-center shrink-0">
+               <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
+             </div>
+           )}
+        </div>
       )}
     </div>
   );
