@@ -3,6 +3,7 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { Map, Loader2, MapPin } from 'lucide-react';
 import { cn } from './SearchBar';
 import { Postcard, FeedItem } from './Postcard';
+import useEmblaCarousel from 'embla-carousel-react';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArr = [...array];
@@ -24,9 +25,6 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const oldestDateRef = useRef<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // Separate ref for the vertical feed container
-  const feedContainerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const [isDraggingMenu, setIsDraggingMenu] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -34,6 +32,14 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
   // Default block size
   const PAGE_SIZE = 10;
+
+  // Initialize Embla Carousel with vertical axis, no internal wheel plugin
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    axis: 'y', 
+    align: 'start', 
+    skipSnaps: false,
+    duration: 30 // Make the programmatic snap slightly faster
+  });
 
   // Fetch unique locations and extract just the countries for the filter menu
   useEffect(() => {
@@ -80,12 +86,10 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       console.error('Error loading initial feed:', error);
     } finally {
       setIsLoading(false);
-      // Reset scroll to top when filter changes
-      if (feedContainerRef.current) {
-        feedContainerRef.current.scrollTop = 0;
-      }
+      // Reset Embla to the first slide when filter changes
+      if (emblaApi) emblaApi.scrollTo(0, true);
     }
-  }, []);
+  }, [emblaApi]);
 
   const fetchMoreFeed = useCallback(async () => {
     if (isFetchingMore || !hasMore || !oldestDateRef.current) return;
@@ -154,22 +158,32 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
   }, [selectedCountry]);
 
-  // Intersection Observer to trigger fetchMoreFeed
-  const lastItemRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isFetchingMore) return;
-      if (observerRef.current) observerRef.current.disconnect();
+  // Re-initialize Embla slides when items change
+  useEffect(() => {
+    if (emblaApi) emblaApi.reInit();
+  }, [emblaApi, items]);
 
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+  // Embla specific infinite scroll listener
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    const onSelect = () => {
+      // If we are at the last or penultimate slide, fetch more
+      if (emblaApi.canScrollNext() === false || emblaApi.selectedScrollSnap() >= emblaApi.scrollSnapList().length - 2) {
+        if (hasMore && !isFetchingMore) {
           fetchMoreFeed();
         }
-      });
+      }
+    };
 
-      if (node) observerRef.current.observe(node);
-    },
-    [isFetchingMore, hasMore, fetchMoreFeed]
-  );
+    emblaApi.on('select', onSelect);
+    emblaApi.on('scroll', onSelect);
+
+    return () => {
+      emblaApi.off('select', onSelect);
+      emblaApi.off('scroll', onSelect);
+    };
+  }, [emblaApi, hasMore, isFetchingMore, fetchMoreFeed]);
 
   // Drag-to-scroll handlers for the horizontal menu on desktop
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -194,6 +208,40 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     const walk = (x - startX) * 2; // Scroll-fast multiplier
     scrollContainerRef.current.scrollLeft = scrollLeft - walk;
   };
+
+  // We use a strict time-based debounce to handle high-precision 
+  // free-spinning mouse wheels (like the MX Master). This ensures that a single tick 
+  // forces a full 1-item jump via Embla API, without Embla interpreting it as a drag.
+  const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    // Only capture vertical scrolling over horizontal
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      if (!emblaApi) return;
+      
+      // Stop the native scroll 
+      e.preventDefault();
+
+      // If we are currently in a cooldown from a previous tick, ignore
+      if (wheelTimeout.current) return;
+
+      // Ignore very small movements (trackpad noise)
+      if (Math.abs(e.deltaY) < 5) return;
+
+      if (e.deltaY > 0) {
+        // Intention to go down
+        emblaApi.scrollNext();
+      } else {
+        // Intention to go up
+        emblaApi.scrollPrev();
+      }
+
+      // Lock out further wheel events for 600ms to allow the slide animation to finish cleanly
+      wheelTimeout.current = setTimeout(() => {
+        wheelTimeout.current = null;
+      }, 600);
+    }
+  }, [emblaApi]);
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
@@ -259,41 +307,41 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         </div>
       ) : (
         <div 
-          ref={feedContainerRef}
-          className="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden snap-y snap-mandatory no-scrollbar"
+          className="embla absolute inset-0 w-full h-full overflow-hidden" 
+          ref={emblaRef}
+          onWheel={handleWheel}
         >
-           {items.map((item, index) => {
-             const isLastItem = index === items.length - 1;
-
-             return (
-               <div
-                 key={`${item.id}-${index}`}     
-                 ref={isLastItem ? lastItemRef : null}
-                 className="w-full h-full shrink-0 flex items-center justify-center snap-always snap-center relative"
-               >
-                 {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
-                 <img
-                    src={item.illustration_url}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu"
-                 />
-                 {/* Soft light burst in center behind card */}
-                 <div className="absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80" />
-                 
-                 {/* 2. THE POSTCARD */}
-                 <div className="z-10 w-full h-full flex items-center justify-center pt-8">
-                   <Postcard item={item} isActive={true} />
-                 </div>
-               </div>
-             );
-           })}
-           
-           {/* Loading indicator at bottom */}
-           {isFetchingMore && (
-             <div className="w-full h-32 flex items-center justify-center shrink-0">
-               <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
-             </div>
-           )}
+          <div className="embla__container h-full flex flex-col">
+            {items.map((item, index) => {
+              return (
+                <div
+                  key={`${item.id}-${index}`}     
+                  className="embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative"
+                >
+                  {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
+                  <img
+                     src={item.illustration_url}
+                     alt=""
+                     className="absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu"
+                  />
+                  {/* Soft light burst in center behind card */}
+                  <div className="absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80" />
+                  
+                  {/* 2. THE POSTCARD */}
+                  <div className="z-10 w-full h-full flex items-center justify-center pt-8">
+                    <Postcard item={item} isActive={true} />
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Loading indicator at bottom */}
+            {isFetchingMore && (
+              <div className="embla__slide w-full h-[30vh] shrink-0 flex items-center justify-center relative">
+                <Loader2 className="w-6 h-6 text-indigo-900/50 animate-spin" />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
