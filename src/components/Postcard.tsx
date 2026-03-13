@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Navigation, ArrowUpRight, Info } from 'lucide-react';
+import { MapPin, Navigation, ArrowUpRight, Info, Heart, Share2 } from 'lucide-react';
 import { cn } from './SearchBar';
 
 export interface FeedItem {
@@ -26,6 +26,7 @@ interface PostcardProps {
 
 export function Postcard({ item, isActive }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
@@ -82,16 +83,51 @@ export function Postcard({ item, isActive }: PostcardProps) {
                  </p>
                </div>
              </div>
-             
-             <button 
-               className="p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors"
-               onClick={(e) => {
-                 e.stopPropagation();
-                 setIsFlipped(true);
-               }}
-             >
-               <Info className="w-4 h-4 md:w-5 md:h-5" />
-             </button>
+             <div className="flex items-center gap-2">
+               <button
+                 className={cn(
+                   "p-2 md:p-2.5 rounded-full transition-colors",
+                   isLiked 
+                     ? "bg-rose-100 text-rose-500" 
+                     : "bg-stone-100/80 hover:bg-rose-50 text-stone-400 hover:text-rose-500"
+                 )}
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   setIsLiked(!isLiked);
+                 }}
+               >
+                 <Heart className={cn("w-4 h-4 md:w-5 md:h-5 transition-transform", isLiked && "fill-current scale-110")} />
+               </button>
+               
+               <button
+                 className="p-2 md:p-2.5 rounded-full bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500 transition-colors"
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   if (navigator.share) {
+                     navigator.share({
+                       title: `Postcard from ${item.city}`,
+                       text: `Check out this AI-generated postcard from ${item.city}, ${item.country}!`,
+                       url: window.location.href,
+                     }).catch(err => console.log("Share failed:", err));
+                   } else {
+                     navigator.clipboard.writeText(window.location.href);
+                     alert("Link copied to clipboard!");
+                   }
+                 }}
+               >
+                 <Share2 className="w-4 h-4 md:w-5 md:h-5" />
+               </button>
+
+               <button 
+                 className="p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors"
+                 onClick={(e) => {
+                   e.stopPropagation();
+                   setIsFlipped(true);
+                 }}
+               >
+                 <Info className="w-4 h-4 md:w-5 md:h-5" />
+               </button>
+             </div>
            </div>
         </div>
 

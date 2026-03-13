@@ -23,6 +23,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const oldestDateRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -92,8 +93,9 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   }, [emblaApi]);
 
   const fetchMoreFeed = useCallback(async () => {
-    if (isFetchingMore || !hasMore || !oldestDateRef.current) return;
+    if (isFetchingRef.current || !hasMore || !oldestDateRef.current) return;
     
+    isFetchingRef.current = true;
     setIsFetchingMore(true);
     try {
       let query = supabase
@@ -123,8 +125,9 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       console.error('Error fetching more feed:', error);
     } finally {
       setIsFetchingMore(false);
+      isFetchingRef.current = false;
     }
-  }, [isFetchingMore, hasMore, selectedCountry]);
+  }, [hasMore, selectedCountry]);
 
   // Initial load when filter changes
   useEffect(() => {
@@ -170,7 +173,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     const onSelect = () => {
       // If we are at the last or penultimate slide, fetch more
       if (emblaApi.canScrollNext() === false || emblaApi.selectedScrollSnap() >= emblaApi.scrollSnapList().length - 2) {
-        if (hasMore && !isFetchingMore) {
+        if (hasMore) {
           fetchMoreFeed();
         }
       }
@@ -183,7 +186,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       emblaApi.off('select', onSelect);
       emblaApi.off('scroll', onSelect);
     };
-  }, [emblaApi, hasMore, isFetchingMore, fetchMoreFeed]);
+  }, [emblaApi, hasMore, fetchMoreFeed]);
 
   // Drag-to-scroll handlers for the horizontal menu on desktop
   const handleMouseDown = (e: React.MouseEvent) => {
