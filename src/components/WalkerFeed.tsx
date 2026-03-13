@@ -309,10 +309,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       }
 
       // If we are at the last or penultimate slide, fetch more
-      if (
-        emblaApi.canScrollNext() === false ||
-        currentIndex >= emblaApi.scrollSnapList().length - 2
-      ) {
+      if (currentIndex >= items.length - 2) {
         if (hasMore && !isFetchingRef.current) {
           fetchMoreFeed();
         }
@@ -404,7 +401,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
               return (
                 <div
                   key={`${item.id}-${index}`}
-                  className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
+                  className='embla__slide w-full h-[100svh] shrink-0 flex items-center justify-center relative'
                 >
                   {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
                   <img
