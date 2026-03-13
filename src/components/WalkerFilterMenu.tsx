@@ -64,13 +64,13 @@ export function WalkerFilterMenu({
         <button
           onClick={() => onSelectCountry(null)}
           className={cn(
-            'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
+            'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
             selectedCountry === null
               ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
               : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
           )}
         >
-          <Map className='w-4 h-4' />
+          <Map className='w-3.5 h-3.5 md:w-4 md:h-4' />
           Everywhere
         </button>
 
@@ -81,13 +81,13 @@ export function WalkerFilterMenu({
             key={country}
             onClick={() => onSelectCountry(country)}
             className={cn(
-              'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
+              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
               selectedCountry === country
                 ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
                 : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
             )}
           >
-            <MapPin className='w-3 h-3 opacity-60' />
+            <MapPin className='w-3 h-3 md:w-3.5 md:h-3.5 opacity-60' />
             {country}
           </button>
         ))}

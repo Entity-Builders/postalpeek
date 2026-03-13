@@ -7,7 +7,7 @@ function App() {
   const isIdle = useMouseIdle(5000);
 
   return (
-    <div className='w-screen h-screen relative overflow-hidden flex flex-col'>
+    <div className='w-screen h-[100dvh] relative overflow-hidden flex flex-col'>
       {/* Walker Feed Fullscreen */}
       <div className='flex-1 w-full h-full relative'>
         <WalkerFeed isIdle={isIdle} />

@@ -401,7 +401,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
               return (
                 <div
                   key={`${item.id}-${index}`}
-                  className='embla__slide w-full h-[100svh] shrink-0 flex items-center justify-center relative'
+                  className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
                 >
                   {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
                   <img
@@ -413,7 +413,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
                   <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
 
                   {/* 2. THE POSTCARD */}
-                  <div className='z-10 w-full h-full flex items-center justify-center pt-8'>
+                  <div className='z-10 w-full h-full flex items-center justify-center'>
                     <Postcard item={item} isActive={true} />
                   </div>
                 </div>

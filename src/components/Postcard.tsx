@@ -56,7 +56,7 @@ export function Postcard({ item, isActive }: PostcardProps) {
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[85vh] aspect-square perspective-1000 cursor-pointer transition-all duration-700 mx-auto ease-in-out',
+        'w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] perspective-1000 cursor-pointer transition-all duration-700 mx-auto ease-in-out',
         isActive
           ? 'scale-100 opacity-100'
           : 'scale-[0.85] opacity-40 pointer-events-none',
@@ -304,7 +304,7 @@ export function Postcard({ item, isActive }: PostcardProps) {
             </div>
 
             {/* Right Side: Address & Photo */}
-            <div className='w-[40%] flex flex-col relative shrink-0'>
+            <div className='w-full sm:w-[40%] flex flex-col relative shrink-0 mt-6 sm:mt-0'>
               <div className='w-20 h-24 border border-stone-300 rounded shrink-0 relative flex float-right bg-stone-100 items-center justify-center rotate-3 shadow-sm self-end mb-8'>
                 <span className='text-[10px] text-stone-400 font-mono tracking-widest -rotate-45 block'>
                   STAMP
