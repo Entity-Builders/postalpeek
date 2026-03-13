@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2, Loader2, X } from 'lucide-react';
+import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2, Loader2 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
@@ -207,8 +207,6 @@ export function Postcard({ item, isActive }: PostcardProps) {
                     'p-2 md:p-2.5 rounded-full transition-colors',
                     animationState === 'processing' 
                       ? 'bg-amber-100 text-amber-500 cursor-not-allowed'
-                      : animationState === 'queued'
-                      ? 'bg-rose-100/80 hover:bg-rose-200 text-rose-500 hover:text-rose-600'
                       : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600'
                   )}
                   disabled={animationState === 'processing'}
@@ -216,33 +214,29 @@ export function Postcard({ item, isActive }: PostcardProps) {
                     e.stopPropagation();
                     if (animationState === 'processing') return;
 
-                    const isCancelling = animationState === 'queued';
-                    const newState = isCancelling ? 'idle' : 'queued';
-                    const shouldAnimate = !isCancelling;
-
-                    setLocalAnimState(newState); // optimistic update
+                    setLocalAnimState('queued'); // optimistic: show spinner immediately
                     
                     try {
-                      const { error } = await supabase
-                        .from('postalpeek_postcards')
-                        .update({
-                          should_animate: shouldAnimate,
-                          video_generation_status: 'idle',
-                        })
-                        .eq('id', item.id);
+                      const { data, error } = await supabase.functions.invoke(
+                        'postalpeek-video-trigger',
+                        { body: { postcardId: item.id } },
+                      );
+
                       if (error) throw error;
+                      
+                      // The function updated the DB, realtime or next fetch will pick it up
+                      console.log('[Postcard] Video triggered:', data);
+                      setLocalAnimState(null); // clear local state, let DB drive it
                     } catch (err) {
-                      console.error('Failed to toggle animation state', err);
-                      setLocalAnimState(isCancelling ? 'queued' : 'idle'); // Revert on error
-                      alert('Failed to update animation queue');
+                      console.error('Failed to trigger video generation', err);
+                      setLocalAnimState(null);
+                      alert('Failed to trigger video generation');
                     }
                   }}
-                  title={animationState === 'queued' ? 'Cancel Animation' : animationState === 'processing' ? 'Processing Video...' : 'Force Video Animation'}
+                  title={animationState === 'processing' ? 'Processing Video...' : 'Generate Video Animation'}
                 >
-                  {animationState === 'processing' ? (
+                  {animationState === 'processing' || animationState === 'queued' ? (
                     <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
-                  ) : animationState === 'queued' ? (
-                    <X className='w-4 h-4 md:w-5 md:h-5' />
                   ) : (
                     <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
                   )}
