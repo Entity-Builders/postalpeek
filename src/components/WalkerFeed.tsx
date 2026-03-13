@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { Map, Loader2, MapPin } from 'lucide-react';
-import { cn } from './SearchBar';
+import { Loader2 } from 'lucide-react';
 import { Postcard, FeedItem } from './Postcard';
-import { decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
+import {
+  decodeHashToUuidPrefix,
+  encodeUuidToHash,
+} from '@eb-packages/logic/src/hash';
 import useEmblaCarousel from 'embla-carousel-react';
+import { WalkerFilterMenu } from './WalkerFilterMenu';
+import { WalkerLoadingState, WalkerEmptyState } from './WalkerFeedStates';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArr = [...array];
@@ -26,11 +30,42 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const oldestDateRef = useRef<string | null>(null);
   const isFetchingRef = useRef(false);
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Parse Initial URL State (Slugs instead of query params)
+  useEffect(() => {
+    // Expected formats:
+    // / (Everywhere, normal feed)
+    // /QywJ9rK (Everywhere, shared card feed starting at QywJ9rK)
+    // /japan (Japan, normal feed)
+    // /japan/QywJ9rK (Japan, shared card feed starting at QywJ9rK)
 
-  const [isDraggingMenu, setIsDraggingMenu] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+    const segments = window.location.pathname.split('/').filter(Boolean);
+
+    // We need to differentiate between a hash and a country.
+    // A Hashids encoded block is unlikely to match a country name exactly.
+    // We'll set the country if the first segment exists AND it's not a known hash format (or just wait for availableCountries to load)
+    // To make it simple: if there are 2 segments, segment 0 is country, segment 1 is hash.
+    // If there is 1 segment, if it has mixed casing/numbers it might be a hash.
+    // For safety, let's decode the *first* segment to see if it's a valid hash prefix. If decodeHashToUuidPrefix returns a valid hex, it's a hash.
+    // Actually decodeHashToUuidPrefix is quite lenient. Better approach: countries usually don't have numbers.
+
+    if (segments.length === 2) {
+      // /country/hash
+      const decodedCountry = decodeURIComponent(segments[0]);
+      setSelectedCountry(decodedCountry);
+    } else if (segments.length === 1) {
+      // /country OR /hash
+      // We assume it's a country if it doesn't contain numbers and has length > 0
+      const segment = segments[0];
+      const hasNumbers = /\d/.test(segment);
+
+      // If it doesn't have numbers and is reasonably long, it's probably a country.
+      // Another way: wait until availableCountries is loaded to verify. But we need it for the initial fetch.
+      if (!hasNumbers && segment.length > 2) {
+        const decodedCountry = decodeURIComponent(segments[0]);
+        setSelectedCountry(decodedCountry);
+      }
+    }
+  }, []);
 
   // Default block size
   const PAGE_SIZE = 10;
@@ -67,9 +102,22 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       isFetchingRef.current = true;
       setIsLoading(true);
       try {
-        // Check for shared card in URL path (e.g. /QywJ9rK)
-        const pathSegment = window.location.pathname.split('/')[1];
-        const sharedCardPrefix = pathSegment ? decodeHashToUuidPrefix(pathSegment) : null;
+        const segments = window.location.pathname.split('/').filter(Boolean);
+        let sharedCardPrefix = null;
+
+        // Extract the hash from the path depending on if a country slug is present
+        if (segments.length === 2) {
+          sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
+        } else if (segments.length === 1) {
+          // If it's a country slug, we ignore it here (already handled by the useEffect above)
+          // If it's a hash, we decode it.
+          const hasNumbers = /\d/.test(segments[0]);
+          if (hasNumbers || segments[0].length <= 8) {
+            // basic heuristic for hash
+            sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
+          }
+        }
+
         let sharedCard: FeedItem | null = null;
 
         if (sharedCardPrefix) {
@@ -133,9 +181,10 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       } finally {
         setIsLoading(false);
         isFetchingRef.current = false;
+        if (emblaApi) emblaApi.scrollTo(0, true);
       }
     },
-    [],
+    [emblaApi],
   );
 
   const fetchMoreFeed = useCallback(async () => {
@@ -207,15 +256,42 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
   }, [selectedCountry]);
 
-  // Embla specific infinite scroll listener
+  // Embla specific infinite scroll listener and URL history syncing
   useEffect(() => {
     if (!emblaApi) return;
 
     const onSelect = () => {
+      // Find the current active item based on the selected slide
+      const currentIndex = emblaApi.selectedScrollSnap();
+
+      // Update the URL path to reflect the current item being viewed without full re-render
+      if (items.length > currentIndex) {
+        const activeItem = items[currentIndex];
+
+        // Encode the UUID prefix to hash. Note: since encodeUuidPrefixToHash is not imported,
+        // we'll extract the first part of the UUID natively to resemble a hash or ID prefix
+        // temporarily, or we can use the full ID if preferred. For now we will use the full ID
+        // as the slice since we didn't import the encoder yet, or import it later.
+        // Actually, assuming decodeHashToUuidPrefix exists, we probably need `encodeUuidPrefixToHash`.
+        // I will just use the first 8 characters for the slug for now to mimic the hash.
+        const hash = encodeUuidToHash(activeItem.id);
+
+        // Reconstruct URL based on whether a country is selected
+        // We use selectedCountry from the state rather than relying on the URL to be pristine;
+
+        let newUrl = `/${hash}`;
+        if (selectedCountry) {
+          newUrl = `/${encodeURIComponent(selectedCountry)}/${hash}`;
+        }
+
+        // History replace state to not clog the back button
+        window.history.replaceState(null, '', newUrl);
+      }
+
       // If we are at the last or penultimate slide, fetch more
       if (
         emblaApi.canScrollNext() === false ||
-        emblaApi.selectedScrollSnap() >= emblaApi.scrollSnapList().length - 2
+        currentIndex >= emblaApi.scrollSnapList().length - 2
       ) {
         if (hasMore && !isFetchingRef.current) {
           fetchMoreFeed();
@@ -224,37 +300,14 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
 
     emblaApi.on('select', onSelect);
-    emblaApi.on('scroll', onSelect);
+    // We remove the 'scroll' listener for URL updates because it fires every frame during drag/wheel,
+    // which triggers history.replaceState too often and can significantly slow down the browser or carousel.
+    // 'select' only fires when the snap point actually changes, which is perfect for URL syncing.
 
     return () => {
       emblaApi.off('select', onSelect);
-      emblaApi.off('scroll', onSelect);
     };
-  }, [emblaApi, hasMore, fetchMoreFeed]);
-
-  // Drag-to-scroll handlers for the horizontal menu on desktop
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollContainerRef.current) return;
-    setIsDraggingMenu(true);
-    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-    setScrollLeft(scrollContainerRef.current.scrollLeft);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDraggingMenu(false);
-  };
-
-  const handleMouseUp = () => {
-    setIsDraggingMenu(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingMenu || !scrollContainerRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollContainerRef.current.offsetLeft;
-    const walk = (x - startX) * 2; // Scroll-fast multiplier
-    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
-  };
+  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry]);
 
   // We use a strict time-based debounce to handle high-precision
   // free-spinning mouse wheels (like the MX Master). This ensures that a single tick
@@ -295,81 +348,32 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
-      {/* FILTER MENU: Horizontal scrolling glassmorphic pills */}
-      <div
-        className={cn(
-          'absolute top-6 left-0 right-0 z-50 px-4 md:px-8 transition-opacity duration-1000',
-          isIdle ? 'opacity-0' : 'opacity-100',
-        )}
-      >
-        <div
-          ref={scrollContainerRef}
-          className='flex items-center gap-2 overflow-x-auto no-scrollbar pb-4 cursor-grab active:cursor-grabbing'
-          style={{ WebkitOverflowScrolling: 'touch' }}
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-        >
-          <button
-            onClick={() => {
-              if (selectedCountry !== null) {
-                setSelectedCountry(null);
-                if (emblaApi) emblaApi.scrollTo(0, true);
-              }
-            }}
-            className={cn(
-              'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
-              selectedCountry === null
-                ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
-                : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
-            )}
-          >
-            <Map className='w-4 h-4' />
-            Everywhere
-          </button>
+      <WalkerFilterMenu
+        isIdle={isIdle}
+        availableCountries={availableCountries}
+        selectedCountry={selectedCountry}
+        onSelectCountry={(country) => {
+          // Clear state immediately to show loader and prevent stale feed
+          setIsLoading(true);
+          oldestDateRef.current = null;
+          isFetchingRef.current = false;
 
-          <div className='w-px h-6 bg-white/20 mx-1 shrink-0' />
+          setSelectedCountry(country);
 
-          {availableCountries.map((country) => (
-            <button
-              key={country}
-              onClick={() => {
-                if (selectedCountry !== country) {
-                  setSelectedCountry(country);
-                  if (emblaApi) emblaApi.scrollTo(0, true);
-                }
-              }}
-              className={cn(
-                'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
-                selectedCountry === country
-                  ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
-                  : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
-              )}
-            >
-              <MapPin className='w-3 h-3 opacity-60' />
-              {country}
-            </button>
-          ))}
-        </div>
-      </div>
+          if (country === null) {
+            window.history.pushState({}, '', '/');
+          } else {
+            window.history.pushState({}, '', `/${encodeURIComponent(country)}`);
+          }
+
+          if (emblaApi) emblaApi.scrollTo(0, true);
+        }}
+      />
 
       {isLoading ? (
-        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-4 z-20'>
-          <Loader2 className='w-8 h-8 text-indigo-400 animate-spin' />
-          <p className='text-indigo-200 font-light tracking-widest text-sm uppercase animate-pulse'>
-            Synching with Serendipitous Post...
-          </p>
-        </div>
+        <WalkerLoadingState />
       ) : items.length === 0 ? (
-        <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full text-white/50 gap-4 glass-panel rounded-3xl bg-black/40 z-20'>
-          <Map className='w-12 h-12 mb-2 text-white/30' />
-          <p className='font-light tracking-wide text-center px-4'>
-            The Postmaster hasn't dispatched any mail for this region yet.
-            <br />
-            Please try another country or clear the filter.
-          </p>
-        </div>
+        <WalkerEmptyState />
       ) : (
         <div
           className='embla absolute inset-0 w-full h-full overflow-hidden'
