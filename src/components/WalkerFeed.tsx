@@ -41,6 +41,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     align: 'start',
     skipSnaps: false,
     duration: 30, // Make the programmatic snap slightly faster
+    watchSlides: true, // Let Embla handle newly added items automatically
   });
 
   // Fetch unique locations and extract just the countries for the filter menu
@@ -206,11 +207,6 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
   }, [selectedCountry]);
 
-  // Re-initialize Embla slides when items change
-  useEffect(() => {
-    if (emblaApi) emblaApi.reInit();
-  }, [emblaApi, items]);
-
   // Embla specific infinite scroll listener
   useEffect(() => {
     if (!emblaApi) return;
@@ -221,7 +217,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         emblaApi.canScrollNext() === false ||
         emblaApi.selectedScrollSnap() >= emblaApi.scrollSnapList().length - 2
       ) {
-        if (hasMore) {
+        if (hasMore && !isFetchingRef.current) {
           fetchMoreFeed();
         }
       }
