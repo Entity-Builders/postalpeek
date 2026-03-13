@@ -64,6 +64,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
   const fetchInitialFeed = useCallback(
     async (country: string | null) => {
+      isFetchingRef.current = true;
       setIsLoading(true);
       try {
         // Check for shared card in URL path (e.g. /QywJ9rK)
@@ -131,11 +132,10 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         console.error('Error loading initial feed:', error);
       } finally {
         setIsLoading(false);
-        // Reset Embla to the first slide when filter changes
-        if (emblaApi) emblaApi.scrollTo(0, true);
+        isFetchingRef.current = false;
       }
     },
-    [emblaApi],
+    [],
   );
 
   const fetchMoreFeed = useCallback(async () => {
@@ -312,7 +312,12 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
           onMouseMove={handleMouseMove}
         >
           <button
-            onClick={() => setSelectedCountry(null)}
+            onClick={() => {
+              if (selectedCountry !== null) {
+                setSelectedCountry(null);
+                if (emblaApi) emblaApi.scrollTo(0, true);
+              }
+            }}
             className={cn(
               'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
               selectedCountry === null
@@ -329,7 +334,12 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
           {availableCountries.map((country) => (
             <button
               key={country}
-              onClick={() => setSelectedCountry(country)}
+              onClick={() => {
+                if (selectedCountry !== country) {
+                  setSelectedCountry(country);
+                  if (emblaApi) emblaApi.scrollTo(0, true);
+                }
+              }}
               className={cn(
                 'flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all backdrop-blur-md border',
                 selectedCountry === country
