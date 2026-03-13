@@ -106,14 +106,20 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         let sharedCardPrefix = null;
 
         // Extract the hash from the path depending on if a country slug is present
-        if (segments.length === 2) {
-          sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
+        if (segments.length === 2 && country) {
+          // If we have /country/hash and the first segment matches the requested country
+          const decodedSegment = decodeURIComponent(segments[0]);
+          if (decodedSegment === country) {
+            sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
+          }
         } else if (segments.length === 1) {
-          // If it's a country slug, we ignore it here (already handled by the useEffect above)
-          // If it's a hash, we decode it.
-          const hasNumbers = /\d/.test(segments[0]);
-          if (hasNumbers || segments[0].length <= 8) {
-            // basic heuristic for hash
+          // It's either /country or /hash
+          const decodedSegment = decodeURIComponent(segments[0]);
+          if (country && decodedSegment === country) {
+            // It's just the country filter, no shared card hash
+            sharedCardPrefix = null;
+          } else {
+            // It must be a hash (like /QywJ9rK and country is null)
             sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
           }
         }

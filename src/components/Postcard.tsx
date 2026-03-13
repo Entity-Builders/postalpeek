@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, ArrowUpRight, Info, Heart, Share2, Check } from 'lucide-react';
+import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { cn } from './SearchBar';
 
@@ -18,6 +18,7 @@ export interface FeedItem {
   created_at: string;
   streetview_pov?: any;
   generation_metadata?: any;
+  video_url?: string;
 }
 
 interface PostcardProps {
@@ -29,6 +30,7 @@ export function Postcard({ item, isActive }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
@@ -64,12 +66,42 @@ export function Postcard({ item, isActive }: PostcardProps) {
         {/* FRONT FACE (Pure Art - Subtle & Minimalist) */}
         <div className='absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'>
           {/* The Illustration */}
-          <div className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner'>
+          <div 
+            className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner'
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
             <img
               src={item.illustration_url}
               alt={item.category}
-              className='absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:scale-105'
+              className={cn(
+                'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
+                !item.video_url && 'hover:scale-105'
+              )}
             />
+            
+            {item.video_url && isHovered && (
+              <video
+                src={item.video_url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300"
+              />
+            )}
+
+            {/* Subtle Play Icon indicator */}
+            {item.video_url && (
+              <div 
+                className={cn(
+                  "absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300",
+                  isHovered ? "opacity-0" : "opacity-100"
+                )}
+              >
+                <Play className="w-3.5 h-3.5 fill-white/80" />
+              </div>
+            )}
             {/* Stamp overlay effect */}
             <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none'>
               <span className='text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12'>
