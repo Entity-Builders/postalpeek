@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play } from 'lucide-react';
+import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
 
 export interface FeedItem {
@@ -19,6 +20,9 @@ export interface FeedItem {
   streetview_pov?: any;
   generation_metadata?: any;
   video_url?: string;
+  video_generation_status?: 'idle' | 'processing' | 'completed' | 'failed';
+  imagine_task_id?: string;
+  should_animate?: boolean;
 }
 
 interface PostcardProps {
@@ -81,23 +85,37 @@ export function Postcard({ item, isActive }: PostcardProps) {
             />
             
             {item.video_url && isHovered && (
-              <video
-                src={item.video_url}
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300"
-              />
+              item.video_url.toLowerCase().includes('.gif') ? (
+                <img
+                  key={item.video_url}
+                  src={item.video_url}
+                  alt="Animated Scene"
+                  className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
+                />
+              ) : (
+                <video
+                  key={item.video_url}
+                  src={item.video_url}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  disablePictureInPicture
+                  controls={false}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onLoadedData={(e) => {
+                    // Force playback explicitly if autoPlay gets blocked by browser policies
+                    e.currentTarget.play().catch(() => {});
+                  }}
+                  className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
+                />
+              )
             )}
 
             {/* Subtle Play Icon indicator */}
-            {item.video_url && (
+            {item.video_url && !isHovered && (
               <div 
-                className={cn(
-                  "absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300",
-                  isHovered ? "opacity-0" : "opacity-100"
-                )}
+                className="absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300"
               >
                 <Play className="w-3.5 h-3.5 fill-white/80" />
               </div>
@@ -176,6 +194,32 @@ export function Postcard({ item, isActive }: PostcardProps) {
                   <Share2 className='w-4 h-4 md:w-5 md:h-5 transition-transform' />
                 )}
               </button>
+
+              {import.meta.env.DEV && !item.video_url && (
+                <button
+                  className='p-2 md:p-2.5 rounded-full bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600 transition-colors'
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const { error } = await supabase
+                        .from('postalpeek_postcards')
+                        .update({
+                          should_animate: true,
+                          video_generation_status: 'idle',
+                        })
+                        .eq('id', item.id);
+                      if (error) throw error;
+                      alert('Added to animation queue!');
+                    } catch (err) {
+                      console.error('Failed to trigger animation', err);
+                      alert('Failed to trigger animation');
+                    }
+                  }}
+                  title='Force Video Animation'
+                >
+                  <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
+                </button>
+              )}
 
               <button
                 className='p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors'

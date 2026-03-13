@@ -29,6 +29,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
   const [hasMore, setHasMore] = useState(true);
   const oldestDateRef = useRef<string | null>(null);
   const isFetchingRef = useRef(false);
+  const currentFetchIdRef = useRef(0); // Track active fetch to prevent race conditions
 
   // Parse Initial URL State (Slugs instead of query params)
   useEffect(() => {
@@ -50,7 +51,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
     if (segments.length === 2) {
       // /country/hash
-      const decodedCountry = decodeURIComponent(segments[0]);
+      const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
       setSelectedCountry(decodedCountry);
     } else if (segments.length === 1) {
       // /country OR /hash
@@ -61,7 +62,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
       // If it doesn't have numbers and is reasonably long, it's probably a country.
       // Another way: wait until availableCountries is loaded to verify. But we need it for the initial fetch.
       if (!hasNumbers && segment.length > 2) {
-        const decodedCountry = decodeURIComponent(segments[0]);
+        const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
         setSelectedCountry(decodedCountry);
       }
     }
@@ -99,6 +100,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
   const fetchInitialFeed = useCallback(
     async (country: string | null) => {
+      const fetchId = ++currentFetchIdRef.current;
       isFetchingRef.current = true;
       setIsLoading(true);
       try {
@@ -108,13 +110,13 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         // Extract the hash from the path depending on if a country slug is present
         if (segments.length === 2 && country) {
           // If we have /country/hash and the first segment matches the requested country
-          const decodedSegment = decodeURIComponent(segments[0]);
+          const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
           if (decodedSegment === country) {
             sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
           }
         } else if (segments.length === 1) {
           // It's either /country or /hash
-          const decodedSegment = decodeURIComponent(segments[0]);
+          const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
           if (country && decodedSegment === country) {
             // It's just the country filter, no shared card hash
             sharedCardPrefix = null;
@@ -158,6 +160,9 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
         const { data, error } = await query;
 
+        // If another fetch started while we were waiting, abort state updates
+        if (fetchId !== currentFetchIdRef.current) return;
+
         if (error) throw error;
 
         let fetchedItems: FeedItem[] = [];
@@ -183,19 +188,22 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
           setItems(fetchedItems);
         }
       } catch (error) {
+        if (fetchId !== currentFetchIdRef.current) return;
         console.error('Error loading initial feed:', error);
       } finally {
-        setIsLoading(false);
-        isFetchingRef.current = false;
-        if (emblaApi) emblaApi.scrollTo(0, true);
+        if (fetchId === currentFetchIdRef.current) {
+          setIsLoading(false);
+          isFetchingRef.current = false;
+        }
       }
     },
-    [emblaApi],
+    [],
   );
 
   const fetchMoreFeed = useCallback(async () => {
     if (isFetchingRef.current || !hasMore || !oldestDateRef.current) return;
 
+    const fetchId = ++currentFetchIdRef.current;
     isFetchingRef.current = true;
     setIsFetchingMore(true);
     try {
@@ -212,6 +220,8 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
       const { data, error } = await query;
 
+      if (fetchId !== currentFetchIdRef.current) return;
+
       if (error) throw error;
 
       if (data && data.length > 0) {
@@ -223,10 +233,13 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         setHasMore(false);
       }
     } catch (error) {
+      if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error fetching more feed:', error);
     } finally {
-      setIsFetchingMore(false);
-      isFetchingRef.current = false;
+      if (fetchId === currentFetchIdRef.current) {
+        setIsFetchingMore(false);
+        isFetchingRef.current = false;
+      }
     }
   }, [hasMore, selectedCountry]);
 
@@ -287,7 +300,8 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
         let newUrl = `/${hash}`;
         if (selectedCountry) {
-          newUrl = `/${encodeURIComponent(selectedCountry)}/${hash}`;
+          const countrySlug = encodeURIComponent(selectedCountry).replace(/%20/g, '-');
+          newUrl = `/${countrySlug}/${hash}`;
         }
 
         // History replace state to not clog the back button
@@ -369,10 +383,9 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
           if (country === null) {
             window.history.pushState({}, '', '/');
           } else {
-            window.history.pushState({}, '', `/${encodeURIComponent(country)}`);
+            const countrySlug = encodeURIComponent(country).replace(/%20/g, '-');
+            window.history.pushState({}, '', `/${countrySlug}`);
           }
-
-          if (emblaApi) emblaApi.scrollTo(0, true);
         }}
       />
 
