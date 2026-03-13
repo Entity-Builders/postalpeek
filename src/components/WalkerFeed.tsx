@@ -12,6 +12,7 @@ import { WalkerLoadingState, WalkerEmptyState } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
+import { analytics } from '../lib/analytics';
 import type { User } from '@supabase/supabase-js';
 
 /** Number of free postcards before the auth gate kicks in */
@@ -118,6 +119,7 @@ export function WalkerFeed({
         }
       } catch (err) {
         console.error('Failed to load distinct countries', err);
+        analytics.captureError(err, { context: 'fetch_countries' });
       }
     }
     fetchCountries();
@@ -220,6 +222,7 @@ export function WalkerFeed({
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error loading initial feed:', error);
+      analytics.captureError(error, { context: 'fetch_initial_feed', country: country });
     } finally {
       if (fetchId === currentFetchIdRef.current) {
         setIsLoading(false);
@@ -263,6 +266,7 @@ export function WalkerFeed({
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error fetching more feed:', error);
+      analytics.captureError(error, { context: 'fetch_more_feed', country: selectedCountry });
     } finally {
       if (fetchId === currentFetchIdRef.current) {
         setIsFetchingMore(false);
@@ -333,6 +337,15 @@ export function WalkerFeed({
         const activeItem = items[itemIndex];
         const hash = encodeUuidToHash(activeItem.id);
 
+        // Track postcard view
+        analytics.track('postcard_viewed', {
+          postcard_id: activeItem.id,
+          country: activeItem.country,
+          city: activeItem.city,
+          category: activeItem.category,
+          index: itemIndex,
+        });
+
         let newUrl = `/${hash}`;
         if (selectedCountry) {
           const countrySlug = encodeURIComponent(selectedCountry).replace(
@@ -355,6 +368,7 @@ export function WalkerFeed({
       // Auth gate: if unauthenticated and past the free limit, lock
       if (!user && itemIndex >= FREE_CARD_LIMIT - 1) {
         setShowAuthGate(true);
+        analytics.track('auth_gate_shown', { items_viewed: itemIndex + 1 });
       }
     };
 
@@ -464,7 +478,13 @@ export function WalkerFeed({
           oldestDateRef.current = null;
           isFetchingRef.current = false;
 
-          setSelectedCountry(country);
+          setSelectedCountry((prev) => {
+            analytics.track('filter_changed', {
+              previous_country: prev,
+              country: country,
+            });
+            return country;
+          });
 
           if (country === null) {
             window.history.pushState({}, '', '/');

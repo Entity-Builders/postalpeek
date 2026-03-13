@@ -4,6 +4,7 @@ import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2, Loader2 
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
+import { analytics } from '../lib/analytics';
 
 export interface FeedItem {
   id: string;
@@ -53,7 +54,14 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
   }, [isActive, isFlipped]);
 
   const handleFlip = () => {
-    setIsFlipped(!isFlipped);
+    const newFlipped = !isFlipped;
+    setIsFlipped(newFlipped);
+    if (newFlipped) {
+      analytics.track('postcard_flipped', {
+        postcard_id: item.id,
+        country: item.country,
+      });
+    }
   };
 
   return (
@@ -173,7 +181,14 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsLiked(!isLiked);
+                  const newLiked = !isLiked;
+                  setIsLiked(newLiked);
+                  if (newLiked) {
+                    analytics.track('postcard_liked', {
+                      postcard_id: item.id,
+                      country: item.country,
+                    });
+                  }
                 }}
               >
                 <Heart
@@ -200,6 +215,11 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
                     .then(() => {
                       setIsCopied(true);
                       setTimeout(() => setIsCopied(false), 2000);
+                      analytics.track('postcard_shared', {
+                        postcard_id: item.id,
+                        country: item.country,
+                        share_link: shareLink,
+                      });
                     })
                     .catch((err) => console.log('Share failed:', err));
                 }}
