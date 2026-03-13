@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Mail, KeyRound } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import type { FeedItem } from './Postcard';
@@ -7,6 +7,38 @@ interface AuthGateModalProps {
   onSuccess: () => void;
   /** Postcards the user has already seen — we use them in the hero showcase */
   viewedItems?: FeedItem[];
+}
+
+/**
+ * Preload illustration URLs during browser idle time so they're cached
+ * when the auth gate modal appears. Uses requestIdleCallback with a
+ * setTimeout fallback for browsers that don't support it.
+ */
+function useIdlePreload(urls: string[]) {
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const toLoad = urls.filter((u) => u && !preloadedRef.current.has(u));
+    if (toLoad.length === 0) return;
+
+    const load = () => {
+      toLoad.forEach((url) => {
+        const img = new Image();
+        img.src = url;
+        preloadedRef.current.add(url);
+      });
+    };
+
+    // Schedule during idle time so it never blocks initial render
+    const rIC = (window as any).requestIdleCallback;
+    if (typeof rIC === 'function') {
+      const id = rIC(load, { timeout: 3000 });
+      return () => (window as any).cancelIdleCallback(id);
+    } else {
+      const id = setTimeout(load, 1500);
+      return () => clearTimeout(id);
+    }
+  }, [urls]);
 }
 
 /**
@@ -24,6 +56,10 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
   // Pick up to 3 cards for the stacked hero showcase
   const heroCards = viewedItems.slice(0, 3);
   const mainCard = heroCards[0];
+
+  // Preload hero images during idle time (doesn't block initial load)
+  const heroUrls = heroCards.map((c) => c.illustration_url).filter(Boolean);
+  useIdlePreload(heroUrls);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

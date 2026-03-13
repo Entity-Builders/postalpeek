@@ -31,10 +31,12 @@ export function WalkerFeed({
   isIdle,
   isAdmin = false,
   user = null,
+  onWelcomeChange,
 }: {
   isIdle?: boolean;
   isAdmin?: boolean;
   user?: User | null;
+  onWelcomeChange?: (isOnWelcome: boolean) => void;
 }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
@@ -42,6 +44,11 @@ export function WalkerFeed({
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [showWelcome] = useState(() => !hasSeenWelcome());
   const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
+
+  // Notify parent when welcome state changes
+  useEffect(() => {
+    onWelcomeChange?.(isOnWelcome);
+  }, [isOnWelcome, onWelcomeChange]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   // Offset for carousel indices when welcome slide is present

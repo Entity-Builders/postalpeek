@@ -17,12 +17,12 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center px-6 select-none">
-      {/* ─── Stacked Postcards ─── */}
+      {/* ─── Stacked Postcards (subtle preview) ─── */}
       {cards.length > 0 && (
-        <div className="relative w-[260px] h-[290px] sm:w-[320px] sm:h-[350px] mb-12">
+        <div className="relative w-[160px] h-[180px] sm:w-[190px] sm:h-[210px] mb-8 opacity-80">
           {/* Card 3 (back) */}
           {cards[2] && (
-            <div className="absolute inset-0 bg-white p-2 rounded-sm shadow-md rotate-[7deg] translate-x-5 -translate-y-2 opacity-50">
+            <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40">
               <div className="w-full h-full overflow-hidden rounded-[2px]">
                 <img
                   src={cards[2].illustration_url}
@@ -35,7 +35,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           )}
           {/* Card 2 (middle) */}
           {cards[1] && (
-            <div className="absolute inset-0 bg-white p-2 rounded-sm shadow-md -rotate-[5deg] -translate-x-4 translate-y-2 opacity-70">
+            <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60">
               <div className="w-full h-full overflow-hidden rounded-[2px]">
                 <img
                   src={cards[1].illustration_url}
@@ -48,8 +48,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           )}
           {/* Card 1 (front — hero) */}
           {cards[0] && (
-            <div className="absolute inset-0 bg-white p-2 pb-8 rounded-sm shadow-xl -rotate-[1.5deg]">
-              <div className="w-full h-[calc(100%-24px)] overflow-hidden rounded-[2px]">
+            <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
+              <div className="w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px]">
                 <img
                   src={cards[0].illustration_url}
                   alt={cards[0].category}
@@ -57,16 +57,16 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
                   loading="lazy"
                 />
               </div>
-              <p className="text-center font-handwriting text-xs text-stone-400 mt-2 truncate px-2">
+              <p className="text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1">
                 {cards[0].city}, {cards[0].country}
               </p>
             </div>
           )}
 
           {/* Postmark stamp */}
-          <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full border-2 border-stone-400/20 flex items-center justify-center rotate-12 pointer-events-none z-20">
-            <div className="w-12 h-12 rounded-full border border-dashed border-stone-400/30 flex items-center justify-center">
-              <span className="font-mono text-[6px] text-stone-500/60 uppercase tracking-wider text-center leading-tight">
+          <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20">
+            <div className="w-8 h-8 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
+              <span className="font-mono text-[5px] text-stone-600 uppercase tracking-wider text-center leading-tight">
                 Postal<br />Peek
               </span>
             </div>
@@ -74,17 +74,20 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         </div>
       )}
 
-      {/* ─── Walker Introduction ─── */}
-      <p className="text-stone-400/60 text-[11px] font-mono tracking-[0.3em] uppercase mb-4">
+      {/* ─── Walker Introduction (hero content) ─── */}
+      <p className="text-stone-500 text-[11px] font-mono tracking-[0.3em] uppercase mb-5">
         Entity Builders presents
       </p>
-      <h1 className="font-serif text-4xl sm:text-5xl text-stone-800 tracking-tight mb-2">
+      <h1
+        className="font-serif text-5xl sm:text-6xl text-stone-900 tracking-tight mb-3"
+        style={{ textShadow: '0 1px 8px rgba(255,255,255,0.5)' }}
+      >
         Kyle Walker
       </h1>
-      <p className="text-stone-400/70 text-sm tracking-wide mb-6">
+      <p className="text-stone-600 text-base tracking-wide mb-8 font-medium">
         Digital Agent · Photographer · Watercolor Artist
       </p>
-      <p className="text-stone-500 text-base sm:text-lg text-center leading-relaxed max-w-[360px] mb-8 font-light">
+      <p className="text-stone-700 text-lg sm:text-xl text-center leading-relaxed max-w-[400px] mb-10">
         I travel the world and paint what I see.
         <br />
         Every street, every café, every hidden corner
@@ -92,16 +95,16 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         becomes a watercolor postcard.
       </p>
 
-      <div className="w-16 h-px bg-stone-300/50 mb-8" />
+      <div className="w-20 h-px bg-stone-400/60 mb-8" />
 
-      <p className="text-stone-400/60 text-base font-light italic font-serif">
+      <p className="text-stone-600 text-lg font-light italic font-serif mb-12">
         These postcards are for you.
       </p>
 
       {/* ─── Scroll Hint ─── */}
-      <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-1.5 text-stone-400/35 animate-bounce">
+      <div className="absolute bottom-12 left-0 right-0 flex flex-col items-center gap-2 text-stone-500 animate-bounce">
         <ChevronDown className="w-5 h-5" />
-        <span className="text-[11px] tracking-[0.2em] uppercase font-light">
+        <span className="text-xs tracking-[0.2em] uppercase font-semibold">
           Scroll to explore
         </span>
       </div>
