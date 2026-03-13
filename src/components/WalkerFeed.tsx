@@ -368,6 +368,23 @@ export function WalkerFeed({
     };
   }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user, showWelcome, indexOffset]);
 
+  // Preload the next slide's illustration so it's ready before the user scrolls
+  useEffect(() => {
+    const nextItemIndex = currentSlideIndex - indexOffset + 1;
+    const nextItem = items[nextItemIndex];
+    if (!nextItem?.illustration_url) return;
+
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = nextItem.illustration_url;
+    document.head.appendChild(link);
+
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, [currentSlideIndex, items, indexOffset]);
+
   // Shared debounce ref for both wheel and keyboard navigation.
   // We use a strict time-based debounce to handle high-precision
   // free-spinning mouse wheels (like the MX Master). This ensures that a single tick
