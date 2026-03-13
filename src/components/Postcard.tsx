@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2 } from 'lucide-react';
+import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2, Loader2, X } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
@@ -35,6 +35,12 @@ export function Postcard({ item, isActive }: PostcardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [localAnimState, setLocalAnimState] = useState<'idle' | 'queued' | null>(null);
+
+  const animationState = item.video_url ? 'completed' :
+    item.video_generation_status === 'processing' ? 'processing' :
+    localAnimState !== null ? localAnimState :
+    item.should_animate ? 'queued' : 'idle';
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
@@ -195,29 +201,51 @@ export function Postcard({ item, isActive }: PostcardProps) {
                 )}
               </button>
 
-              {import.meta.env.DEV && !item.video_url && (
+              {import.meta.env.DEV && animationState !== 'completed' && (
                 <button
-                  className='p-2 md:p-2.5 rounded-full bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600 transition-colors'
+                  className={cn(
+                    'p-2 md:p-2.5 rounded-full transition-colors',
+                    animationState === 'processing' 
+                      ? 'bg-amber-100 text-amber-500 cursor-not-allowed'
+                      : animationState === 'queued'
+                      ? 'bg-rose-100/80 hover:bg-rose-200 text-rose-500 hover:text-rose-600'
+                      : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600'
+                  )}
+                  disabled={animationState === 'processing'}
                   onClick={async (e) => {
                     e.stopPropagation();
+                    if (animationState === 'processing') return;
+
+                    const isCancelling = animationState === 'queued';
+                    const newState = isCancelling ? 'idle' : 'queued';
+                    const shouldAnimate = !isCancelling;
+
+                    setLocalAnimState(newState); // optimistic update
+                    
                     try {
                       const { error } = await supabase
                         .from('postalpeek_postcards')
                         .update({
-                          should_animate: true,
+                          should_animate: shouldAnimate,
                           video_generation_status: 'idle',
                         })
                         .eq('id', item.id);
                       if (error) throw error;
-                      alert('Added to animation queue!');
                     } catch (err) {
-                      console.error('Failed to trigger animation', err);
-                      alert('Failed to trigger animation');
+                      console.error('Failed to toggle animation state', err);
+                      setLocalAnimState(isCancelling ? 'queued' : 'idle'); // Revert on error
+                      alert('Failed to update animation queue');
                     }
                   }}
-                  title='Force Video Animation'
+                  title={animationState === 'queued' ? 'Cancel Animation' : animationState === 'processing' ? 'Processing Video...' : 'Force Video Animation'}
                 >
-                  <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
+                  {animationState === 'processing' ? (
+                    <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+                  ) : animationState === 'queued' ? (
+                    <X className='w-4 h-4 md:w-5 md:h-5' />
+                  ) : (
+                    <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
+                  )}
                 </button>
               )}
 
