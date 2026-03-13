@@ -9,6 +9,11 @@ import {
 import useEmblaCarousel from 'embla-carousel-react';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import { WalkerLoadingState, WalkerEmptyState } from './WalkerFeedStates';
+import { AuthGateModal } from './AuthGateModal';
+import type { User } from '@supabase/supabase-js';
+
+/** Number of free postcards before the auth gate kicks in */
+const FREE_CARD_LIMIT = 5;
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArr = [...array];
@@ -19,10 +24,19 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return newArr;
 };
 
-export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAdmin?: boolean }) {
+export function WalkerFeed({
+  isIdle,
+  isAdmin = false,
+  user = null,
+}: {
+  isIdle?: boolean;
+  isAdmin?: boolean;
+  user?: User | null;
+}) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -62,7 +76,10 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
       // If it doesn't have numbers and is reasonably long, it's probably a country.
       // Another way: wait until availableCountries is loaded to verify. But we need it for the initial fetch.
       if (!hasNumbers && segment.length > 2) {
-        const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
+        const decodedCountry = decodeURIComponent(segments[0]).replace(
+          /-/g,
+          ' ',
+        );
         setSelectedCountry(decodedCountry);
       }
     }
@@ -98,107 +115,110 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
     fetchCountries();
   }, []);
 
-  const fetchInitialFeed = useCallback(
-    async (country: string | null) => {
-      const fetchId = ++currentFetchIdRef.current;
-      isFetchingRef.current = true;
-      setIsLoading(true);
-      try {
-        const segments = window.location.pathname.split('/').filter(Boolean);
-        let sharedCardPrefix = null;
+  const fetchInitialFeed = useCallback(async (country: string | null) => {
+    const fetchId = ++currentFetchIdRef.current;
+    isFetchingRef.current = true;
+    setIsLoading(true);
+    try {
+      const segments = window.location.pathname.split('/').filter(Boolean);
+      let sharedCardPrefix = null;
 
-        // Extract the hash from the path depending on if a country slug is present
-        if (segments.length === 2 && country) {
-          // If we have /country/hash and the first segment matches the requested country
-          const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
-          if (decodedSegment === country) {
-            sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
-          }
-        } else if (segments.length === 1) {
-          // It's either /country or /hash
-          const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
-          if (country && decodedSegment === country) {
-            // It's just the country filter, no shared card hash
-            sharedCardPrefix = null;
-          } else {
-            // It must be a hash (like /QywJ9rK and country is null)
-            sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
-          }
+      // Extract the hash from the path depending on if a country slug is present
+      if (segments.length === 2 && country) {
+        // If we have /country/hash and the first segment matches the requested country
+        const decodedSegment = decodeURIComponent(segments[0]).replace(
+          /-/g,
+          ' ',
+        );
+        if (decodedSegment === country) {
+          sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
         }
-
-        let sharedCard: FeedItem | null = null;
-
-        if (sharedCardPrefix) {
-          // UUID ranges since .like() does not work on native Postgres UUID columns
-          const minUuid = `${sharedCardPrefix}-0000-0000-0000-000000000000`;
-          const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
-
-          const { data: sharedData, error: sharedError } = await supabase
-            .from('postalpeek_postcards')
-            .select('*')
-            .gte('id', minUuid)
-            .lte('id', maxUuid)
-            .limit(1)
-            .single();
-
-          if (!sharedError && sharedData) {
-            sharedCard = sharedData;
-          } else if (sharedError) {
-            console.error('Failed to load shared card:', sharedError);
-          }
-        }
-
-        let query = supabase
-          .from('postalpeek_postcards')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(PAGE_SIZE);
-
-        if (country) {
-          query = query.eq('country', country);
-        }
-
-        const { data, error } = await query;
-
-        // If another fetch started while we were waiting, abort state updates
-        if (fetchId !== currentFetchIdRef.current) return;
-
-        if (error) throw error;
-
-        let fetchedItems: FeedItem[] = [];
-
-        if (data && data.length > 0) {
-          oldestDateRef.current = data[data.length - 1].created_at;
-
-          // Filter out the shared card from the generic fetch to avoid duplicates
-          const filteredData = sharedCard
-            ? data.filter((item) => item.id !== sharedCard?.id)
-            : data;
-
-          fetchedItems = shuffleArray(filteredData);
-          setHasMore(data.length === PAGE_SIZE);
+      } else if (segments.length === 1) {
+        // It's either /country or /hash
+        const decodedSegment = decodeURIComponent(segments[0]).replace(
+          /-/g,
+          ' ',
+        );
+        if (country && decodedSegment === country) {
+          // It's just the country filter, no shared card hash
+          sharedCardPrefix = null;
         } else {
-          setHasMore(false);
-        }
-
-        // Prepend the shared card if it exists
-        if (sharedCard) {
-          setItems([sharedCard, ...fetchedItems]);
-        } else {
-          setItems(fetchedItems);
-        }
-      } catch (error) {
-        if (fetchId !== currentFetchIdRef.current) return;
-        console.error('Error loading initial feed:', error);
-      } finally {
-        if (fetchId === currentFetchIdRef.current) {
-          setIsLoading(false);
-          isFetchingRef.current = false;
+          // It must be a hash (like /QywJ9rK and country is null)
+          sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
         }
       }
-    },
-    [],
-  );
+
+      let sharedCard: FeedItem | null = null;
+
+      if (sharedCardPrefix) {
+        // UUID ranges since .like() does not work on native Postgres UUID columns
+        const minUuid = `${sharedCardPrefix}-0000-0000-0000-000000000000`;
+        const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
+
+        const { data: sharedData, error: sharedError } = await supabase
+          .from('postalpeek_postcards')
+          .select('*')
+          .gte('id', minUuid)
+          .lte('id', maxUuid)
+          .limit(1)
+          .single();
+
+        if (!sharedError && sharedData) {
+          sharedCard = sharedData;
+        } else if (sharedError) {
+          console.error('Failed to load shared card:', sharedError);
+        }
+      }
+
+      let query = supabase
+        .from('postalpeek_postcards')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
+
+      if (country) {
+        query = query.eq('country', country);
+      }
+
+      const { data, error } = await query;
+
+      // If another fetch started while we were waiting, abort state updates
+      if (fetchId !== currentFetchIdRef.current) return;
+
+      if (error) throw error;
+
+      let fetchedItems: FeedItem[] = [];
+
+      if (data && data.length > 0) {
+        oldestDateRef.current = data[data.length - 1].created_at;
+
+        // Filter out the shared card from the generic fetch to avoid duplicates
+        const filteredData = sharedCard
+          ? data.filter((item) => item.id !== sharedCard?.id)
+          : data;
+
+        fetchedItems = shuffleArray(filteredData);
+        setHasMore(data.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+
+      // Prepend the shared card if it exists
+      if (sharedCard) {
+        setItems([sharedCard, ...fetchedItems]);
+      } else {
+        setItems(fetchedItems);
+      }
+    } catch (error) {
+      if (fetchId !== currentFetchIdRef.current) return;
+      console.error('Error loading initial feed:', error);
+    } finally {
+      if (fetchId === currentFetchIdRef.current) {
+        setIsLoading(false);
+        isFetchingRef.current = false;
+      }
+    }
+  }, []);
 
   const fetchMoreFeed = useCallback(async () => {
     if (isFetchingRef.current || !hasMore || !oldestDateRef.current) return;
@@ -300,7 +320,10 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
 
         let newUrl = `/${hash}`;
         if (selectedCountry) {
-          const countrySlug = encodeURIComponent(selectedCountry).replace(/%20/g, '-');
+          const countrySlug = encodeURIComponent(selectedCountry).replace(
+            /%20/g,
+            '-',
+          );
           newUrl = `/${countrySlug}/${hash}`;
         }
 
@@ -314,6 +337,11 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
           fetchMoreFeed();
         }
       }
+
+      // Auth gate: if unauthenticated and past the free limit, lock
+      if (!user && currentIndex >= FREE_CARD_LIMIT - 1) {
+        setShowAuthGate(true);
+      }
     };
 
     emblaApi.on('select', onSelect);
@@ -324,7 +352,7 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
     return () => {
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry]);
+  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user]);
 
   // Shared debounce ref for both wheel and keyboard navigation.
   // We use a strict time-based debounce to handle high-precision
@@ -409,7 +437,10 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
           if (country === null) {
             window.history.pushState({}, '', '/');
           } else {
-            const countrySlug = encodeURIComponent(country).replace(/%20/g, '-');
+            const countrySlug = encodeURIComponent(country).replace(
+              /%20/g,
+              '-',
+            );
             window.history.pushState({}, '', `/${countrySlug}`);
           }
         }}
@@ -457,6 +488,14 @@ export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAd
             )}
           </div>
         </div>
+      )}
+
+      {/* Auth Gate — blocks further scrolling for unauthenticated users */}
+      {showAuthGate && (
+        <AuthGateModal
+          onSuccess={() => setShowAuthGate(false)}
+          viewedItems={items.slice(0, FREE_CARD_LIMIT)}
+        />
       )}
     </div>
   );

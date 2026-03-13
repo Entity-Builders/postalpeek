@@ -39,7 +39,7 @@ function App() {
     <div className='w-screen h-[100dvh] relative overflow-hidden flex flex-col'>
       {/* Walker Feed Fullscreen */}
       <div className='flex-1 w-full h-full relative'>
-        <WalkerFeed isIdle={isIdle} isAdmin={isAdmin} />
+        <WalkerFeed isIdle={isIdle} isAdmin={isAdmin} user={user} />
       </div>
 
       {/* Footer - Absolute overlay */}
