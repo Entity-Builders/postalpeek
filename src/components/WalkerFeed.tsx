@@ -326,10 +326,29 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
     };
   }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry]);
 
+  // Shared debounce ref for both wheel and keyboard navigation.
   // We use a strict time-based debounce to handle high-precision
   // free-spinning mouse wheels (like the MX Master). This ensures that a single tick
   // forces a full 1-item jump via Embla API, without Embla interpreting it as a drag.
-  const wheelTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollWithDebounce = useCallback(
+    (direction: 'next' | 'prev') => {
+      if (!emblaApi || navTimeout.current) return;
+
+      if (direction === 'next') {
+        emblaApi.scrollNext();
+      } else {
+        emblaApi.scrollPrev();
+      }
+
+      // Lock out further events for 600ms to allow the slide animation to finish cleanly
+      navTimeout.current = setTimeout(() => {
+        navTimeout.current = null;
+      }, 600);
+    },
+    [emblaApi],
+  );
 
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
@@ -340,28 +359,38 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
         // Stop the native scroll
         e.preventDefault();
 
-        // If we are currently in a cooldown from a previous tick, ignore
-        if (wheelTimeout.current) return;
-
         // Ignore very small movements (trackpad noise)
         if (Math.abs(e.deltaY) < 5) return;
 
-        if (e.deltaY > 0) {
-          // Intention to go down
-          emblaApi.scrollNext();
-        } else {
-          // Intention to go up
-          emblaApi.scrollPrev();
-        }
-
-        // Lock out further wheel events for 600ms to allow the slide animation to finish cleanly
-        wheelTimeout.current = setTimeout(() => {
-          wheelTimeout.current = null;
-        }, 600);
+        scrollWithDebounce(e.deltaY > 0 ? 'next' : 'prev');
       }
     },
-    [emblaApi],
+    [emblaApi, scrollWithDebounce],
   );
+
+  // Keyboard navigation: ArrowUp/ArrowDown (and j/k vim-style)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture if user is typing in an input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        scrollWithDebounce('next');
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        scrollWithDebounce('prev');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scrollWithDebounce]);
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
