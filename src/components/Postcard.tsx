@@ -355,9 +355,9 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
           ></div>
 
           {/* Main content – scrollable on mobile */}
-          <div className='relative flex flex-col sm:flex-row w-full h-full text-black/80 gap-4 sm:gap-6 overflow-y-auto'>
+          <div className='relative flex flex-col sm:flex-row w-full h-full text-black/80 gap-4 sm:gap-6 overflow-y-auto pb-2'>
             {/* ── Top on mobile / Right on desktop: Stamp, Address & Photo ── */}
-            <div className='w-full sm:w-[40%] flex flex-col relative shrink-0 order-first sm:order-last'>
+            <div className='w-full sm:w-[40%] flex flex-col relative sm:shrink-0 order-last sm:order-last'>
               {/* Stamp */}
               <div className='w-16 h-20 sm:w-20 sm:h-24 border border-stone-300 rounded flex bg-stone-100 items-center justify-center rotate-3 shadow-sm self-end mb-4 sm:mb-8'>
                 <span className='text-[9px] sm:text-[10px] text-stone-400 font-mono tracking-widest -rotate-45 block'>
@@ -419,7 +419,7 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
             </div>
 
             {/* ── Bottom on mobile / Left on desktop: The Story ── */}
-            <div className='flex-1 flex flex-col pt-2 sm:border-r border-black/10 sm:pr-6 order-last sm:order-first min-h-0'>
+            <div className='flex-1 flex flex-col pt-2 sm:border-r border-black/10 sm:pr-6 order-first sm:order-first min-h-0'>
               <span className='inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] md:text-sm font-medium rounded-full mb-3 md:mb-6 tracking-wide uppercase w-fit'>
                 {item.category}
               </span>
