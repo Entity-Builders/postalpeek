@@ -10,6 +10,8 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import { WalkerLoadingState, WalkerEmptyState } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
+import { WalkerWelcome } from './WalkerWelcome';
+import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
 import type { User } from '@supabase/supabase-js';
 
 /** Number of free postcards before the auth gate kicks in */
@@ -37,6 +39,12 @@ export function WalkerFeed({
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [showWelcome] = useState(() => !hasSeenWelcome());
+  const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Offset for carousel indices when welcome slide is present
+  const indexOffset = showWelcome ? 1 : 0;
 
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -302,21 +310,28 @@ export function WalkerFeed({
     const onSelect = () => {
       // Find the current active item based on the selected slide
       const currentIndex = emblaApi.selectedScrollSnap();
+      setCurrentSlideIndex(currentIndex);
+
+      // If still on the welcome slide, nothing to do
+      if (showWelcome && currentIndex === 0) {
+        setIsOnWelcome(true);
+        return;
+      } else if (showWelcome) {
+        setIsOnWelcome(false);
+      }
+
+      // Mark welcome as seen once user scrolls past it
+      if (showWelcome && currentIndex >= 1) {
+        markWelcomeSeen();
+      }
+
+      // Adjusted index accounting for the welcome slide
+      const itemIndex = currentIndex - indexOffset;
 
       // Update the URL path to reflect the current item being viewed without full re-render
-      if (items.length > currentIndex) {
-        const activeItem = items[currentIndex];
-
-        // Encode the UUID prefix to hash. Note: since encodeUuidPrefixToHash is not imported,
-        // we'll extract the first part of the UUID natively to resemble a hash or ID prefix
-        // temporarily, or we can use the full ID if preferred. For now we will use the full ID
-        // as the slice since we didn't import the encoder yet, or import it later.
-        // Actually, assuming decodeHashToUuidPrefix exists, we probably need `encodeUuidPrefixToHash`.
-        // I will just use the first 8 characters for the slug for now to mimic the hash.
+      if (itemIndex >= 0 && itemIndex < items.length) {
+        const activeItem = items[itemIndex];
         const hash = encodeUuidToHash(activeItem.id);
-
-        // Reconstruct URL based on whether a country is selected
-        // We use selectedCountry from the state rather than relying on the URL to be pristine;
 
         let newUrl = `/${hash}`;
         if (selectedCountry) {
@@ -327,19 +342,18 @@ export function WalkerFeed({
           newUrl = `/${countrySlug}/${hash}`;
         }
 
-        // History replace state to not clog the back button
         window.history.replaceState(null, '', newUrl);
       }
 
       // If we are at the last or penultimate slide, fetch more
-      if (currentIndex >= items.length - 2) {
+      if (itemIndex >= items.length - 2) {
         if (hasMore && !isFetchingRef.current) {
           fetchMoreFeed();
         }
       }
 
       // Auth gate: if unauthenticated and past the free limit, lock
-      if (!user && currentIndex >= FREE_CARD_LIMIT - 1) {
+      if (!user && itemIndex >= FREE_CARD_LIMIT - 1) {
         setShowAuthGate(true);
       }
     };
@@ -352,7 +366,7 @@ export function WalkerFeed({
     return () => {
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user]);
+  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user, showWelcome, indexOffset]);
 
   // Shared debounce ref for both wheel and keyboard navigation.
   // We use a strict time-based debounce to handle high-precision
@@ -422,7 +436,8 @@ export function WalkerFeed({
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
-      <WalkerFilterMenu
+      {!isOnWelcome && (
+        <WalkerFilterMenu
         isIdle={isIdle}
         availableCountries={availableCountries}
         selectedCountry={selectedCountry}
@@ -445,6 +460,7 @@ export function WalkerFeed({
           }
         }}
       />
+      )}
 
       {isLoading ? (
         <WalkerLoadingState />
@@ -457,24 +473,40 @@ export function WalkerFeed({
           onWheel={handleWheel}
         >
           <div className='embla__container h-full flex flex-col'>
+            {/* Walker Welcome — first slide for new visitors */}
+            {showWelcome && (
+              <div className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
+                <WalkerWelcome previewCards={items.slice(0, 3)} />
+              </div>
+            )}
+
             {items.map((item, index) => {
+              // Slide index accounting for the optional welcome slide
+              const slideIndex = index + indexOffset;
+              // Only fully render slides within ±1 of the current view
+              const isNearby = Math.abs(slideIndex - currentSlideIndex) <= 1;
+
               return (
                 <div
                   key={`${item.id}-${index}`}
                   className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
                 >
-                  {/* 1. THE ENVIRONMENT LIGHTING (Soft Background PER ITEM so it scrolls natively) */}
-                  <img
-                    src={item.illustration_url}
-                    alt=''
-                    className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
-                  />
+                  {/* 1. THE ENVIRONMENT LIGHTING — only mount for nearby slides */}
+                  {isNearby && (
+                    <img
+                      src={item.illustration_url}
+                      alt=''
+                      loading='lazy'
+                      decoding='async'
+                      className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
+                    />
+                  )}
                   {/* Soft light burst in center behind card */}
                   <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
 
                   {/* 2. THE POSTCARD */}
                   <div className='z-10 w-full h-full flex items-center justify-center'>
-                    <Postcard item={item} isActive={true} isAdmin={isAdmin} />
+                    <Postcard item={item} isActive={true} isAdmin={isAdmin} isNearby={isNearby} />
                   </div>
                 </div>
               );

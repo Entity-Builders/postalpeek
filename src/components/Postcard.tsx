@@ -29,9 +29,11 @@ interface PostcardProps {
   item: FeedItem;
   isActive: boolean;
   isAdmin?: boolean;
+  /** When false, images are not mounted to save bandwidth (off-screen slides) */
+  isNearby?: boolean;
 }
 
-export function Postcard({ item, isActive, isAdmin = false }: PostcardProps) {
+export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -82,14 +84,21 @@ export function Postcard({ item, isActive, isAdmin = false }: PostcardProps) {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            <img
-              src={item.illustration_url}
-              alt={item.category}
-              className={cn(
-                'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
-                !item.video_url && 'hover:scale-105'
-              )}
-            />
+            {isNearby ? (
+              <img
+                src={item.illustration_url}
+                alt={item.category}
+                loading={isActive ? 'eager' : 'lazy'}
+                decoding='async'
+                fetchPriority={isActive ? 'high' : 'auto'}
+                className={cn(
+                  'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
+                  !item.video_url && 'hover:scale-105'
+                )}
+              />
+            ) : (
+              <div className='absolute inset-0 w-full h-full bg-stone-200/50' />
+            )}
             
             {item.video_url && isHovered && (
               item.video_url.toLowerCase().includes('.gif') ? (
@@ -343,6 +352,8 @@ export function Postcard({ item, isActive, isAdmin = false }: PostcardProps) {
                   <img
                     src={item.original_image_url}
                     alt='Original reality'
+                    loading='lazy'
+                    decoding='async'
                     className='w-full h-full object-cover'
                   />
                   <div className='absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]'>
