@@ -19,7 +19,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return newArr;
 };
 
-export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
+export function WalkerFeed({ isIdle, isAdmin = false }: { isIdle?: boolean; isAdmin?: boolean }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -443,7 +443,7 @@ export function WalkerFeed({ isIdle }: { isIdle?: boolean }) {
 
                   {/* 2. THE POSTCARD */}
                   <div className='z-10 w-full h-full flex items-center justify-center'>
-                    <Postcard item={item} isActive={true} />
+                    <Postcard item={item} isActive={true} isAdmin={isAdmin} />
                   </div>
                 </div>
               );

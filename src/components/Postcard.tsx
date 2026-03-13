@@ -28,9 +28,10 @@ export interface FeedItem {
 interface PostcardProps {
   item: FeedItem;
   isActive: boolean;
+  isAdmin?: boolean;
 }
 
-export function Postcard({ item, isActive }: PostcardProps) {
+export function Postcard({ item, isActive, isAdmin = false }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -201,7 +202,7 @@ export function Postcard({ item, isActive }: PostcardProps) {
                 )}
               </button>
 
-              {import.meta.env.DEV && animationState !== 'completed' && (
+              {isAdmin && animationState !== 'completed' && (
                 <button
                   className={cn(
                     'p-2 md:p-2.5 rounded-full transition-colors',
