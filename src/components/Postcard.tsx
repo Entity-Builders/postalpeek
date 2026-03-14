@@ -120,7 +120,8 @@ export function Postcard({
       onClick={handleFlip}
     >
       <motion.div
-        className='w-full h-full relative preserve-3d'
+        className='w-full h-full relative'
+        style={{ transformStyle: 'preserve-3d' }}
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{
           duration: 0.8,
@@ -130,7 +131,10 @@ export function Postcard({
         }}
       >
         {/* FRONT FACE (Pure Art - Subtle & Minimalist) */}
-        <div className='absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'>
+        <div
+          className='absolute inset-0 w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+        >
           {/* The Illustration */}
           <div
             className='flex-1 relative overflow-hidden rounded-lg bg-stone-200/40 shadow-inner image-protected'
@@ -411,7 +415,10 @@ export function Postcard({
         </div>
 
         {/* BACK FACE (Text, Stamp, Coordinates) */}
-        <div className='absolute inset-0 w-full h-full backface-hidden bg-[#fdfbf7] rounded-sm md:rounded-md shadow-2xl rotate-y-180 p-4 md:p-8 border border-[rgba(0,0,0,0.05)] overflow-hidden'>
+        <div
+          className='absolute inset-0 w-full h-full bg-[#fdfbf7] rounded-sm md:rounded-md shadow-2xl p-4 md:p-8 border border-[rgba(0,0,0,0.05)] overflow-hidden'
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+        >
           {/* Subtle paper texture overlay */}
           <div
             className='absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-multiply'
