@@ -11,10 +11,11 @@ interface WalkerWelcomeProps {
 }
 
 /**
- * First-visit onboarding slide — cinematic reveal powered by useWelcomeAnimation.
+ * First-visit cinematic welcome screen.
  *
- * Layout: postcards area is ALWAYS rendered (opacity 0 → 0.85) so the text
- * never jumps when images arrive. The postcard container always takes its space.
+ * Layout: Postcards are absolutely positioned at the top of the screen
+ * and drop in from above — they never push the text down. Text is centered
+ * in the full height, starting from frame 0.
  */
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const cards = previewCards.slice(0, 3);
@@ -27,68 +28,64 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const imgUrl0 = useSignedImage(cards[0]?.illustration_url, { width: WIDTHS.thumb });
   const srcSet0 = useSignedSrcSet(cards[0]?.illustration_url, [WIDTHS.thumb]);
 
-  // All animation configs from the centralized hook
   const anim = useWelcomeAnimation(imgUrl0);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-between px-6 py-10 select-none overflow-hidden">
-      <div className="flex-shrink-0 h-4 sm:h-8" />
+    <div className="w-full h-full flex flex-col items-center justify-center relative select-none overflow-hidden px-6">
 
-      <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-
-        {/* ─── Postcards stack ─── */}
-        {/* Always rendered to reserve layout space — opacity handles visibility */}
-        <motion.div
-          className="relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-6 sm:mb-10 flex-shrink-0"
-          {...anim.postcards}
-        >
-          {/* Card 3 (back) — continuous sway */}
-          {cards[2] && (
-            <motion.div
-              className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md opacity-40"
-              {...anim.sway.back}
-            >
-              <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                <img src={imgUrl2} srcSet={srcSet2} alt="" className="w-full h-full object-cover" loading="eager" />
-              </div>
-            </motion.div>
-          )}
-
-          {/* Card 2 (middle) — continuous sway */}
-          {cards[1] && (
-            <motion.div
-              className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md opacity-60"
-              {...anim.sway.middle}
-            >
-              <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                <img src={imgUrl1} srcSet={srcSet1} alt="" className="w-full h-full object-cover" loading="eager" />
-              </div>
-            </motion.div>
-          )}
-
-          {/* Card 1 (front — hero, static) */}
-          {cards[0] && (
-            <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
-              <div className="w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px] bg-stone-100">
-                <img src={imgUrl0} srcSet={srcSet0} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" />
-              </div>
-              <p className="text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1">
-                {cards[0].city}, {cards[0].country}
-              </p>
+      {/* ─── Postcards: absolutely positioned, drops from above ─── */}
+      <motion.div
+        className="absolute top-[6%] sm:top-[8%] left-1/2 -translate-x-1/2 w-[180px] h-[200px] sm:w-[240px] sm:h-[270px] z-10"
+        {...anim.postcards}
+      >
+        {/* Card 3 (back) — continuous sway */}
+        {cards[2] && (
+          <motion.div
+            className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md opacity-40"
+            {...anim.sway.back}
+          >
+            <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
+              <img src={imgUrl2} srcSet={srcSet2} alt="" className="w-full h-full object-cover" loading="eager" />
             </div>
-          )}
+          </motion.div>
+        )}
 
-          {/* Postmark stamp */}
-          <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20">
-            <div className="w-8 h-8 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
-              <span className="font-mono text-[5px] text-stone-600 uppercase tracking-wider text-center leading-tight">
-                Postal<br />Peek
-              </span>
+        {/* Card 2 (middle) — continuous sway */}
+        {cards[1] && (
+          <motion.div
+            className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md opacity-60"
+            {...anim.sway.middle}
+          >
+            <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
+              <img src={imgUrl1} srcSet={srcSet1} alt="" className="w-full h-full object-cover" loading="eager" />
             </div>
+          </motion.div>
+        )}
+
+        {/* Card 1 (front — hero, static) */}
+        {cards[0] && (
+          <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
+            <div className="w-full h-[calc(100%-20px)] overflow-hidden rounded-[2px] bg-stone-100">
+              <img src={imgUrl0} srcSet={srcSet0} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" />
+            </div>
+            <p className="text-center font-handwriting text-[10px] sm:text-xs text-stone-500 mt-1 truncate px-1">
+              {cards[0].city}, {cards[0].country}
+            </p>
           </div>
-        </motion.div>
+        )}
 
-        {/* ─── Text (animates from second 0, independent of images) ─── */}
+        {/* Postmark stamp */}
+        <div className="absolute -top-2 -right-2 w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
+            <span className="font-mono text-[5px] sm:text-[6px] text-stone-600 uppercase tracking-wider text-center leading-tight">
+              Postal<br />Peek
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ─── Text content: centered, starts from frame 0 ─── */}
+      <div className="flex flex-col items-center mt-[52%] sm:mt-[42%]">
         <motion.p
           className="text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-3 sm:mb-5 text-center"
           {...anim.presents}
@@ -134,7 +131,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
 
       {/* ─── Scroll Hint ─── */}
       <motion.div
-        className="flex-shrink-0 flex flex-col items-center gap-1 sm:gap-2 text-stone-500 animate-bounce pt-4 pb-2"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 sm:gap-2 text-stone-500 animate-bounce"
         {...anim.scrollHint}
       >
         <ChevronDown className="w-5 h-5" />
