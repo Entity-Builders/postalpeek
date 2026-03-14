@@ -32,11 +32,17 @@ interface PostcardProps {
   isAdmin?: boolean;
   /** When false, images are not mounted to save bandwidth (off-screen slides) */
   isNearby?: boolean;
+  /** Set of postcard IDs the current user has favorited */
+  favoriteIds?: Set<string>;
+  /** Called when an authenticated user toggles the heart */
+  onToggleFavorite?: (postcardId: string) => void;
+  /** Called when an unauthenticated user taps the heart */
+  onAuthRequired?: (postcardId: string) => void;
 }
 
-export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: PostcardProps) {
+export function Postcard({ item, isActive, isAdmin = false, isNearby = true, favoriteIds, onToggleFavorite, onAuthRequired }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  const isLiked = favoriteIds?.has(item.id) ?? false;
   const [isCopied, setIsCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [localAnimState, setLocalAnimState] = useState<'idle' | 'queued' | null>(null);
@@ -181,9 +187,15 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true }: P
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
-                  const newLiked = !isLiked;
-                  setIsLiked(newLiked);
-                  if (newLiked) {
+                  if (onAuthRequired && !onToggleFavorite) {
+                    // No toggle handler means user is not authenticated
+                    onAuthRequired(item.id);
+                    return;
+                  }
+                  if (onToggleFavorite) {
+                    onToggleFavorite(item.id);
+                  }
+                  if (!isLiked) {
                     analytics.track('postcard_liked', {
                       postcard_id: item.id,
                       country: item.country,

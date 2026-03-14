@@ -13,6 +13,7 @@ import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
 import { analytics } from '../lib/analytics';
+import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import type { User } from '@supabase/supabase-js';
 
 /** Number of free postcards before the auth gate kicks in */
@@ -47,6 +48,7 @@ export function WalkerFeed({
     // If the gate was previously triggered this session and user is still not logged in, show it immediately
     return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
   });
+  const [pendingFavoriteId, setPendingFavoriteId] = useState<string | null>(null);
   const [showWelcome] = useState(() => !hasSeenWelcome());
   const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
 
@@ -55,6 +57,9 @@ export function WalkerFeed({
     onWelcomeChange?.(isOnWelcome);
   }, [isOnWelcome, onWelcomeChange]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Favorites management
+  const { favoriteIds, toggle: toggleFavorite } = useFavorites(user ?? null);
 
   // Offset for carousel indices when welcome slide is present
   const indexOffset = showWelcome ? 1 : 0;
@@ -566,7 +571,27 @@ export function WalkerFeed({
 
                   {/* 2. THE POSTCARD */}
                   <div className='z-10 w-full h-full flex items-center justify-center'>
-                    <Postcard item={item} isActive={true} isAdmin={isAdmin} isNearby={isNearby} />
+                    <Postcard
+                      item={item}
+                      isActive={true}
+                      isAdmin={isAdmin}
+                      isNearby={isNearby}
+                      favoriteIds={favoriteIds}
+                      onToggleFavorite={user ? toggleFavorite : undefined}
+                      onAuthRequired={!user ? (postcardId) => {
+                        setPendingFavoriteId(postcardId);
+                        setShowAuthGate(true);
+                        sessionStorage.setItem(AUTH_GATE_KEY, 'true');
+                        try {
+                          const heroCards = items.slice(0, 3).map(c => ({
+                            id: c.id, illustration_url: c.illustration_url,
+                            city: c.city, country: c.country, category: c.category,
+                          }));
+                          sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
+                        } catch { /* quota exceeded */ }
+                        analytics.track('auth_gate_shown', { trigger: 'favorite', postcard_id: postcardId });
+                      } : undefined}
+                    />
                   </div>
                 </div>
               );
@@ -589,6 +614,14 @@ export function WalkerFeed({
             setShowAuthGate(false);
             sessionStorage.removeItem(AUTH_GATE_KEY);
             sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
+            // Auto-save the pending favorite after successful auth
+            if (pendingFavoriteId) {
+              // Small delay to let auth state propagate
+              setTimeout(() => {
+                toggleFavorite(pendingFavoriteId);
+                setPendingFavoriteId(null);
+              }, 500);
+            }
           }}
           viewedItems={
             items.length > 0
