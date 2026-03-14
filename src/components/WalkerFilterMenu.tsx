@@ -72,7 +72,7 @@ export function WalkerFilterMenu({
         <button
           onClick={() => onSelectCountry(null)}
           className={cn(
-            'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
+            'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
             selectedCountry === null && !showFavoritesOnly
               ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
               : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
@@ -86,7 +86,7 @@ export function WalkerFilterMenu({
           <button
             onClick={onToggleFavorites}
             className={cn(
-              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
+              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
               showFavoritesOnly
                 ? 'bg-rose-500/90 text-white border-rose-400 shadow-lg'
                 : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
@@ -105,7 +105,7 @@ export function WalkerFilterMenu({
             onClick={() => onSelectCountry(country)}
             onMouseEnter={() => onHoverCountry?.(country)}
             className={cn(
-              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
+              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
               selectedCountry === country && !showFavoritesOnly
                 ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
                 : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
