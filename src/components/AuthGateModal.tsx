@@ -27,6 +27,15 @@ export function AuthGateModal({
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  React.useEffect(() => {
+    // Reveal form after user has time to read the Walker text
+    const timer = setTimeout(() => {
+      setShowForm(true);
+    }, 2000); 
+    return () => clearTimeout(timer);
+  }, []);
 
   const heroCards = viewedItems.slice(0, 3);
   const mainCard = heroCards[0];
@@ -74,27 +83,30 @@ export function AuthGateModal({
     try {
       let tokenToVerify = otpCode;
 
-      // DEV BYPASS: always accept 123456 on localhost by fetching the real OTP from local Inbucket
+      // DEV BYPASS: always accept 123456 on localhost by fetching the real OTP from local Mailpit
       if (window.location.hostname === 'localhost' && otpCode === '123456') {
         try {
-          const res = await fetch(`http://127.0.0.1:54324/api/v1/mailbox/${email}`);
-          if (res.ok) {
-            const messages = await res.json();
-            if (messages && messages.length > 0) {
-              const latestId = messages[0].id;
-              const msgRes = await fetch(`http://127.0.0.1:54324/api/v1/mailbox/${email}/${latestId}`);
+          // Supabase replaced Inbucket with Mailpit
+          const searchRes = await fetch(`http://127.0.0.1:54324/api/v1/search?query=to:${encodeURIComponent(email)}&limit=1`);
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.messages && searchData.messages.length > 0) {
+              const latestId = searchData.messages[0].ID;
+              const msgRes = await fetch(`http://127.0.0.1:54324/api/v1/message/${latestId}`);
               if (msgRes.ok) {
                 const msgData = await msgRes.json();
-                const match = msgData.body?.text?.match(/\b\d{6}\b/) || msgData.body?.html?.match(/\b\d{6}\b/);
+                // Check Snippet, HTML, or Text for the 6-digit code
+                const textToSearch = msgData.Snippet + ' ' + (msgData.Text || '') + ' ' + (msgData.HTML || '');
+                const match = textToSearch.match(/\b\d{6}\b/);
                 if (match) {
                   tokenToVerify = match[0];
-                  console.log('Dev Bypass: Substituted 123456 with real OTP');
+                  console.log('Dev Bypass: Substituted 123456 with real OTP from Mailpit');
                 }
               }
             }
           }
         } catch (err) {
-          console.warn('Inbucket dev bypass failed:', err);
+          console.warn('Mailpit dev bypass failed:', err);
         }
       }
 
@@ -235,8 +247,15 @@ export function AuthGateModal({
           </p>
 
           {/* Auth form — warm palette */}
-          <div className='w-full max-w-sm'>
-            {error && (
+          <div className='w-full max-w-sm min-h-[240px]'>
+            {showForm && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease }}
+                className='w-full'
+              >
+                {error && (
               <div className='bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-4 text-center'>
                 {error}
               </div>
@@ -253,7 +272,6 @@ export function AuthGateModal({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      autoFocus
                       className='w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-base placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm'
                     />
                   </div>
@@ -369,6 +387,8 @@ export function AuthGateModal({
                   Didn't get the code? Resend
                 </button>
               </form>
+            )}
+              </motion.div>
             )}
           </div>
         </motion.div>

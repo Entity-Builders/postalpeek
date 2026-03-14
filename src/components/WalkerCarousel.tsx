@@ -9,7 +9,7 @@ import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import type { User } from '@supabase/supabase-js';
 
-const FREE_CARD_LIMIT = 5;
+const FREE_CARD_LIMIT = 4;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
 const AUTH_GATE_CARDS_KEY = 'postalpeek_auth_cards';
 
@@ -54,8 +54,11 @@ export function WalkerCarousel({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
 
-  const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() => displayItems.slice(0, 2));
-  const [prevDisplayItems, setPrevDisplayItems] = useState<FeedItem[]>(displayItems);
+  const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
+    displayItems.slice(0, 2),
+  );
+  const [prevDisplayItems, setPrevDisplayItems] =
+    useState<FeedItem[]>(displayItems);
 
   // Synchronously derive state during render to avoid cascading renders in useEffect
   if (displayItems !== prevDisplayItems) {
@@ -97,7 +100,7 @@ export function WalkerCarousel({
 
   useEffect(() => {
     if (displayItems.length === 0) return;
-    
+
     if (staggeredItems.length < displayItems.length) {
       const timer = setTimeout(() => {
         setStaggeredItems(displayItems);
