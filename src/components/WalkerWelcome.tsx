@@ -102,12 +102,12 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           </motion.div>
         )}
 
-        {/* ─── ACT 2: Text — each element gets its moment ─── */}
+        {/* ─── ACT 1: Text — starts IMMEDIATELY from second 0 ─── */}
         <motion.p
           className="text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-3 sm:mb-5 text-center"
           initial={{ opacity: 0, y: 12 }}
-          animate={heroLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease, delay: 1.4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease, delay: 0.2 }}
         >
           Entity Builders presents
         </motion.p>
@@ -116,8 +116,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           className="font-serif text-4xl sm:text-6xl text-stone-900 tracking-tight mb-2 sm:mb-3 text-center"
           style={{ textShadow: '0 1px 8px rgba(255,255,255,0.5)' }}
           initial={{ opacity: 0, y: 16, scale: 0.95 }}
-          animate={heroLoaded ? { opacity: 1, y: 0, scale: 1 } : {}}
-          transition={{ duration: 0.9, ease, delay: 1.8 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.9, ease, delay: 0.7 }}
         >
           Kyle Walker
         </motion.h1>
@@ -125,8 +125,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         <motion.p
           className="text-stone-600 text-sm sm:text-base tracking-wide mb-4 sm:mb-8 font-medium text-center"
           initial={{ opacity: 0, y: 10 }}
-          animate={heroLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease, delay: 2.3 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease, delay: 1.2 }}
         >
           Digital Agent · Photographer · Watercolor Artist
         </motion.p>
@@ -134,8 +134,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         <motion.p
           className="text-stone-700 text-base sm:text-xl text-center leading-relaxed max-w-[400px] mb-6 sm:mb-10 px-2"
           initial={{ opacity: 0, y: 10 }}
-          animate={heroLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease, delay: 2.9 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease, delay: 1.8 }}
         >
           I travel the world and paint what I see.
           <br />
@@ -147,15 +147,15 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         <motion.div
           className="w-20 h-px bg-stone-400/60 mb-4 sm:mb-8"
           initial={{ opacity: 0, scaleX: 0 }}
-          animate={heroLoaded ? { opacity: 1, scaleX: 1 } : {}}
-          transition={{ duration: 0.6, ease, delay: 3.4 }}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ duration: 0.6, ease, delay: 2.4 }}
         />
 
         <motion.p
           className="text-stone-600 text-base sm:text-lg font-light italic font-serif text-center"
           initial={{ opacity: 0, y: 10 }}
-          animate={heroLoaded ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease, delay: 3.7 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease, delay: 2.8 }}
         >
           These postcards are for you.
         </motion.p>
@@ -165,8 +165,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
       <motion.div
         className="flex-shrink-0 flex flex-col items-center gap-1 sm:gap-2 text-stone-500 animate-bounce pt-4 pb-2"
         initial={{ opacity: 0 }}
-        animate={heroLoaded ? { opacity: 1 } : {}}
-        transition={{ delay: 4.2, duration: 0.8 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 3.4, duration: 0.8 }}
       >
         <ChevronDown className="w-5 h-5" />
         <span className="text-xs tracking-[0.2em] uppercase font-semibold">
