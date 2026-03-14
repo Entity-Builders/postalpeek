@@ -43,6 +43,7 @@ export function PostcardFront({
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const [localAnimState, setLocalAnimState] = useState<
     'idle' | 'queued' | null
   >(null);
@@ -69,7 +70,10 @@ export function PostcardFront({
     >
       {/* The Illustration */}
       <div
-        className="flex-1 relative overflow-hidden rounded-lg bg-stone-200/40 shadow-inner image-protected"
+        className={cn(
+          "flex-1 relative overflow-hidden rounded-lg shadow-inner image-protected",
+          isImageLoading ? "bg-stone-200 animate-pulse" : "bg-stone-200/40"
+        )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onContextMenu={(e) => e.preventDefault()}
@@ -84,9 +88,14 @@ export function PostcardFront({
           decoding="async"
           fetchPriority={isPriority ? 'high' : 'auto'}
           draggable={false}
-          onError={handleImageError}
+          onLoad={() => setIsImageLoading(false)}
+          onError={(e) => {
+            setIsImageLoading(false);
+            handleImageError(e);
+          }}
           className={cn(
             'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-1',
+            isImageLoading ? 'opacity-0' : 'opacity-100',
             !item.video_url && 'hover:scale-105',
           )}
         />
