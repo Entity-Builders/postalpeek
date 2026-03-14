@@ -12,7 +12,7 @@ import { WalkerLoadingState, WalkerEmptyState, WalkerFavoritesEmptyState } from 
 import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
-import { getSeenCardIds, markCardsSeen } from '../utils/seenCardsStorage';
+
 import { analytics } from '../lib/analytics';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import type { User } from '@supabase/supabase-js';
@@ -53,7 +53,7 @@ export function WalkerFeed({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   // Favorites management
-  const { favoriteIds, toggle: toggleFavorite } = useFavorites(user ?? null);
+  const { favoriteIds, favoriteItems, toggle: toggleFavorite } = useFavorites(user ?? null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // Reset favorites filter when user logs out
@@ -61,11 +61,11 @@ export function WalkerFeed({
     if (!user) setShowFavoritesOnly(false);
   }, [user]);
 
-  // Derived display items: filter by favorites when active
+  // Derived display items: when favorites filter is active, show server-fetched favorites
   const displayItems = useMemo(() => {
-    if (!showFavoritesOnly || favoriteIds.size === 0) return items;
-    return items.filter((item) => favoriteIds.has(item.id));
-  }, [items, showFavoritesOnly, favoriteIds]);
+    if (!showFavoritesOnly) return items;
+    return favoriteItems;
+  }, [items, showFavoritesOnly, favoriteItems]);
 
 
   // Offset for carousel indices when welcome slide is present
@@ -76,7 +76,7 @@ export function WalkerFeed({
   const [hasMore, setHasMore] = useState(true);
   const loadedIdsRef = useRef<string[]>([]);
   const isFetchingRef = useRef(false);
-  const freshPoolExhaustedRef = useRef(false); // When true, stop excluding seen IDs
+
   const currentFetchIdRef = useRef(0); // Track active fetch to prevent race conditions
   const prefetchCacheRef = useRef<Map<string | '__everywhere__', FeedItem[]>>(new Map());
 
@@ -174,7 +174,7 @@ export function WalkerFeed({
       setHasMore(cached.length === PAGE_SIZE);
       setIsLoading(false);
       isFetchingRef.current = false;
-      freshPoolExhaustedRef.current = false;
+
       return;
     }
 
@@ -225,10 +225,8 @@ export function WalkerFeed({
         }
       }
 
-      // Exclude both the shared card and previously seen cards for a "fresh-first" experience
-      const seenIds = getSeenCardIds();
-      const baseExcludeIds = sharedCard ? [sharedCard.id] : [];
-      const excludeIds = [...baseExcludeIds, ...seenIds];
+      // Exclude the shared card from the random pool so it doesn't appear twice
+      const excludeIds = sharedCard ? [sharedCard.id] : [];
 
       const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
         p_limit: PAGE_SIZE,
@@ -239,36 +237,18 @@ export function WalkerFeed({
       if (fetchId !== currentFetchIdRef.current) return;
       if (error) throw error;
 
-      let fetchedItems: FeedItem[] = (data as FeedItem[]) || [];
+      const fetchedItems: FeedItem[] = (data as FeedItem[]) || [];
 
-      // If the fresh pool returned fewer than PAGE_SIZE, backfill with seen cards
-      if (fetchedItems.length < PAGE_SIZE && seenIds.length > 0) {
-        freshPoolExhaustedRef.current = true;
-        const remaining = PAGE_SIZE - fetchedItems.length;
-        const alreadyLoadedIds = [...baseExcludeIds, ...fetchedItems.map(i => i.id)];
 
-        const { data: backfillData } = await supabase.rpc('postalpeek_get_random_feed', {
-          p_limit: remaining,
-          p_country: country,
-          p_exclude_ids: alreadyLoadedIds,
-        });
-
-        if (fetchId !== currentFetchIdRef.current) return;
-        if (backfillData) {
-          fetchedItems = [...fetchedItems, ...(backfillData as FeedItem[])];
-        }
-      } else {
-        freshPoolExhaustedRef.current = false;
-      }
 
       if (fetchedItems.length > 0) {
         loadedIdsRef.current = [
-          ...baseExcludeIds,
+          ...excludeIds,
           ...fetchedItems.map((item) => item.id),
         ];
         setHasMore(fetchedItems.length === PAGE_SIZE);
       } else {
-        loadedIdsRef.current = [...baseExcludeIds];
+        loadedIdsRef.current = [...excludeIds];
         setHasMore(false);
       }
 
@@ -296,11 +276,10 @@ export function WalkerFeed({
     if (prefetchCacheRef.current.has(cacheKey) || country === selectedCountry) return;
 
     try {
-      const seenIds = getSeenCardIds();
       const { data } = await supabase.rpc('postalpeek_get_random_feed', {
         p_limit: PAGE_SIZE,
         p_country: country,
-        p_exclude_ids: seenIds,
+        p_exclude_ids: [],
       });
       if (data) {
         prefetchCacheRef.current.set(cacheKey, data as FeedItem[]);
@@ -324,10 +303,7 @@ export function WalkerFeed({
     isFetchingRef.current = true;
     setIsFetchingMore(true);
     try {
-      // If fresh pool isn't exhausted, also exclude seen IDs to keep serving unseen cards
-      const excludeIds = freshPoolExhaustedRef.current
-        ? loadedIdsRef.current
-        : [...new Set([...loadedIdsRef.current, ...getSeenCardIds()])];
+      const excludeIds = loadedIdsRef.current;
 
       const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
         p_limit: PAGE_SIZE,
@@ -339,25 +315,9 @@ export function WalkerFeed({
 
       if (error) throw error;
 
-      let newItems = (data as FeedItem[]) || [];
+      const newItems = (data as FeedItem[]) || [];
 
-      // If fresh pool just ran out mid-scroll, backfill from the full pool (including seen)
-      if (newItems.length < PAGE_SIZE && !freshPoolExhaustedRef.current) {
-        freshPoolExhaustedRef.current = true;
-        const remaining = PAGE_SIZE - newItems.length;
-        const alreadyLoadedIds = [...loadedIdsRef.current, ...newItems.map(i => i.id)];
 
-        const { data: backfillData } = await supabase.rpc('postalpeek_get_random_feed', {
-          p_limit: remaining,
-          p_country: selectedCountry,
-          p_exclude_ids: alreadyLoadedIds,
-        });
-
-        if (fetchId !== currentFetchIdRef.current) return;
-        if (backfillData) {
-          newItems = [...newItems, ...(backfillData as FeedItem[])];
-        }
-      }
 
       if (newItems.length > 0) {
         loadedIdsRef.current = [
@@ -451,7 +411,7 @@ export function WalkerFeed({
           category: activeItem.category,
           index: itemIndex,
         });
-        markCardsSeen([activeItem.id]);
+
 
         let newUrl = `/${hash}`;
         if (selectedCountry) {
@@ -611,7 +571,7 @@ export function WalkerFeed({
           // Clear state immediately to show loader and prevent stale feed
           setIsLoading(true);
           loadedIdsRef.current = [];
-          freshPoolExhaustedRef.current = false;
+
           isFetchingRef.current = false;
 
           setSelectedCountry((prev) => {
