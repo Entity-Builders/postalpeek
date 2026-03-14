@@ -12,7 +12,7 @@ import { WalkerLoadingState, WalkerEmptyState, WalkerFavoritesEmptyState } from 
 import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
-import { cdnUrl } from '../utils/imageUtils';
+import { cdnImage, WIDTHS } from '../utils/imageUtils';
 
 import { analytics } from '../lib/analytics';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -288,7 +288,7 @@ export function WalkerFeed({
         (data as FeedItem[]).slice(0, 3).forEach((item: FeedItem) => {
           if (item.illustration_url) {
             const img = new Image();
-            img.src = cdnUrl(item.illustration_url);
+            img.src = cdnImage(item.illustration_url, { width: WIDTHS.mobile });
           }
         });
       }
@@ -470,7 +470,7 @@ export function WalkerFeed({
     const link = document.createElement('link');
     link.rel = 'preload';
     link.as = 'image';
-    link.href = cdnUrl(nextItem.illustration_url);
+    link.href = cdnImage(nextItem.illustration_url, { width: WIDTHS.desktop });
     document.head.appendChild(link);
 
     return () => {
@@ -628,7 +628,7 @@ export function WalkerFeed({
                   {/* 1. THE ENVIRONMENT LIGHTING — only mount for nearby slides */}
                   {isNearby && (
                     <img
-                      src={cdnUrl(item.illustration_url)}
+                      src={cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 })}
                       alt=''
                       loading='lazy'
                       decoding='async'

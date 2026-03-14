@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { cdnUrl } from '../utils/imageUtils';
+import { cdnUrl, cdnImage, cdnSrcSet, WIDTHS } from '../utils/imageUtils';
 import {
   MapPin,
   ArrowUpRight,
@@ -126,7 +126,9 @@ export function Postcard({
           >
             {isNearby ? (
               <img
-                src={cdnUrl(item.illustration_url)}
+                src={cdnImage(item.illustration_url, { width: WIDTHS.desktop })}
+                srcSet={cdnSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop])}
+                sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
                 alt={item.category}
                 loading={isActive ? 'eager' : 'lazy'}
                 decoding='async'
@@ -444,7 +446,7 @@ export function Postcard({
               >
                 <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200'>
                   <img
-                    src={cdnUrl(item.original_image_url)}
+                    src={cdnImage(item.original_image_url, { width: WIDTHS.thumb })}
                     alt='Original reality'
                     loading='lazy'
                     decoding='async'
