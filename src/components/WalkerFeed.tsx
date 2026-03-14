@@ -21,14 +21,7 @@ const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
 const AUTH_GATE_CARDS_KEY = 'postalpeek_auth_cards';
 
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const newArr = [...array];
-  for (let i = newArr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-  }
-  return newArr;
-};
+
 
 export function WalkerFeed({
   isIdle,
@@ -67,7 +60,7 @@ export function WalkerFeed({
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const oldestDateRef = useRef<string | null>(null);
+  const loadedIdsRef = useRef<string[]>([]);
   const isFetchingRef = useRef(false);
   const currentFetchIdRef = useRef(0); // Track active fetch to prevent race conditions
 
@@ -154,7 +147,6 @@ export function WalkerFeed({
 
       // Extract the hash from the path depending on if a country slug is present
       if (segments.length === 2 && country) {
-        // If we have /country/hash and the first segment matches the requested country
         const decodedSegment = decodeURIComponent(segments[0]).replace(
           /-/g,
           ' ',
@@ -163,16 +155,13 @@ export function WalkerFeed({
           sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
         }
       } else if (segments.length === 1) {
-        // It's either /country or /hash
         const decodedSegment = decodeURIComponent(segments[0]).replace(
           /-/g,
           ' ',
         );
         if (country && decodedSegment === country) {
-          // It's just the country filter, no shared card hash
           sharedCardPrefix = null;
         } else {
-          // It must be a hash (like /QywJ9rK and country is null)
           sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
         }
       }
@@ -180,7 +169,6 @@ export function WalkerFeed({
       let sharedCard: FeedItem | null = null;
 
       if (sharedCardPrefix) {
-        // UUID ranges since .like() does not work on native Postgres UUID columns
         const minUuid = `${sharedCardPrefix}-0000-0000-0000-000000000000`;
         const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
 
@@ -199,36 +187,30 @@ export function WalkerFeed({
         }
       }
 
-      let query = supabase
-        .from('postalpeek_postcards')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (country) {
-        query = query.eq('country', country);
-      }
-
-      const { data, error } = await query;
+      // Use the random feed RPC instead of chronological ordering
+      const excludeIds = sharedCard ? [sharedCard.id] : [];
+      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
+        p_limit: PAGE_SIZE,
+        p_country: country,
+        p_exclude_ids: excludeIds,
+      });
 
       // If another fetch started while we were waiting, abort state updates
       if (fetchId !== currentFetchIdRef.current) return;
 
       if (error) throw error;
 
-      let fetchedItems: FeedItem[] = [];
+      const fetchedItems: FeedItem[] = (data as FeedItem[]) || [];
 
-      if (data && data.length > 0) {
-        oldestDateRef.current = data[data.length - 1].created_at;
-
-        // Filter out the shared card from the generic fetch to avoid duplicates
-        const filteredData = sharedCard
-          ? data.filter((item) => item.id !== sharedCard?.id)
-          : data;
-
-        fetchedItems = shuffleArray(filteredData);
-        setHasMore(data.length === PAGE_SIZE);
+      if (fetchedItems.length > 0) {
+        // Track loaded IDs for future exclude_ids pagination
+        loadedIdsRef.current = [
+          ...excludeIds,
+          ...fetchedItems.map((item) => item.id),
+        ];
+        setHasMore(fetchedItems.length === PAGE_SIZE);
       } else {
+        loadedIdsRef.current = [...excludeIds];
         setHasMore(false);
       }
 
@@ -251,34 +233,31 @@ export function WalkerFeed({
   }, []);
 
   const fetchMoreFeed = useCallback(async () => {
-    if (isFetchingRef.current || !hasMore || !oldestDateRef.current) return;
+    if (isFetchingRef.current || !hasMore) return;
 
     const fetchId = ++currentFetchIdRef.current;
     isFetchingRef.current = true;
     setIsFetchingMore(true);
     try {
-      let query = supabase
-        .from('postalpeek_postcards')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .lt('created_at', oldestDateRef.current)
-        .limit(PAGE_SIZE);
-
-      if (selectedCountry) {
-        query = query.eq('country', selectedCountry);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
+        p_limit: PAGE_SIZE,
+        p_country: selectedCountry,
+        p_exclude_ids: loadedIdsRef.current,
+      });
 
       if (fetchId !== currentFetchIdRef.current) return;
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        oldestDateRef.current = data[data.length - 1].created_at;
-        // Shuffle the newly fetched block so the feed remains unpredictable
-        setItems((prev) => [...prev, ...shuffleArray(data)]);
-        setHasMore(data.length === PAGE_SIZE);
+      const newItems = (data as FeedItem[]) || [];
+
+      if (newItems.length > 0) {
+        loadedIdsRef.current = [
+          ...loadedIdsRef.current,
+          ...newItems.map((item) => item.id),
+        ];
+        setItems((prev) => [...prev, ...newItems]);
+        setHasMore(newItems.length === PAGE_SIZE);
       } else {
         setHasMore(false);
       }
@@ -505,7 +484,7 @@ export function WalkerFeed({
         onSelectCountry={(country) => {
           // Clear state immediately to show loader and prevent stale feed
           setIsLoading(true);
-          oldestDateRef.current = null;
+          loadedIdsRef.current = [];
           isFetchingRef.current = false;
 
           setSelectedCountry((prev) => {
