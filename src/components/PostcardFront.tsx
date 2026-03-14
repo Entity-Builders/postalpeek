@@ -8,6 +8,7 @@ import {
   Play,
   Wand2,
   Loader2,
+  Ticket,
 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
@@ -23,7 +24,7 @@ interface PostcardFrontProps {
   isLiked: boolean;
   onToggleFavorite?: (postcardId: string) => void;
   onAuthRequired?: (postcardId: string) => void;
-  onFlipCard: () => void;
+  onFlipCard: (view?: 'info' | 'coupon') => void;
   mainImgUrl: string;
   placeholderUrl?: string;
   srcSetString?: string;
@@ -59,6 +60,8 @@ export function PostcardFront({
         : item.should_animate
           ? 'queued'
           : 'idle';
+
+  const isBusiness = item.generation_metadata?.strategy === 'Zigzag Shared Place';
 
   return (
     <div
@@ -367,11 +370,25 @@ export function PostcardFront({
             </button>
           )}
 
+          {isBusiness && (
+            <button
+              className="p-2 md:p-2.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-500 hover:text-rose-600 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFlipCard('coupon');
+                analytics.track('coupon_viewed', { postcard_id: item.id });
+              }}
+              title="Special Offer"
+            >
+              <Ticket className="w-4 h-4 md:w-5 md:h-5" />
+            </button>
+          )}
+
           <button
             className="p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              onFlipCard();
+              onFlipCard('info');
             }}
           >
             <Info className="w-4 h-4 md:w-5 md:h-5" />

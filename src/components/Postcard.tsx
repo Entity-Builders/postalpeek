@@ -6,6 +6,7 @@ import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import { PostcardFront } from './PostcardFront';
 import { PostcardBack } from './PostcardBack';
+import { PostcardCoupon } from './PostcardCoupon';
 
 export interface FeedItem {
   id: string;
@@ -54,12 +55,15 @@ export function Postcard({
   onAuthRequired,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
     if (!isActive && isFlipped) {
       setIsFlipped(false);
+      // Optional: reset backView to 'info' after flip animation ends
+      setTimeout(() => setBackView('info'), 400); 
     }
   }, [isActive, isFlipped]);
 
@@ -142,17 +146,24 @@ export function Postcard({
           isLiked={isLiked}
           onToggleFavorite={onToggleFavorite}
           onAuthRequired={onAuthRequired}
-          onFlipCard={() => setIsFlipped(true)}
+          onFlipCard={(view: 'info' | 'coupon' = 'info') => {
+            setBackView(view);
+            setIsFlipped(true);
+          }}
           mainImgUrl={mainImgUrl}
           placeholderUrl={finalPlaceholder}
           srcSetString={srcSetString}
           handleImageError={handleImageError}
         />
-        <PostcardBack
-          item={item}
-          polaroidUrl={polaroidUrl}
-          handleImageError={handleImageError}
-        />
+        {backView === 'coupon' ? (
+          <PostcardCoupon item={item} />
+        ) : (
+          <PostcardBack
+            item={item}
+            polaroidUrl={polaroidUrl}
+            handleImageError={handleImageError}
+          />
+        )}
       </motion.div>
     </div>
   );
