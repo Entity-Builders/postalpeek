@@ -657,9 +657,9 @@ export function WalkerFeed({
       />
       )}
 
-      {isLoading ? (
+      {isLoading && !showWelcome ? (
         <WalkerLoadingState />
-      ) : displayItems.length === 0 ? (
+      ) : displayItems.length === 0 && !showWelcome ? (
         showFavoritesOnly ? <WalkerFavoritesEmptyState /> : <WalkerEmptyState />
       ) : (
         <div
