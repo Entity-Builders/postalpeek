@@ -35,13 +35,13 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   return (
     <div className="w-full h-full flex flex-col items-center select-none overflow-hidden">
 
-      {/* ─── ZONE 1: Postcards (flex-[5] = ~50% of screen) ─── */}
+      {/* ─── ZONE 1: Postcards (flex-[4.5] ≈ 45% of screen) ─── */}
       <motion.div
-        className="flex-[5] w-full flex items-center justify-center relative min-h-0"
+        className="flex-[4.5] w-full flex items-center justify-center relative min-h-0 overflow-hidden"
         {...anim.postcards}
       >
-        {/* Postcard stack — sizes relative to this zone */}
-        <div className="relative w-[55%] max-w-[360px] aspect-[3/4]">
+        {/* Postcard stack — sized by height of this zone, aspect-locked */}
+        <div className="relative h-[85%] aspect-[3/4] max-w-[55%]">
           {/* Card 3 (back) — continuous sway */}
           {cards[2] && (
             <motion.div
@@ -89,8 +89,8 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         </div>
       </motion.div>
 
-      {/* ─── ZONE 2: Text content (flex-[4] = ~40% of screen) ─── */}
-      <div className="flex-[4] flex flex-col items-center justify-start px-6 min-h-0">
+      {/* ─── ZONE 2: Text content (flex-[4.5] ≈ 45% of screen) ─── */}
+      <div className="flex-[4.5] flex flex-col items-center justify-start px-6 min-h-0">
         <motion.p
           className="text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-2 sm:mb-3 text-center"
           {...anim.presents}
