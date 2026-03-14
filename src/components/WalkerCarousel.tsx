@@ -44,7 +44,6 @@ export function WalkerCarousel({
   user,
   isAdmin,
   showWelcome,
-  isOnWelcome,
   setIsOnWelcome,
   favoriteIds,
   toggleFavorite,
