@@ -95,19 +95,21 @@ export function WalkerFeed({
       setSelectedCountry(decodedCountry);
     } else if (segments.length === 1) {
       // /country OR /hash
-      // We assume it's a country if it doesn't contain numbers and has length > 0
+      // Try to decode as a Hashids hash first. If it returns a valid hex prefix,
+      // this segment is a shared-card hash. Otherwise treat it as a country slug.
       const segment = segments[0];
-      const hasNumbers = /\d/.test(segment);
+      const maybePrefix = decodeHashToUuidPrefix(segment);
+      const isValidHex = maybePrefix !== null && /^[0-9a-f]{8}$/i.test(maybePrefix);
 
-      // If it doesn't have numbers and is reasonably long, it's probably a country.
-      // Another way: wait until availableCountries is loaded to verify. But we need it for the initial fetch.
-      if (!hasNumbers && segment.length > 2) {
-        const decodedCountry = decodeURIComponent(segments[0]).replace(
+      if (!isValidHex && segment.length > 0) {
+        const decodedCountry = decodeURIComponent(segment).replace(
           /-/g,
           ' ',
         );
         setSelectedCountry(decodedCountry);
       }
+      // If isValidHex is true, it's a hash — selectedCountry stays null,
+      // and fetchInitialFeed will pick it up from the URL path.
     }
   }, []);
 
