@@ -8,41 +8,6 @@ interface WalkerWelcomeProps {
   /** First postcards from the feed to display as stacked preview */
   previewCards: FeedItem[];
 }
-
-/**
- * Inner component to safely use hooks without violating conditional rendering rules.
- */
-function PreviewCard({ item, wrapperClassName, innerClassName, isHero = false }: { item: FeedItem, wrapperClassName: string, innerClassName: string, isHero?: boolean }) {
-  const blurUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
-  const mainUrl = useSignedImage(item.illustration_url, { width: WIDTHS.thumb });
-  const mainSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.thumb]);
-
-  return (
-    <div className={wrapperClassName}>
-      <div className={innerClassName}>
-        <img
-          src={blurUrl}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover blur-md scale-110 saturate-150 transform-gpu z-0 opacity-80"
-          loading="eager"
-        />
-        <img
-          src={mainUrl}
-          srcSet={mainSrcSet}
-          alt={isHero ? item.category : ""}
-          className="absolute inset-0 w-full h-full object-cover z-1 transition-opacity duration-500"
-          loading={isHero ? "eager" : "lazy"}
-        />
-      </div>
-      {isHero && (
-        <p className="text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1">
-          {item.city}, {item.country}
-        </p>
-      )}
-    </div>
-  );
-}
-
 /**
  * First-visit onboarding slide introducing "Kyle Walker" — the digital wanderer
  * behind PostalPeek. Appears as the first slide in the Embla carousel.
@@ -50,6 +15,23 @@ function PreviewCard({ item, wrapperClassName, innerClassName, isHero = false }:
  */
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const cards = previewCards.slice(0, 3);
+
+  // We can safely call hooks here because card count is deterministic (3).
+  // If we have fewer than 3, we just pass null/undefined which the hook handles gracefully.
+  const blurUrl2 = useSignedImage(cards[2]?.illustration_url, {
+    width: WIDTHS.thumb,
+  });
+  const srcSet2 = useSignedSrcSet(cards[2]?.illustration_url, [WIDTHS.thumb]);
+
+  const blurUrl1 = useSignedImage(cards[1]?.illustration_url, {
+    width: WIDTHS.thumb,
+  });
+  const srcSet1 = useSignedSrcSet(cards[1]?.illustration_url, [WIDTHS.thumb]);
+
+  const blurUrl0 = useSignedImage(cards[0]?.illustration_url, {
+    width: WIDTHS.thumb,
+  });
+  const srcSet0 = useSignedSrcSet(cards[0]?.illustration_url, [WIDTHS.thumb]);
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-between px-6 py-10 select-none overflow-hidden'>
@@ -60,31 +42,51 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
       <div className='flex flex-col items-center justify-center flex-1 min-h-0'>
         {/* ─── Stacked Postcards (subtle preview) ─── */}
         {cards.length > 0 && (
-          <div className='relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-4 sm:mb-8 opacity-80 flex-shrink-0'>
+          <div className='relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-4 sm:mb-8 opacity-80 flex-shrink-0 animate-in fade-in zoom-in-95 duration-1000 ease-out fill-mode-both delay-150'>
             {/* Card 3 (back) */}
             {cards[2] && (
-              <PreviewCard
-                item={cards[2]}
-                wrapperClassName="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40"
-                innerClassName="w-full h-full overflow-hidden rounded-[2px] relative bg-stone-200/40"
-              />
+              <div className='absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40'>
+                <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
+                  <img
+                    src={blurUrl2}
+                    srcSet={srcSet2}
+                    alt=''
+                    className='w-full h-full object-cover'
+                    loading='lazy'
+                  />
+                </div>
+              </div>
             )}
             {/* Card 2 (middle) */}
             {cards[1] && (
-               <PreviewCard
-                 item={cards[1]}
-                 wrapperClassName="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60"
-                 innerClassName="w-full h-full overflow-hidden rounded-[2px] relative bg-stone-200/40"
-               />
+              <div className='absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60'>
+                <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
+                  <img
+                    src={blurUrl1}
+                    srcSet={srcSet1}
+                    alt=''
+                    className='w-full h-full object-cover'
+                    loading='lazy'
+                  />
+                </div>
+              </div>
             )}
             {/* Card 1 (front — hero) */}
             {cards[0] && (
-              <PreviewCard
-                item={cards[0]}
-                wrapperClassName="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]"
-                innerClassName="w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px] relative bg-stone-200/40"
-                isHero={true}
-              />
+              <div className='absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]'>
+                <div className='w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px] bg-stone-100'>
+                  <img
+                    src={blurUrl0}
+                    srcSet={srcSet0}
+                    alt={cards[0].category}
+                    className='w-full h-full object-cover'
+                    loading='eager' // Hero card needs to be eager
+                  />
+                </div>
+                <p className='text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1'>
+                  {cards[0].city}, {cards[0].country}
+                </p>
+              </div>
             )}
 
             {/* Postmark stamp */}

@@ -286,13 +286,35 @@ export function WalkerFeed({
         setItems(fetchedItems);
       }
 
-      // Pre-sign all image URLs in the batch *non-blockingly* so we don't delay the LCP
-      const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems)
-        .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
+      // 1. Pre-sign URLs for the critical hero cards (up to 3) FIRST
+      const allItems = sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems;
+      const heroItems = allItems.slice(0, 3);
+      const heroUrls = heroItems.flatMap(i => [i.illustration_url].filter(Boolean));
       
-      // We don't await this here. The UI will render with original URLs if needed,
-      // and re-render with signed URLs once this background promise resolves.
-      preSignUrls(allUrls).catch(err => console.error('Failed to pre-sign URLs', err));
+      // Wait for the hero URLs to be signed
+      await preSignUrls(heroUrls);
+
+      // 2. Preload the exact thumbnail images into the browser cache
+      // This guarantees the WalkerWelcome screen renders flawlessly with zero pops
+      if (heroItems.length > 0) {
+        await Promise.allSettled(
+          heroItems.map(item => {
+            if (!item.illustration_url) return Promise.resolve();
+            return new Promise<void>((resolve) => {
+              const img = new Image();
+              // use the signed transform URL for the thumb size
+              img.src = cdnImage(item.illustration_url, { width: WIDTHS.thumb });
+              img.onload = () => resolve();
+              img.onerror = () => resolve(); // still resolve to not block UI forever
+            });
+          })
+        );
+      }
+
+      // 3. Kick off pre-signing for the rest of the batch non-blockingly
+      const remainingUrls = allItems.slice(3)
+        .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
+      preSignUrls(remainingUrls).catch(err => console.error('Failed to pre-sign URLs', err));
 
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
