@@ -74,7 +74,8 @@ async function signPath(
 ): Promise<string> {
   const expiry = Math.floor(Date.now() / 1000) + ttlSeconds;
   const token = await hmacSign(`${objectPath}:${expiry}`);
-  return `/s/${token}/${expiry}/${objectPath}`;
+  // No leading slash — callers already add one in template literals
+  return `s/${token}/${expiry}/${objectPath}`;
 }
 
 // ─── URL Cache ──────────────────────────────────────────────────
