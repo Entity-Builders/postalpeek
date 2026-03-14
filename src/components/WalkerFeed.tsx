@@ -67,6 +67,7 @@ export function WalkerFeed({
     return items.filter((item) => favoriteIds.has(item.id));
   }, [items, showFavoritesOnly, favoriteIds]);
 
+
   // Offset for carousel indices when welcome slide is present
   const indexOffset = showWelcome ? 1 : 0;
 
@@ -131,6 +132,13 @@ export function WalkerFeed({
     duration: 30, // Make the programmatic snap slightly faster
     watchSlides: true, // Let Embla handle newly added items automatically
   });
+
+  // Reset carousel to first slide when favorites filter changes
+  useEffect(() => {
+    if (emblaApi) {
+      emblaApi.scrollTo(0, true); // instant jump, no animation
+    }
+  }, [showFavoritesOnly, emblaApi]);
 
   // Fetch unique locations and extract just the countries for the filter menu
   useEffect(() => {
@@ -548,6 +556,11 @@ export function WalkerFeed({
         }}
         isLoggedIn={!!user}
         onSelectCountry={(country) => {
+          // If country hasn't changed, just clear favorites filter — data is already loaded
+          if (country === selectedCountry) {
+            setShowFavoritesOnly(false);
+            return;
+          }
           // Turn off favorites filter when switching countries
           setShowFavoritesOnly(false);
           // Clear state immediately to show loader and prevent stale feed
