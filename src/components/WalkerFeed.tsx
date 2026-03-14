@@ -76,22 +76,38 @@ export function WalkerFeed({
   // We only mount the first 2 items instantly to get a blazing fast LCP.
   // The rest are mounted 150ms later to unblock the main JavaScript thread.
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>([]);
+  const previousDisplayItemsRef = useRef<FeedItem[]>([]);
 
   useEffect(() => {
     if (displayItems.length === 0) {
       setStaggeredItems([]);
+      previousDisplayItemsRef.current = [];
       return;
     }
 
-    // Instantly show the first 2 items (or fewer if we don't have 2)
-    setStaggeredItems(displayItems.slice(0, 2));
+    const prevItems = previousDisplayItemsRef.current;
+    previousDisplayItemsRef.current = displayItems;
 
-    // Wait for the browser to paint those 2 items, then render the rest
-    const timer = setTimeout(() => {
+    // Check if this is a completely new feed or if we're just appending items.
+    // We only want to stagger on the initial load of a new feed to avoid
+    // layout shifts and carousel recalculations during pagination scrolling.
+    const prevIds = new Set(prevItems.map((i) => i.id));
+    const isNewFeed = prevIds.size === 0 || !displayItems.some((i) => prevIds.has(i.id));
+
+    if (isNewFeed) {
+      // Instantly show the first 2 items (or fewer if we don't have 2)
+      setStaggeredItems(displayItems.slice(0, 2));
+
+      // Wait for the browser to paint those 2 items, then render the rest
+      const timer = setTimeout(() => {
+        setStaggeredItems(displayItems);
+      }, 150); // 150ms gives React enough time to finish the first paint
+
+      return () => clearTimeout(timer);
+    } else {
+      // It's the same feed (pagination appended items), so just render them all immediately
       setStaggeredItems(displayItems);
-    }, 150); // 150ms gives React enough time to finish the first paint
-
-    return () => clearTimeout(timer);
+    }
   }, [displayItems]);
 
   // Offset for carousel indices when welcome slide is present

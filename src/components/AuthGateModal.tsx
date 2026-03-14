@@ -69,9 +69,35 @@ export function AuthGateModal({
     setLoading(true);
     setError(null);
     try {
+      let tokenToVerify = otpCode;
+
+      // DEV BYPASS: always accept 123456 on localhost by fetching the real OTP from local Inbucket
+      if (window.location.hostname === 'localhost' && otpCode === '123456') {
+        try {
+          const res = await fetch(`http://127.0.0.1:54324/api/v1/mailbox/${email}`);
+          if (res.ok) {
+            const messages = await res.json();
+            if (messages && messages.length > 0) {
+              const latestId = messages[0].id;
+              const msgRes = await fetch(`http://127.0.0.1:54324/api/v1/mailbox/${email}/${latestId}`);
+              if (msgRes.ok) {
+                const msgData = await msgRes.json();
+                const match = msgData.body?.text?.match(/\b\d{6}\b/) || msgData.body?.html?.match(/\b\d{6}\b/);
+                if (match) {
+                  tokenToVerify = match[0];
+                  console.log('Dev Bypass: Substituted 123456 with real OTP');
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Inbucket dev bypass failed:', err);
+        }
+      }
+
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token: otpCode,
+        token: tokenToVerify,
         type: 'email',
       });
       if (error) throw error;
