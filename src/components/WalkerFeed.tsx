@@ -17,6 +17,7 @@ import type { User } from '@supabase/supabase-js';
 
 /** Number of free postcards before the auth gate kicks in */
 const FREE_CARD_LIMIT = 5;
+const AUTH_GATE_KEY = 'postalpeek_auth_gate';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArr = [...array];
@@ -41,7 +42,10 @@ export function WalkerFeed({
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(() => {
+    // If the gate was previously triggered this session and user is still not logged in, show it immediately
+    return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
+  });
   const [showWelcome] = useState(() => !hasSeenWelcome());
   const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
 
@@ -375,6 +379,7 @@ export function WalkerFeed({
       // Auth gate: if unauthenticated and past the free limit, lock
       if (!user && itemIndex >= FREE_CARD_LIMIT - 1) {
         setShowAuthGate(true);
+        sessionStorage.setItem(AUTH_GATE_KEY, 'true');
         analytics.track('auth_gate_shown', { items_viewed: itemIndex + 1 });
       }
     };
@@ -569,7 +574,10 @@ export function WalkerFeed({
       {/* Auth Gate — blocks further scrolling for unauthenticated users */}
       {showAuthGate && (
         <AuthGateModal
-          onSuccess={() => setShowAuthGate(false)}
+          onSuccess={() => {
+            setShowAuthGate(false);
+            sessionStorage.removeItem(AUTH_GATE_KEY);
+          }}
           viewedItems={items.slice(0, FREE_CARD_LIMIT)}
         />
       )}
