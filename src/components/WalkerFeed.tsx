@@ -71,6 +71,27 @@ export function WalkerFeed({
     return favoriteItems;
   }, [items, showFavoritesOnly, favoriteItems]);
 
+  // Staggered Render State for Initial Load Performance
+  // We only mount the first 2 items instantly to get a blazing fast LCP.
+  // The rest are mounted 150ms later to unblock the main JavaScript thread.
+  const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>([]);
+
+  useEffect(() => {
+    if (displayItems.length === 0) {
+      setStaggeredItems([]);
+      return;
+    }
+
+    // Instantly show the first 2 items (or fewer if we don't have 2)
+    setStaggeredItems(displayItems.slice(0, 2));
+
+    // Wait for the browser to paint those 2 items, then render the rest
+    const timer = setTimeout(() => {
+      setStaggeredItems(displayItems);
+    }, 150); // 150ms gives React enough time to finish the first paint
+
+    return () => clearTimeout(timer);
+  }, [displayItems]);
 
   // Offset for carousel indices when welcome slide is present
   const indexOffset = showWelcome ? 1 : 0;
@@ -259,16 +280,20 @@ export function WalkerFeed({
         setHasMore(false);
       }
 
-      // Pre-sign all image URLs in the batch
-      const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems)
-        .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
-      await preSignUrls(allUrls);
-
       if (sharedCard) {
         setItems([sharedCard, ...fetchedItems]);
       } else {
         setItems(fetchedItems);
       }
+
+      // Pre-sign all image URLs in the batch *non-blockingly* so we don't delay the LCP
+      const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems)
+        .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
+      
+      // We don't await this here. The UI will render with original URLs if needed,
+      // and re-render with signed URLs once this background promise resolves.
+      preSignUrls(allUrls).catch(err => console.error('Failed to pre-sign URLs', err));
+
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error loading initial feed:', error);
@@ -646,11 +671,11 @@ export function WalkerFeed({
             {/* Walker Welcome — first slide for new visitors */}
             {showWelcome && (
               <div className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
-                <WalkerWelcome previewCards={items.slice(0, 3)} />
+                <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
               </div>
             )}
 
-            {displayItems.map((item, index) => {
+            {staggeredItems.map((item, index) => {
               // Slide index accounting for the optional welcome slide
               const slideIndex = index + indexOffset;
               // Render 1 slide backwards (above) and dynamic slides forwards (up to 5 if resting)

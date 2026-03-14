@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { cdnUrl, cdnImage, cdnSrcSet, WIDTHS } from '../utils/imageUtils';
+import { WIDTHS, cdnImage, cdnUrl } from '../utils/imageUtils';
+import { useSignedImage, useSignedSrcSet } from '../utils/useSignedImage';
 import {
   MapPin,
   ArrowUpRight,
@@ -99,6 +100,15 @@ export function Postcard({
     }
   };
 
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Derive non-blocking signed Cloudflare URLs for the images
+  const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
+  const mainImgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
+  const srcSetString = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop]);
+
   return (
     <div
       className={cn(
@@ -130,7 +140,7 @@ export function Postcard({
           >
             {/* The Cloudy Blur Placeholder (Cloudflare micro-image) */}
             <img
-              src={cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 })}
+              src={placeholderUrl}
               alt=''
               loading='eager' /* Micro-placeholder always eager */
               decoding='async'
@@ -139,8 +149,8 @@ export function Postcard({
             />
 
             <img
-              src={cdnImage(item.illustration_url, { width: WIDTHS.desktop })}
-              srcSet={cdnSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop])}
+              src={mainImgUrl}
+              srcSet={srcSetString}
               sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
               alt={item.category}
               loading={isPriority ? 'eager' : 'lazy'}
@@ -463,6 +473,7 @@ export function Postcard({
                     decoding='async'
                     draggable={false}
                     className='w-full h-full object-cover'
+                    onError={handleImageError} // Added onError handler
                   />
                   <div className='absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]'>
                     <span className='flex items-center gap-1.5 text-white text-xs font-semibold tracking-wide bg-black/60 px-3 py-1.5 rounded-full'>

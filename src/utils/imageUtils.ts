@@ -111,6 +111,9 @@ async function getSignedPath(objectPath: string): Promise<string> {
 
 const preSignedStore = new Map<string, string>();
 
+// Event emitter to notify React components when a URL is signed
+export const imageSignerEvents = new EventTarget();
+
 /**
  * Pre-sign a batch of image URLs. Call this after fetching postcard data.
  * After this resolves, `cdnUrl()` and `cdnImage()` will return signed URLs.
@@ -125,8 +128,14 @@ export async function preSignUrls(urls: string[]): Promise<void> {
 
   await Promise.all(
     needsSigning.map(async (objectPath) => {
-      const signed = await getSignedPath(objectPath);
-      preSignedStore.set(objectPath, signed);
+      try {
+        const signed = await getSignedPath(objectPath);
+        preSignedStore.set(objectPath, signed);
+        // Dispatch event for this specific object path so connected hooks can re-render
+        imageSignerEvents.dispatchEvent(new CustomEvent('url_signed', { detail: objectPath }));
+      } catch (e) {
+        console.error(`Failed to sign ${objectPath}`, e);
+      }
     }),
   );
 }
