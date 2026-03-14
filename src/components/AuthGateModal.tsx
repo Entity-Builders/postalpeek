@@ -9,43 +9,6 @@ interface AuthGateModalProps {
   viewedItems?: FeedItem[];
 }
 
-/**
- * Preload illustration URLs during browser idle time so they're cached
- * when the auth gate modal appears. Uses requestIdleCallback with a
- * setTimeout fallback for browsers that don't support it.
- */
-function useIdlePreload(urls: string[]) {
-  const preloadedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const toLoad = urls.filter((u) => u && !preloadedRef.current.has(u));
-    if (toLoad.length === 0) return;
-
-    const load = () => {
-      toLoad.forEach((url) => {
-        const img = new Image();
-        img.src = url;
-        preloadedRef.current.add(url);
-      });
-    };
-
-    // Schedule during idle time so it never blocks initial render
-    const w = window as Window & {
-      requestIdleCallback?: (
-        cb: () => void,
-        opts?: { timeout: number },
-      ) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (typeof w.requestIdleCallback === 'function') {
-      const id = w.requestIdleCallback(load, { timeout: 3000 });
-      return () => w.cancelIdleCallback?.(id);
-    } else {
-      const id = setTimeout(load, 1500);
-      return () => clearTimeout(id);
-    }
-  }, [urls]);
-}
 
 /**
  * Immersive auth gate with stacked hero postcards + Walker narrative.
@@ -66,9 +29,19 @@ export function AuthGateModal({
   const heroCards = viewedItems.slice(0, 3);
   const mainCard = heroCards[0];
 
-  // Preload hero images during idle time (doesn't block initial load)
+  // Eagerly preload hero images — the auth gate is a blocking modal, so no
+  // need to defer. On refresh with cached cards this fires immediately.
   const heroUrls = heroCards.map((c) => c.illustration_url).filter(Boolean);
-  useIdlePreload(heroUrls);
+  const preloadedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    heroUrls.forEach((url) => {
+      if (!preloadedRef.current.has(url)) {
+        const img = new Image();
+        img.src = url;
+        preloadedRef.current.add(url);
+      }
+    });
+  }, [heroUrls]);
 
   /** Step 1: Send OTP to email */
   const handleSendOtp = async (e: React.FormEvent) => {
