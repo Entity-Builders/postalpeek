@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Map } from 'lucide-react';
+import { Loader2, Map, Heart } from 'lucide-react';
 
 export function WalkerLoadingState() {
   return (
@@ -20,6 +20,20 @@ export function WalkerEmptyState() {
         The Postmaster hasn't dispatched any mail for this region yet.
         <br />
         Please try another country or clear the filter.
+      </p>
+    </div>
+  );
+}
+
+export function WalkerFavoritesEmptyState() {
+  return (
+    <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-3 z-20'>
+      <Heart className='w-16 h-16 mb-1 text-rose-300/80 fill-rose-200/40' />
+      <p className='text-lg font-medium tracking-wide text-center text-stone-600'>
+        No favorites yet
+      </p>
+      <p className='text-sm font-light text-center text-stone-400'>
+        Tap the <span className='text-rose-400'>♥</span> on postcards you love!
       </p>
     </div>
   );

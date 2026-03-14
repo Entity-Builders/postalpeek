@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Map, MapPin } from 'lucide-react';
+import { Map, MapPin, Heart } from 'lucide-react';
 import { cn } from './SearchBar';
 
 interface WalkerFilterMenuProps {
@@ -7,6 +7,9 @@ interface WalkerFilterMenuProps {
   availableCountries: string[];
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
+  showFavoritesOnly: boolean;
+  onToggleFavorites: () => void;
+  isLoggedIn: boolean;
 }
 
 export function WalkerFilterMenu({
@@ -14,6 +17,9 @@ export function WalkerFilterMenu({
   availableCountries,
   selectedCountry,
   onSelectCountry,
+  showFavoritesOnly,
+  onToggleFavorites,
+  isLoggedIn,
 }: WalkerFilterMenuProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +71,7 @@ export function WalkerFilterMenu({
           onClick={() => onSelectCountry(null)}
           className={cn(
             'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
-            selectedCountry === null
+            selectedCountry === null && !showFavoritesOnly
               ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
               : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
           )}
@@ -73,6 +79,21 @@ export function WalkerFilterMenu({
           <Map className='w-3.5 h-3.5 md:w-4 md:h-4' />
           Everywhere
         </button>
+
+        {isLoggedIn && (
+          <button
+            onClick={onToggleFavorites}
+            className={cn(
+              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
+              showFavoritesOnly
+                ? 'bg-rose-500/90 text-white border-rose-400 shadow-lg'
+                : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
+            )}
+          >
+            <Heart className={cn('w-3 h-3 md:w-3.5 md:h-3.5', showFavoritesOnly ? 'fill-current' : '')} />
+            My Favorites
+          </button>
+        )}
 
         <div className='w-px h-6 bg-white/20 mx-1 shrink-0' />
 
@@ -82,7 +103,7 @@ export function WalkerFilterMenu({
             onClick={() => onSelectCountry(country)}
             className={cn(
               'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
-              selectedCountry === country
+              selectedCountry === country && !showFavoritesOnly
                 ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
                 : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
             )}

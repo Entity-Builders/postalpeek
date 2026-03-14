@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { Loader2 } from 'lucide-react';
 import { Postcard, FeedItem } from './Postcard';
@@ -8,7 +8,7 @@ import {
 } from '@eb-packages/logic/src/hash';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
-import { WalkerLoadingState, WalkerEmptyState } from './WalkerFeedStates';
+import { WalkerLoadingState, WalkerEmptyState, WalkerFavoritesEmptyState } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
@@ -54,6 +54,18 @@ export function WalkerFeed({
 
   // Favorites management
   const { favoriteIds, toggle: toggleFavorite } = useFavorites(user ?? null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  // Reset favorites filter when user logs out
+  useEffect(() => {
+    if (!user) setShowFavoritesOnly(false);
+  }, [user]);
+
+  // Derived display items: filter by favorites when active
+  const displayItems = useMemo(() => {
+    if (!showFavoritesOnly || favoriteIds.size === 0) return items;
+    return items.filter((item) => favoriteIds.has(item.id));
+  }, [items, showFavoritesOnly, favoriteIds]);
 
   // Offset for carousel indices when welcome slide is present
   const indexOffset = showWelcome ? 1 : 0;
@@ -526,7 +538,18 @@ export function WalkerFeed({
         isIdle={isIdle}
         availableCountries={availableCountries}
         selectedCountry={selectedCountry}
+        showFavoritesOnly={showFavoritesOnly}
+        onToggleFavorites={() => {
+          setShowFavoritesOnly((prev) => {
+            const next = !prev;
+            analytics.track('filter_changed', { favorites_only: next });
+            return next;
+          });
+        }}
+        isLoggedIn={!!user}
         onSelectCountry={(country) => {
+          // Turn off favorites filter when switching countries
+          setShowFavoritesOnly(false);
           // Clear state immediately to show loader and prevent stale feed
           setIsLoading(true);
           loadedIdsRef.current = [];
@@ -556,8 +579,8 @@ export function WalkerFeed({
 
       {isLoading ? (
         <WalkerLoadingState />
-      ) : items.length === 0 ? (
-        <WalkerEmptyState />
+      ) : displayItems.length === 0 ? (
+        showFavoritesOnly ? <WalkerFavoritesEmptyState /> : <WalkerEmptyState />
       ) : (
         <div
           className='embla absolute inset-0 w-full h-full overflow-hidden'
@@ -572,7 +595,7 @@ export function WalkerFeed({
               </div>
             )}
 
-            {items.map((item, index) => {
+            {displayItems.map((item, index) => {
               // Slide index accounting for the optional welcome slide
               const slideIndex = index + indexOffset;
               // Only fully render slides within ±1 of the current view
