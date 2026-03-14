@@ -63,7 +63,8 @@ export function WalkerFeed({
   }, [user]);
 
   // Idle Prefetching State
-  const [lookaheadOffset, setLookaheadOffset] = useState(2);
+  // Start with just 1 slide ahead to avoid Cloudflare 429 Too Many Requests
+  const [lookaheadOffset, setLookaheadOffset] = useState(1);
 
   // Derived display items: when favorites filter is active, show server-fetched favorites
   const displayItems = useMemo(() => {
@@ -286,13 +287,12 @@ export function WalkerFeed({
         setItems(fetchedItems);
       }
 
-      // Pre-sign all image URLs in the batch *non-blockingly* so we don't delay the LCP
+      // Pre-sign all image URLs in the batch and AWAIT them so the first render
+      // of the first card already has signed URLs, preventing 403 leaks.
       const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems)
         .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
       
-      // We don't await this here. WalkerWelcome handles its own graceful reveal
-      // by showing text first and fading in postcards once images are cached.
-      preSignUrls(allUrls).catch(err => console.error('Failed to pre-sign URLs', err));
+      await preSignUrls(allUrls).catch(err => console.error('Failed to pre-sign URLs', err));
 
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
@@ -508,15 +508,16 @@ export function WalkerFeed({
   //    prop (sets `loading="eager"` + `fetchPriority="high"`) and uses the `useSignedImage` hook
   //    which correctly waits for signed URLs before rendering.
 
-  // Expand the lookahead window when the user stays idle on a card
+  // Expand the lookahead window slightly when the user stays idle on a card
   useEffect(() => {
-    // Reset back to standard 2-slide lookahead when we scroll to a new slide
-    setLookaheadOffset(2);
+    // Reset back to standard 1-slide lookahead when we scroll to a new slide
+    setLookaheadOffset(1);
 
-    // If we're resting on a slide, wait 1.5s then aggressively prefetch the next 5
+    // If we're resting on a slide, wait 2s then prefetch just 1 more (total 2)
+    // We keep this low to avoid triggering 429 errors on Cloudflare
     const timer = setTimeout(() => {
-      setLookaheadOffset(5);
-    }, 1500);
+      setLookaheadOffset(2);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [currentSlideIndex]);

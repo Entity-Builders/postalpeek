@@ -143,11 +143,14 @@ export async function preSignUrls(urls: string[]): Promise<void> {
 /**
  * Get the (potentially signed) path for an object.
  * If signing is enabled and the URL has been pre-signed, returns the signed path.
- * Otherwise returns the original path (for migration grace period).
+ * If signing is enabled but not yet complete, returns a sentinel.
+ * Otherwise returns the original path (for development with ALLOW_UNSIGNED=true).
  */
+export const SIGNING_SENTINEL = '__PENDING_SIGNATURE__';
+
 function resolveObjectPath(objectPath: string): string {
   if (!SIGN_KEY) return objectPath;
-  return preSignedStore.get(objectPath) || objectPath;
+  return preSignedStore.get(objectPath) || SIGNING_SENTINEL;
 }
 
 // ─── Public API ─────────────────────────────────────────────────
@@ -165,6 +168,9 @@ export function cdnUrl(url: string): string {
 
   const objectPath = normalized.replace(CDN_ORIGIN, '').replace(/^\//, '');
   const signedPath = resolveObjectPath(objectPath);
+
+  // If a signature is required but not ready, return empty string to prevent 403 leaks
+  if (signedPath === SIGNING_SENTINEL) return '';
 
   return `${CDN_ORIGIN}/${signedPath}`;
 }
@@ -211,6 +217,9 @@ export function cdnImage(url: string, opts: TransformOptions = {}): string {
 
   // Resolve to signed path (or original if signing is off)
   const signedPath = resolveObjectPath(rawPath);
+
+  // If a signature is required but not ready, return empty string to prevent 403 leaks
+  if (signedPath === SIGNING_SENTINEL) return '';
 
   // Build transform options string
   const params: string[] = [];

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { cdnImage, WIDTHS } from '../utils/imageUtils';
+import { cdnUrl, WIDTHS } from '../utils/imageUtils';
+import { useSignedImage } from '../utils/useSignedImage';
 import { sway, ease } from '../utils/useWelcomeAnimation';
 import type { FeedItem } from './Postcard';
 
@@ -30,18 +31,21 @@ export function AuthGateModal({
   const heroCards = viewedItems.slice(0, 3);
   const mainCard = heroCards[0];
 
-  // Eagerly preload hero images
-  const heroUrls = heroCards.map((c) => c.illustration_url).filter(Boolean);
-  const preloadedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    heroUrls.forEach((url) => {
-      if (!preloadedRef.current.has(url)) {
-        const img = new Image();
-        img.src = cdnImage(url, { width: WIDTHS.thumb });
-        preloadedRef.current.add(url);
-      }
-    });
-  }, [heroUrls]);
+  const [fallbackEnabled, setFallbackEnabled] = useState(false);
+
+  const baseImgUrl2 = useSignedImage(heroCards[2]?.illustration_url, { width: WIDTHS.thumb });
+  const baseImgUrl1 = useSignedImage(heroCards[1]?.illustration_url, { width: WIDTHS.thumb });
+  const baseImgUrl0 = useSignedImage(mainCard?.illustration_url, { width: WIDTHS.thumb });
+
+  const imgUrl2 = fallbackEnabled ? cdnUrl(heroCards[2]?.illustration_url || '') : baseImgUrl2;
+  const imgUrl1 = fallbackEnabled ? cdnUrl(heroCards[1]?.illustration_url || '') : baseImgUrl1;
+  const imgUrl0 = fallbackEnabled ? cdnUrl(mainCard?.illustration_url || '') : baseImgUrl0;
+
+  const handleImageFallback = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    if (e.currentTarget.src.includes('/cdn-cgi/image/')) {
+      setFallbackEnabled(true);
+    }
+  };
 
   /** Step 1: Send OTP to email */
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -119,11 +123,14 @@ export function AuthGateModal({
                 {...sway.back}
               >
                 <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
-                  <img
-                    src={cdnImage(heroCards[2].illustration_url, { width: WIDTHS.thumb })}
-                    alt=''
-                    className='w-full h-full object-cover'
-                  />
+                  {imgUrl2 && (
+                    <img
+                      src={imgUrl2}
+                      alt=''
+                      className='w-full h-full object-cover'
+                      onError={handleImageFallback}
+                    />
+                  )}
                 </div>
               </motion.div>
             )}
@@ -134,11 +141,14 @@ export function AuthGateModal({
                 {...sway.middle}
               >
                 <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
-                  <img
-                    src={cdnImage(heroCards[1].illustration_url, { width: WIDTHS.thumb })}
-                    alt=''
-                    className='w-full h-full object-cover'
-                  />
+                  {imgUrl1 && (
+                    <img
+                      src={imgUrl1}
+                      alt=''
+                      className='w-full h-full object-cover'
+                      onError={handleImageFallback}
+                    />
+                  )}
                 </div>
               </motion.div>
             )}
@@ -146,11 +156,14 @@ export function AuthGateModal({
             {mainCard && (
               <div className='absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]'>
                 <div className='w-full h-[calc(100%-24px)] overflow-hidden rounded-[2px] bg-stone-100'>
-                  <img
-                    src={cdnImage(mainCard.illustration_url, { width: WIDTHS.thumb })}
-                    alt={mainCard.category}
-                    className='w-full h-full object-cover'
-                  />
+                  {imgUrl0 && (
+                    <img
+                      src={imgUrl0}
+                      alt={mainCard.category}
+                      className='w-full h-full object-cover'
+                      onError={handleImageFallback}
+                    />
+                  )}
                 </div>
                 <p className='text-center font-handwriting text-[10px] sm:text-xs text-stone-500 mt-1 truncate px-1'>
                   {mainCard.city}, {mainCard.country}

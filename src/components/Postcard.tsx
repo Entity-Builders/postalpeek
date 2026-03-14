@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { WIDTHS, cdnImage, cdnUrl } from '../utils/imageUtils';
+import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../utils/useSignedImage';
 import {
   MapPin,
@@ -100,19 +100,34 @@ export function Postcard({
     }
   };
 
-  const handleImageError = () => {
+  const [fallbackEnabled, setFallbackEnabled] = useState(false);
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const currentSrc = e.currentTarget.src;
+    
+    // If the failed image was attempting a Cloudflare transformation, it's likely a 429 Free Tier limit.
+    // Trigger the React-level fallback which will instantly re-render all images on this card with raw URLs.
+    if (currentSrc.includes('/cdn-cgi/image/')) {
+      console.warn(`[Image Fallback] Cloudflare Limit (429) detected. Falling back to raw R2 images for card ${item.id}`);
+      setFallbackEnabled(true);
+      return;
+    }
+
     analytics.captureError(new Error('Image failed to load'), {
       postcard_id: item.id,
-      image_url: item.original_image_url,
+      image_url: currentSrc,
     });
   };
 
   // Derive non-blocking signed Cloudflare URLs for the images
-  // NOTE: The blur placeholder is NOT rendered here — WalkerFeed already renders
-  // a full-bleed 64px blur behind each card, so duplicating it wastes a CF transform request.
-  const mainImgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
-  // Only mobile + tablet in srcSet — desktop (1024) is already covered by mainImgUrl above
-  const srcSetString = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
+  const baseMainUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
+  const baseSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
+  const basePolaroidUrl = useSignedImage(item.original_image_url, { width: WIDTHS.thumb });
+
+  // If fallback is triggered, bypass the signed transformations and use raw signed URLs
+  const mainImgUrl = fallbackEnabled ? cdnUrl(item.illustration_url) : baseMainUrl;
+  const srcSetString = fallbackEnabled ? undefined : baseSrcSet;
+  const polaroidUrl = fallbackEnabled ? cdnUrl(item.original_image_url) : basePolaroidUrl;
 
   return (
     <div
@@ -158,6 +173,7 @@ export function Postcard({
               decoding='async'
               fetchPriority={isPriority ? 'high' : 'auto'}
               draggable={false}
+              onError={handleImageError}
               className={cn(
                 'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-1',
                 !item.video_url && 'hover:scale-105',
@@ -470,15 +486,17 @@ export function Postcard({
                 }}
               >
                 <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200 image-protected' onContextMenu={(e) => e.preventDefault()}>
-                  <img
-                    src={cdnImage(item.original_image_url, { width: WIDTHS.thumb })}
-                    alt='Original reality'
-                    loading='lazy'
-                    decoding='async'
-                    draggable={false}
-                    className='w-full h-full object-cover'
-                    onError={handleImageError} // Added onError handler
-                  />
+                  {polaroidUrl && (
+                    <img
+                      src={polaroidUrl}
+                      alt='Original reality'
+                      loading='lazy'
+                      decoding='async'
+                      draggable={false}
+                      className='w-full h-full object-cover'
+                      onError={handleImageError}
+                    />
+                  )}
                   <div className='absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]'>
                     <span className='flex items-center gap-1.5 text-white text-xs font-semibold tracking-wide bg-black/60 px-3 py-1.5 rounded-full'>
                       Inspect <ArrowUpRight className='w-3 h-3' />

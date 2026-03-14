@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import type { FeedItem } from './Postcard';
-import { WIDTHS } from '../utils/imageUtils';
-import { useSignedImage, useSignedSrcSet } from '../utils/useSignedImage';
+import { WIDTHS, cdnUrl } from '../utils/imageUtils';
+import { useSignedImage } from '../utils/useSignedImage';
 import { useWelcomeAnimation } from '../utils/useWelcomeAnimation';
 
 interface WalkerWelcomeProps {
@@ -23,12 +23,21 @@ interface WalkerWelcomeProps {
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const cards = previewCards.slice(0, 3);
 
-  const imgUrl2 = useSignedImage(cards[2]?.illustration_url, { width: WIDTHS.thumb });
-  const srcSet2 = useSignedSrcSet(cards[2]?.illustration_url, [WIDTHS.thumb]);
-  const imgUrl1 = useSignedImage(cards[1]?.illustration_url, { width: WIDTHS.thumb });
-  const srcSet1 = useSignedSrcSet(cards[1]?.illustration_url, [WIDTHS.thumb]);
-  const imgUrl0 = useSignedImage(cards[0]?.illustration_url, { width: WIDTHS.thumb });
-  const srcSet0 = useSignedSrcSet(cards[0]?.illustration_url, [WIDTHS.thumb]);
+  const [fallbackEnabled, setFallbackEnabled] = useState(false);
+
+  const baseImgUrl2 = useSignedImage(cards[2]?.illustration_url, { width: WIDTHS.thumb });
+  const baseImgUrl1 = useSignedImage(cards[1]?.illustration_url, { width: WIDTHS.thumb });
+  const baseImgUrl0 = useSignedImage(cards[0]?.illustration_url, { width: WIDTHS.thumb });
+
+  const imgUrl2 = fallbackEnabled ? cdnUrl(cards[2]?.illustration_url || '') : baseImgUrl2;
+  const imgUrl1 = fallbackEnabled ? cdnUrl(cards[1]?.illustration_url || '') : baseImgUrl1;
+  const imgUrl0 = fallbackEnabled ? cdnUrl(cards[0]?.illustration_url || '') : baseImgUrl0;
+
+  const handleImageFallback = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    if (e.currentTarget.src.includes('/cdn-cgi/image/')) {
+      setFallbackEnabled(true);
+    }
+  };
 
   const anim = useWelcomeAnimation(imgUrl0);
 
@@ -49,7 +58,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               {...anim.sway.back}
             >
               <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl2 && <img src={imgUrl2} srcSet={srcSet2 || undefined} alt="" className="w-full h-full object-cover" loading="eager" />}
+                {imgUrl2 && <img src={imgUrl2} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
             </motion.div>
           )}
@@ -61,7 +70,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               {...anim.sway.middle}
             >
               <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl1 && <img src={imgUrl1} srcSet={srcSet1 || undefined} alt="" className="w-full h-full object-cover" loading="eager" />}
+                {imgUrl1 && <img src={imgUrl1} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
             </motion.div>
           )}
@@ -70,7 +79,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           {cards[0] && (
             <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
               <div className="w-full h-[calc(100%-24px)] overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl0 && <img src={imgUrl0} srcSet={srcSet0 || undefined} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" />}
+                {imgUrl0 && <img src={imgUrl0} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
               <p className="text-center font-handwriting text-[10px] sm:text-xs text-stone-500 mt-1 truncate px-1">
                 {cards[0].city}, {cards[0].country}

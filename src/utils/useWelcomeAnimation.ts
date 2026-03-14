@@ -4,19 +4,33 @@ import { useState, useEffect } from 'react';
  * Reliable image-loaded detection using `new Image()`.
  * Handles both browser cache hits (`img.complete`) and cold loads.
  */
+/**
+ * Simplified image-loaded detection.
+ * If the src is empty (which it will be if signatures are pending), it returns false.
+ * Since we now block unsigned URLs in imageUtils, this naturally waits for the signature.
+ */
 function useImageLoaded(src: string): boolean {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!src) return;
-    const img = new Image();
-    img.src = src;
-    if (img.complete) {
-      queueMicrotask(() => setLoaded(true));
+    if (!src) {
+      queueMicrotask(() => setLoaded(false));
       return;
     }
-    img.onload = () => setLoaded(true);
-    img.onerror = () => setLoaded(true);
+    
+    const img = new Image();
+    img.src = src;
+    
+    const handleLoad = () => setLoaded(true);
+    const handleError = () => setLoaded(true); // Treat error as loaded to allow animations to proceed
+
+    if (img.complete) {
+      handleLoad();
+    } else {
+      img.onload = handleLoad;
+      img.onerror = handleError;
+    }
+
     return () => {
       img.onload = null;
       img.onerror = null;
