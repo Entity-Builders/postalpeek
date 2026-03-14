@@ -61,12 +61,12 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         {cards.length > 0 && (
           <motion.div
             className="relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-6 sm:mb-10 flex-shrink-0"
-            initial={{ opacity: 0, scale: 1.6, y: 40 }}
+            initial={{ opacity: 0, scale: 2.8, y: 60 }}
             animate={heroLoaded
               ? { opacity: 0.85, scale: 1, y: 0 }
-              : { opacity: 0, scale: 1.6, y: 40 }
+              : { opacity: 0, scale: 2.8, y: 60 }
             }
-            transition={{ duration: 1.2, ease, delay: 0.1 }}
+            transition={{ duration: 1.4, ease, delay: 0.1 }}
           >
             {cards[2] && (
               <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40">
