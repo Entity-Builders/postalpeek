@@ -78,6 +78,7 @@ export function WalkerFeed({
   const isFetchingRef = useRef(false);
   const freshPoolExhaustedRef = useRef(false); // When true, stop excluding seen IDs
   const currentFetchIdRef = useRef(0); // Track active fetch to prevent race conditions
+  const prefetchCacheRef = useRef<Map<string | '__everywhere__', FeedItem[]>>(new Map());
 
   // Parse Initial URL State (Slugs instead of query params)
   useEffect(() => {
@@ -162,6 +163,21 @@ export function WalkerFeed({
   const fetchInitialFeed = useCallback(async (country: string | null) => {
     const fetchId = ++currentFetchIdRef.current;
     isFetchingRef.current = true;
+
+    // Check prefetch cache first
+    const cacheKey = country ?? '__everywhere__';
+    const cached = prefetchCacheRef.current.get(cacheKey);
+    if (cached && cached.length > 0) {
+      prefetchCacheRef.current.delete(cacheKey);
+      loadedIdsRef.current = cached.map(item => item.id);
+      setItems(cached);
+      setHasMore(cached.length === PAGE_SIZE);
+      setIsLoading(false);
+      isFetchingRef.current = false;
+      freshPoolExhaustedRef.current = false;
+      return;
+    }
+
     setIsLoading(true);
     try {
       const segments = window.location.pathname.split('/').filter(Boolean);
@@ -272,6 +288,34 @@ export function WalkerFeed({
       }
     }
   }, []);
+
+  // Prefetch a country's feed on hover so data is instant when clicked
+  const prefetchCountry = useCallback(async (country: string | null) => {
+    const cacheKey = country ?? '__everywhere__';
+    // Don't prefetch if already cached or if it's the current selection
+    if (prefetchCacheRef.current.has(cacheKey) || country === selectedCountry) return;
+
+    try {
+      const seenIds = getSeenCardIds();
+      const { data } = await supabase.rpc('postalpeek_get_random_feed', {
+        p_limit: PAGE_SIZE,
+        p_country: country,
+        p_exclude_ids: seenIds,
+      });
+      if (data) {
+        prefetchCacheRef.current.set(cacheKey, data as FeedItem[]);
+        // Also preload the first few images
+        (data as FeedItem[]).slice(0, 3).forEach((item: FeedItem) => {
+          if (item.illustration_url) {
+            const img = new Image();
+            img.src = item.illustration_url;
+          }
+        });
+      }
+    } catch {
+      // Silent fail — prefetch is best-effort
+    }
+  }, [selectedCountry]);
 
   const fetchMoreFeed = useCallback(async () => {
     if (isFetchingRef.current || !hasMore) return;
@@ -555,6 +599,7 @@ export function WalkerFeed({
           });
         }}
         isLoggedIn={!!user}
+        onHoverCountry={prefetchCountry}
         onSelectCountry={(country) => {
           // If country hasn't changed, just clear favorites filter — data is already loaded
           if (country === selectedCountry) {

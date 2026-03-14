@@ -7,6 +7,7 @@ interface WalkerFilterMenuProps {
   availableCountries: string[];
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
+  onHoverCountry?: (country: string) => void;
   showFavoritesOnly: boolean;
   onToggleFavorites: () => void;
   isLoggedIn: boolean;
@@ -17,6 +18,7 @@ export function WalkerFilterMenu({
   availableCountries,
   selectedCountry,
   onSelectCountry,
+  onHoverCountry,
   showFavoritesOnly,
   onToggleFavorites,
   isLoggedIn,
@@ -101,6 +103,7 @@ export function WalkerFilterMenu({
           <button
             key={country}
             onClick={() => onSelectCountry(country)}
+            onMouseEnter={() => onHoverCountry?.(country)}
             className={cn(
               'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border',
               selectedCountry === country && !showFavoritesOnly
