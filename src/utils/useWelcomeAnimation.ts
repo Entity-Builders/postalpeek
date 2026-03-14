@@ -11,20 +11,26 @@ function useImageLoaded(src: string): boolean {
     if (!src) return;
     const img = new Image();
     img.src = src;
-    if (img.complete) { setLoaded(true); return; }
+    if (img.complete) {
+      queueMicrotask(() => setLoaded(true));
+      return;
+    }
     img.onload = () => setLoaded(true);
     img.onerror = () => setLoaded(true);
-    return () => { img.onload = null; img.onerror = null; };
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [src]);
 
   return loaded;
 }
 
-/* ─── Shared easing ─── */
-const ease = [0.22, 1, 0.36, 1] as const;
+/* ─── Shared easing (exported for reuse) ─── */
+export const ease = [0.22, 1, 0.36, 1] as const;
 
-/* ─── Sway loops for back postcards ─── */
-const sway = {
+/* ─── Sway loops for back postcards (exported for reuse) ─── */
+export const sway = {
   /** Card 3 (back): slow 6s breathing cycle */
   back: {
     animate: { rotate: [7, 9, 6, 7], x: [12, 14, 10, 12], y: [-4, -2, -6, -4] },
@@ -32,7 +38,11 @@ const sway = {
   },
   /** Card 2 (middle): slightly faster 5s cycle (desynchronized) */
   middle: {
-    animate: { rotate: [-5, -3, -7, -5], x: [-12, -10, -14, -12], y: [4, 6, 2, 4] },
+    animate: {
+      rotate: [-5, -3, -7, -5],
+      x: [-12, -10, -14, -12],
+      y: [4, 6, 2, 4],
+    },
     transition: { duration: 5, ease: 'easeInOut' as const, repeat: Infinity },
   },
 };
