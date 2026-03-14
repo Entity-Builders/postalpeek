@@ -35,7 +35,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
 
       {/* ─── Postcards: absolutely positioned, drops from above ─── */}
       <motion.div
-        className="absolute top-[6%] sm:top-[8%] left-1/2 -translate-x-1/2 w-[180px] h-[200px] sm:w-[240px] sm:h-[270px] z-10"
+        className="absolute top-[4%] sm:top-[6%] left-1/2 -translate-x-1/2 w-[60vw] h-[35dvh] sm:w-[320px] sm:h-[380px] z-10"
         {...anim.postcards}
       >
         {/* Card 3 (back) — continuous sway */}
@@ -85,7 +85,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
       </motion.div>
 
       {/* ─── Text content: centered, starts from frame 0 ─── */}
-      <div className="flex flex-col items-center mt-[52%] sm:mt-[42%]">
+      <div className="flex flex-col items-center mt-[42dvh] sm:mt-[46%]">
         <motion.p
           className="text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-3 sm:mb-5 text-center"
           {...anim.presents}
