@@ -62,6 +62,9 @@ export function WalkerFeed({
     if (!user) setShowFavoritesOnly(false);
   }, [user]);
 
+  // Idle Prefetching State
+  const [lookaheadOffset, setLookaheadOffset] = useState(2);
+
   // Derived display items: when favorites filter is active, show server-fetched favorites
   const displayItems = useMemo(() => {
     if (!showFavoritesOnly) return items;
@@ -473,22 +476,42 @@ export function WalkerFeed({
     };
   }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user, showWelcome, indexOffset]);
 
-  // Preload the next slide's illustration so it's ready before the user scrolls
+  // Preload the next 2 slides illustrations so they are ready before the user scrolls
   useEffect(() => {
-    const nextItemIndex = currentSlideIndex - indexOffset + 1;
-    const nextItem = items[nextItemIndex];
-    if (!nextItem?.illustration_url) return;
+    const preloadAhead = 2; // load up to 2 items ahead
+    for (let i = 1; i <= preloadAhead; i++) {
+        const nextItemIndex = currentSlideIndex - indexOffset + i;
+        const nextItem = items[nextItemIndex];
+        if (!nextItem?.illustration_url) continue;
 
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = cdnImage(nextItem.illustration_url, { width: WIDTHS.desktop });
-    document.head.appendChild(link);
+        const url = cdnImage(nextItem.illustration_url, { width: WIDTHS.desktop });
+        
+        // Only preload if not already in document to prevent duplicates
+        if (!document.querySelector(`link[rel="preload"][href="${url}"]`)) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = url;
+            document.head.appendChild(link);
+            
+            // Clean up old preloads might be too aggressive, leaving them attached for now
+            // NextJS and Vite generally leave them
+        }
+    }
+  }, [currentSlideIndex, items, indexOffset, lookaheadOffset]);
 
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, [currentSlideIndex, items, indexOffset]);
+  // Expand the lookahead window when the user stays idle on a card
+  useEffect(() => {
+    // Reset back to standard 2-slide lookahead when we scroll to a new slide
+    setLookaheadOffset(2);
+
+    // If we're resting on a slide, wait 1.5s then aggressively prefetch the next 5
+    const timer = setTimeout(() => {
+      setLookaheadOffset(5);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentSlideIndex]);
 
   // Shared debounce ref for both wheel and keyboard navigation.
   // We use a strict time-based debounce to handle high-precision
@@ -630,8 +653,9 @@ export function WalkerFeed({
             {displayItems.map((item, index) => {
               // Slide index accounting for the optional welcome slide
               const slideIndex = index + indexOffset;
-              // Only fully render slides within ±1 of the current view
-              const isNearby = Math.abs(slideIndex - currentSlideIndex) <= 1;
+              // Render 1 slide backwards (above) and dynamic slides forwards (up to 5 if resting)
+              const difference = slideIndex - currentSlideIndex;
+              const isNearby = difference >= -1 && difference <= lookaheadOffset;
 
               return (
                 <div
