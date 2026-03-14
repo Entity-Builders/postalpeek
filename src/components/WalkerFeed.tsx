@@ -18,6 +18,7 @@ import type { User } from '@supabase/supabase-js';
 /** Number of free postcards before the auth gate kicks in */
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
+const AUTH_GATE_CARDS_KEY = 'postalpeek_auth_cards';
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArr = [...array];
@@ -380,6 +381,16 @@ export function WalkerFeed({
       if (!user && itemIndex >= FREE_CARD_LIMIT - 1) {
         setShowAuthGate(true);
         sessionStorage.setItem(AUTH_GATE_KEY, 'true');
+        // Cache hero cards so images are instant on refresh
+        try {
+          const heroCards = items.slice(0, 3).map(c => ({
+            id: c.id, illustration_url: c.illustration_url,
+            city: c.city, country: c.country, category: c.category,
+          }));
+          sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
+        } catch { /* quota exceeded — no big deal */ }
+        // Reset URL so no hash lingers behind the auth gate
+        window.history.replaceState(null, '', '/');
         analytics.track('auth_gate_shown', { items_viewed: itemIndex + 1 });
       }
     };
@@ -577,8 +588,19 @@ export function WalkerFeed({
           onSuccess={() => {
             setShowAuthGate(false);
             sessionStorage.removeItem(AUTH_GATE_KEY);
+            sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
           }}
-          viewedItems={items.slice(0, FREE_CARD_LIMIT)}
+          viewedItems={
+            items.length > 0
+              ? items.slice(0, FREE_CARD_LIMIT)
+              : (() => {
+                  // On refresh, items may still be loading — use cached cards
+                  try {
+                    const cached = sessionStorage.getItem(AUTH_GATE_CARDS_KEY);
+                    return cached ? JSON.parse(cached) : [];
+                  } catch { return []; }
+                })()
+          }
         />
       )}
     </div>

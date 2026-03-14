@@ -10,8 +10,14 @@
   --color-background: var(--bg-base);
   --color-surface: var(--bg-surface);
 
-  --animate-fade-in: fadeIn 0.5s ease-out forwards;
-  --animate-slide-up: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fadeIn 0.8s ease-out forwards;
+  --animate-slide-up: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+  --animate-modal-bg: modalFadeIn 0.6s ease-out forwards;
+
+  @keyframes modalFadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
 
   @keyframes fadeIn {
     0% {
@@ -27,13 +33,28 @@
   @keyframes slideUp {
     0% {
       opacity: 0;
-      transform: translateY(100%);
+      transform: translateY(40px);
     }
     100% {
       opacity: 1;
       transform: translateY(0);
     }
   }
+
+  @keyframes dropSettle {
+    0% {
+      opacity: 0;
+      transform: translateX(var(--drop-tx, 0px)) translateY(calc(var(--drop-ty, 0px) - 10px)) rotate(var(--drop-rotate-to));
+    }
+    100% {
+      opacity: var(--drop-opacity, 1);
+      transform: translateX(var(--drop-tx, 0px)) translateY(var(--drop-ty, 0px)) rotate(var(--drop-rotate-to));
+    }
+  }
+
+  --animate-drop-1: dropSettle 0.6s ease-out 0.1s forwards;
+  --animate-drop-2: dropSettle 0.6s ease-out 0.25s forwards;
+  --animate-drop-3: dropSettle 0.6s ease-out 0.45s forwards;
 }
 
 :root {
