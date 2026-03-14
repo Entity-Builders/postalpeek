@@ -119,7 +119,10 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#0a0a12] overflow-hidden">
+    <div
+      className="fixed inset-0 z-[100] bg-[#0a0a12]"
+      style={{ width: '100vw', height: '100dvh' }}
+    >
       {/* Ambient glow from the hero postcard */}
       {mainCard && (
         <div
@@ -132,11 +135,14 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
         />
       )}
 
-      {/* Centered container — full screen on mobile, constrained card on desktop */}
-      <div className="relative z-10 w-full flex flex-col h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:mx-auto sm:my-auto">
+      {/* Grid layout: hero fills remaining space, form anchored at bottom */}
+      <div
+        className="relative z-10 w-full h-full sm:max-w-md sm:mx-auto sm:h-auto sm:max-h-[90vh] sm:my-auto"
+        style={{ display: 'grid', gridTemplateRows: '1fr auto' }}
+      >
 
         {/* ─── TOP: Hero Postcard Showcase ─── */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-end px-6 pb-4 pt-6">
+        <div className="overflow-hidden flex flex-col items-center justify-end px-6 pb-4 pt-6">
           {/* Stacked postcards OR branded fallback */}
           {mainCard ? (
             <div className="relative w-[180px] h-[200px] sm:w-[260px] sm:h-[280px]">
