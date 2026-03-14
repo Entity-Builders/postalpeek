@@ -119,7 +119,7 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0a12]">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#0a0a12] overflow-hidden">
       {/* Ambient glow from the hero postcard */}
       {mainCard && (
         <div
@@ -132,14 +132,14 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
         />
       )}
 
-      {/* Centered container — constrained on desktop, full on mobile */}
-      <div className="relative z-10 w-full max-w-md mx-auto flex flex-col h-full sm:h-auto sm:max-h-[90vh]">
+      {/* Centered container — full screen on mobile, constrained card on desktop */}
+      <div className="relative z-10 w-full flex flex-col h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:mx-auto sm:my-auto">
 
         {/* ─── TOP: Hero Postcard Showcase ─── */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pt-10 pb-6 min-h-0">
-          {/* Stacked postcards */}
-          {mainCard && (
-            <div className="relative w-[240px] h-[260px] sm:w-[260px] sm:h-[280px]">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-end px-6 pb-4 pt-6">
+          {/* Stacked postcards OR branded fallback */}
+          {mainCard ? (
+            <div className="relative w-[180px] h-[200px] sm:w-[260px] sm:h-[280px]">
               {/* Card 3 (back) */}
               {heroCards[2] && (
                 <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-lg rotate-6 translate-x-3 -translate-y-1 opacity-50">
@@ -187,10 +187,22 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
                 </div>
               </div>
             </div>
+          ) : (
+            /* Branded fallback — no postcards seen yet */
+            <div className="flex flex-col items-center gap-5 animate-fade-in">
+              <div className="w-24 h-24 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center bg-white/5 backdrop-blur-sm">
+                <span className="font-mono text-[11px] text-white/50 uppercase tracking-wider text-center leading-tight">
+                  Postal<br />Peek
+                </span>
+              </div>
+              <p className="text-white/25 text-xs font-mono tracking-widest uppercase">
+                Postcards from everywhere
+              </p>
+            </div>
           )}
 
           {/* Walker Copy */}
-          <div className="text-center mt-8">
+          <div className="text-center mt-5">
             <p className="text-white/35 text-[11px] font-mono tracking-[0.25em] uppercase mb-3">
               {viewedItems.length} postcards delivered · ∞ remaining
             </p>
@@ -205,8 +217,8 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
           </div>
         </div>
 
-        {/* ─── BOTTOM: Auth Form (Bottom Sheet) ─── */}
-        <div className="bg-white rounded-t-3xl sm:rounded-3xl px-7 pt-7 pb-9 animate-slide-up shadow-[0_-20px_60px_rgba(0,0,0,0.4)]">
+        {/* ─── BOTTOM: Auth Form (Bottom Sheet — full-width on mobile) ─── */}
+        <div className="bg-white rounded-t-3xl sm:rounded-3xl px-7 pt-7 pb-[max(2.25rem,env(safe-area-inset-bottom,2.25rem))] sm:pb-9 sm:mb-6 animate-slide-up shadow-[0_-20px_60px_rgba(0,0,0,0.4)]">
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-500 text-sm rounded-xl px-4 py-2.5 mb-4 text-center">
               {error}
@@ -225,14 +237,14 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
                   onChange={(e) => setEmail(e.target.value)}
                   autoFocus
                   required
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 text-sm placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 focus:bg-white transition-all"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 text-base placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 focus:bg-white transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading || !email}
-                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:bg-stone-200 disabled:text-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-1 shadow-lg shadow-indigo-600/20"
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:bg-indigo-600/30 disabled:text-white/50 disabled:shadow-none text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-1 shadow-lg shadow-indigo-600/20"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -271,13 +283,13 @@ export function AuthGateModal({ onSuccess, viewedItems = [] }: AuthGateModalProp
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 autoFocus
                 required
-                className="w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 text-center text-lg tracking-[0.5em] font-mono placeholder:text-stone-400 placeholder:tracking-normal placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 focus:bg-white transition-all"
+                className="w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 text-center text-xl tracking-[0.5em] font-mono placeholder:text-stone-400 placeholder:tracking-normal placeholder:text-base focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 focus:bg-white transition-all"
               />
 
               <button
                 type="submit"
                 disabled={loading || otpCode.length < 6}
-                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:bg-stone-200 disabled:text-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-1 shadow-lg shadow-indigo-600/20"
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] disabled:bg-indigo-600/30 disabled:text-white/50 disabled:shadow-none text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-1 shadow-lg shadow-indigo-600/20"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
