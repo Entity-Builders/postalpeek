@@ -268,10 +268,15 @@ export function AuthGateModal({
                     <Mail className='absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400' />
                     <input
                       type='email'
+                      name='email'
                       placeholder='Email'
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete='email'
+                      autoCapitalize='none'
+                      autoCorrect='off'
+                      spellCheck={false}
                       className='w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-base placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm'
                     />
                   </div>

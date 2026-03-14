@@ -53,10 +53,15 @@ export function AdminLoginModal({ onLogin, onClose }: AdminLoginModalProps) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
             type="email"
+            name="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoFocus
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full px-4 py-3 rounded-lg border border-stone-200 bg-stone-50 text-stone-800 text-sm placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-colors"
           />
           <input
