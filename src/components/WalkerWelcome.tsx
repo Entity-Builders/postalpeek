@@ -69,18 +69,26 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
             transition={{ duration: 1.4, ease, delay: 0.1 }}
           >
             {cards[2] && (
-              <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40">
+              <motion.div
+                className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40"
+                animate={{ rotate: [7, 9, 6, 7], x: [12, 14, 10, 12], y: [-4, -2, -6, -4] }}
+                transition={{ duration: 6, ease: 'easeInOut', repeat: Infinity }}
+              >
                 <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
                   <img src={imgUrl2} srcSet={srcSet2} alt="" className="w-full h-full object-cover" loading="eager" />
                 </div>
-              </div>
+              </motion.div>
             )}
             {cards[1] && (
-              <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60">
+              <motion.div
+                className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60"
+                animate={{ rotate: [-5, -3, -7, -5], x: [-12, -10, -14, -12], y: [4, 6, 2, 4] }}
+                transition={{ duration: 5, ease: 'easeInOut', repeat: Infinity }}
+              >
                 <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
                   <img src={imgUrl1} srcSet={srcSet1} alt="" className="w-full h-full object-cover" loading="eager" />
                 </div>
-              </div>
+              </motion.div>
             )}
             {cards[0] && (
               <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
