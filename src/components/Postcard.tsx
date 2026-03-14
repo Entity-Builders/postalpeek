@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { cdnUrl } from '../utils/imageUtils';
 import {
   MapPin,
   ArrowUpRight,
@@ -125,7 +126,7 @@ export function Postcard({
           >
             {isNearby ? (
               <img
-                src={item.illustration_url}
+                src={cdnUrl(item.illustration_url)}
                 alt={item.category}
                 loading={isActive ? 'eager' : 'lazy'}
                 decoding='async'
@@ -144,14 +145,14 @@ export function Postcard({
               (item.video_url.toLowerCase().includes('.gif') ? (
                 <img
                   key={item.video_url}
-                  src={item.video_url}
+                  src={cdnUrl(item.video_url!)}
                   alt='Animated Scene'
                   className='absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none'
                 />
               ) : (
                 <video
                   key={item.video_url}
-                  src={item.video_url}
+                  src={cdnUrl(item.video_url!)}
                   autoPlay
                   muted
                   loop
@@ -443,7 +444,7 @@ export function Postcard({
               >
                 <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200'>
                   <img
-                    src={item.original_image_url}
+                    src={cdnUrl(item.original_image_url)}
                     alt='Original reality'
                     loading='lazy'
                     decoding='async'

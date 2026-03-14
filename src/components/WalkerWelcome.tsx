@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { cdnUrl } from '../utils/imageUtils';
 
 interface WalkerWelcomeProps {
   /** First postcards from the feed to display as stacked preview */
@@ -30,7 +31,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40">
                 <div className="w-full h-full overflow-hidden rounded-[2px]">
                   <img
-                    src={cards[2].illustration_url}
+                    src={cdnUrl(cards[2].illustration_url)}
                     alt=""
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -43,7 +44,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60">
                 <div className="w-full h-full overflow-hidden rounded-[2px]">
                   <img
-                    src={cards[1].illustration_url}
+                    src={cdnUrl(cards[1].illustration_url)}
                     alt=""
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -56,7 +57,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
                 <div className="w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px]">
                   <img
-                    src={cards[0].illustration_url}
+                    src={cdnUrl(cards[0].illustration_url)}
                     alt={cards[0].category}
                     className="w-full h-full object-cover"
                     loading="lazy"

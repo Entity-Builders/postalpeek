@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { cdnUrl } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
 
 interface AuthGateModalProps {
@@ -37,7 +38,7 @@ export function AuthGateModal({
     heroUrls.forEach((url) => {
       if (!preloadedRef.current.has(url)) {
         const img = new Image();
-        img.src = url;
+        img.src = cdnUrl(url);
         preloadedRef.current.add(url);
       }
     });
@@ -107,7 +108,7 @@ export function AuthGateModal({
         <div
           className='absolute inset-0 opacity-25 blur-[100px] scale-150'
           style={{
-            backgroundImage: `url(${mainCard.illustration_url})`,
+            backgroundImage: `url(${cdnUrl(mainCard.illustration_url)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
@@ -140,7 +141,7 @@ export function AuthGateModal({
                 >
                   <div className='w-full h-full overflow-hidden rounded-[2px]'>
                     <img
-                      src={heroCards[2].illustration_url}
+                      src={cdnUrl(heroCards[2].illustration_url)}
                       alt=''
                       className='w-full h-full object-cover'
                     />
@@ -163,7 +164,7 @@ export function AuthGateModal({
                 >
                   <div className='w-full h-full overflow-hidden rounded-[2px]'>
                     <img
-                      src={heroCards[1].illustration_url}
+                      src={cdnUrl(heroCards[1].illustration_url)}
                       alt=''
                       className='w-full h-full object-cover'
                     />
@@ -182,7 +183,7 @@ export function AuthGateModal({
               >
                 <div className='w-full h-[calc(100%-20px)] overflow-hidden rounded-[2px]'>
                   <img
-                    src={mainCard.illustration_url}
+                    src={cdnUrl(mainCard.illustration_url)}
                     alt={mainCard.category}
                     className='w-full h-full object-cover'
                   />

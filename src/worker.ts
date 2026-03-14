@@ -97,7 +97,12 @@ export default {
       if (postcard) {
         const title = `${postcard.category} — ${postcard.city}, ${postcard.country} | PostalPeek`;
         const description = postcard.description;
-        const image = postcard.illustration_url;
+        const image = postcard.illustration_url
+          ? postcard.illustration_url.replace(
+              'pub-2fd871195f814f7083d91fe7dbbdb4b2.r2.dev',
+              'img.postalpeek.app',
+            )
+          : '';
         const pageUrl = url.href;
 
         // Replace placeholder tokens with actual values
