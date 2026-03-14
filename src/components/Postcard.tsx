@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, ArrowUpRight, Info, Heart, Share2, Check, Play, Wand2, Loader2 } from 'lucide-react';
+import {
+  MapPin,
+  ArrowUpRight,
+  Info,
+  Heart,
+  Share2,
+  Check,
+  Play,
+  Wand2,
+  Loader2,
+} from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
@@ -40,17 +50,32 @@ interface PostcardProps {
   onAuthRequired?: (postcardId: string) => void;
 }
 
-export function Postcard({ item, isActive, isAdmin = false, isNearby = true, favoriteIds, onToggleFavorite, onAuthRequired }: PostcardProps) {
+export function Postcard({
+  item,
+  isActive,
+  isAdmin = false,
+  isNearby = true,
+  favoriteIds,
+  onToggleFavorite,
+  onAuthRequired,
+}: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
   const [isCopied, setIsCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [localAnimState, setLocalAnimState] = useState<'idle' | 'queued' | null>(null);
+  const [localAnimState, setLocalAnimState] = useState<
+    'idle' | 'queued' | null
+  >(null);
 
-  const animationState = item.video_url ? 'completed' :
-    item.video_generation_status === 'processing' ? 'processing' :
-    localAnimState !== null ? localAnimState :
-    item.should_animate ? 'queued' : 'idle';
+  const animationState = item.video_url
+    ? 'completed'
+    : item.video_generation_status === 'processing'
+      ? 'processing'
+      : localAnimState !== null
+        ? localAnimState
+        : item.should_animate
+          ? 'queued'
+          : 'idle';
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
@@ -93,7 +118,7 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
         {/* FRONT FACE (Pure Art - Subtle & Minimalist) */}
         <div className='absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'>
           {/* The Illustration */}
-          <div 
+          <div
             className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner'
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -107,20 +132,21 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                 fetchPriority={isActive ? 'high' : 'auto'}
                 className={cn(
                   'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
-                  !item.video_url && 'hover:scale-105'
+                  !item.video_url && 'hover:scale-105',
                 )}
               />
             ) : (
               <div className='absolute inset-0 w-full h-full bg-stone-200/50' />
             )}
-            
-            {item.video_url && isHovered && (
-              item.video_url.toLowerCase().includes('.gif') ? (
+
+            {item.video_url &&
+              isHovered &&
+              (item.video_url.toLowerCase().includes('.gif') ? (
                 <img
                   key={item.video_url}
                   src={item.video_url}
-                  alt="Animated Scene"
-                  className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
+                  alt='Animated Scene'
+                  className='absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none'
                 />
               ) : (
                 <video
@@ -137,17 +163,14 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                     // Force playback explicitly if autoPlay gets blocked by browser policies
                     e.currentTarget.play().catch(() => {});
                   }}
-                  className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
+                  className='absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none'
                 />
-              )
-            )}
+              ))}
 
             {/* Subtle Play Icon indicator */}
             {item.video_url && !isHovered && (
-              <div 
-                className="absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300"
-              >
-                <Play className="w-3.5 h-3.5 fill-white/80" />
+              <div className='absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300'>
+                <Play className='w-3.5 h-3.5 fill-white/80' />
               </div>
             )}
             {/* Stamp overlay effect */}
@@ -167,12 +190,12 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
           {/* Bottom margin (Title & Location) */}
           <div className='mt-3 md:mt-4 px-2 flex justify-between items-end'>
             <div>
-              <h3 className='font-serif text-lg md:text-xl text-stone-800 tracking-tight leading-none mb-1'>
+              <h3 className='font-serif text-lg md:text-xl font-semibold tracking-tight leading-none mb-1' style={{ color: '#1a1a1a' }}>
                 {item.category.replace(/[\u{1F300}-\u{1F9FF}]/u, '').trim()}
               </h3>
               <div className='flex items-center gap-1.5 min-w-0'>
                 <MapPin className='w-3.5 h-3.5 text-stone-400 shrink-0' />
-                <p className='text-sm md:text-base text-stone-500 tracking-wide font-light truncate'>
+                <p className='text-sm md:text-base text-neutral-600 tracking-wide truncate'>
                   {item.city}, {item.country}
                 </p>
               </div>
@@ -247,9 +270,9 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                 <button
                   className={cn(
                     'p-2 md:p-2.5 rounded-full transition-colors',
-                    animationState === 'processing' 
+                    animationState === 'processing'
                       ? 'bg-amber-100 text-amber-500 cursor-not-allowed'
-                      : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600'
+                      : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600',
                   )}
                   disabled={animationState === 'processing'}
                   onClick={async (e) => {
@@ -257,7 +280,7 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                     if (animationState === 'processing') return;
 
                     setLocalAnimState('queued'); // optimistic: show spinner immediately
-                    
+
                     try {
                       const { data, error } = await supabase.functions.invoke(
                         'postalpeek-video-trigger',
@@ -270,15 +293,18 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                         let provider: string | undefined;
                         let httpStatus: number | undefined;
                         try {
-                          const body = typeof error === 'object' && error.context
-                            ? await error.context.json()
-                            : null;
+                          const body =
+                            typeof error === 'object' && error.context
+                              ? await error.context.json()
+                              : null;
                           if (body) {
                             reason = body.reason || body.error || reason;
                             provider = body.provider;
                             httpStatus = body.httpStatus;
                           }
-                        } catch { /* response already consumed or not JSON */ }
+                        } catch {
+                          /* response already consumed or not JSON */
+                        }
 
                         analytics.captureError(
                           error instanceof Error ? error : new Error(reason),
@@ -308,7 +334,7 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                         );
                         return;
                       }
-                      
+
                       // The function updated the DB, realtime or next fetch will pick it up
                       console.log('[Postcard] Video triggered:', data);
                       analytics.track('video_trigger_success', {
@@ -332,9 +358,14 @@ export function Postcard({ item, isActive, isAdmin = false, isNearby = true, fav
                       alert('Failed to trigger video generation');
                     }
                   }}
-                  title={animationState === 'processing' ? 'Processing Video...' : 'Generate Video Animation'}
+                  title={
+                    animationState === 'processing'
+                      ? 'Processing Video...'
+                      : 'Generate Video Animation'
+                  }
                 >
-                  {animationState === 'processing' || animationState === 'queued' ? (
+                  {animationState === 'processing' ||
+                  animationState === 'queued' ? (
                     <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
                   ) : (
                     <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
