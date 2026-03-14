@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -54,8 +54,33 @@ export function WalkerCarousel({
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
+
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>([]);
-  const previousDisplayItemsRef = useRef<FeedItem[]>([]);
+  const [prevDisplayItems, setPrevDisplayItems] =
+    useState<FeedItem[]>(displayItems);
+
+  // Synchronously derive state during render to avoid cascading renders in useEffect
+  if (displayItems !== prevDisplayItems) {
+    setPrevDisplayItems(displayItems);
+    if (displayItems.length === 0) {
+      setStaggeredItems([]);
+    } else {
+      const prevIds = new Set(prevDisplayItems.map((i) => i.id));
+      const isNewFeed =
+        prevIds.size === 0 || !displayItems.some((i) => prevIds.has(i.id));
+      if (isNewFeed) {
+        setStaggeredItems(displayItems.slice(0, 2));
+      } else {
+        setStaggeredItems(displayItems);
+      }
+    }
+  }
+
+  const [prevSlideIndex, setPrevSlideIndex] = useState(-1);
+  if (currentSlideIndex !== prevSlideIndex) {
+    setPrevSlideIndex(currentSlideIndex);
+    setLookaheadOffset(1);
+  }
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: 'y',
@@ -70,32 +95,23 @@ export function WalkerCarousel({
     if (emblaApi) {
       emblaApi.scrollTo(0, true);
     }
-    setCurrentSlideIndex(0);
   }, [showFavoritesOnly, emblaApi]);
 
   useEffect(() => {
-    if (displayItems.length === 0) {
-      setStaggeredItems([]);
-      previousDisplayItemsRef.current = [];
-      return;
-    }
+    if (displayItems.length === 0) return;
 
-    const prevItems = previousDisplayItemsRef.current;
-    previousDisplayItemsRef.current = displayItems;
-
-    const prevIds = new Set(prevItems.map((i) => i.id));
-    const isNewFeed = prevIds.size === 0 || !displayItems.some((i) => prevIds.has(i.id));
+    // We already calculated this during render, but we need it here to know if we should set the timeout
+    const prevIds = new Set(prevDisplayItems.map((i) => i.id));
+    const isNewFeed =
+      prevIds.size === 0 || !displayItems.some((i) => prevIds.has(i.id));
 
     if (isNewFeed) {
-      setStaggeredItems(displayItems.slice(0, 2));
       const timer = setTimeout(() => {
         setStaggeredItems(displayItems);
       }, 150);
       return () => clearTimeout(timer);
-    } else {
-      setStaggeredItems(displayItems);
     }
-  }, [displayItems]);
+  }, [displayItems, prevDisplayItems]);
 
   const indexOffset = showWelcome ? 1 : 0;
 
@@ -133,7 +149,10 @@ export function WalkerCarousel({
 
         let newUrl = `/${hash}`;
         if (selectedCountry) {
-          const countrySlug = encodeURIComponent(selectedCountry).replace(/%20/g, '-');
+          const countrySlug = encodeURIComponent(selectedCountry).replace(
+            /%20/g,
+            '-',
+          );
           newUrl = `/${countrySlug}/${hash}`;
         }
 
@@ -157,7 +176,10 @@ export function WalkerCarousel({
             country: c.country,
             category: c.category,
           }));
-          sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
+          sessionStorage.setItem(
+            AUTH_GATE_CARDS_KEY,
+            JSON.stringify(heroCards),
+          );
         } catch {
           /* quota exceeded */
         }
@@ -171,10 +193,20 @@ export function WalkerCarousel({
     return () => {
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user, showWelcome, indexOffset, setIsOnWelcome, setShowAuthGate]);
+  }, [
+    emblaApi,
+    hasMore,
+    fetchMoreFeed,
+    items,
+    selectedCountry,
+    user,
+    showWelcome,
+    indexOffset,
+    setIsOnWelcome,
+    setShowAuthGate,
+  ]);
 
   useEffect(() => {
-    setLookaheadOffset(1);
     const timer = setTimeout(() => {
       setLookaheadOffset(2);
     }, 2000);
@@ -197,7 +229,7 @@ export function WalkerCarousel({
         navTimeout.current = null;
       }, 600);
     },
-    [emblaApi]
+    [emblaApi],
   );
 
   const handleWheel = useCallback(
@@ -209,12 +241,15 @@ export function WalkerCarousel({
         scrollWithDebounce(e.deltaY > 0 ? 'next' : 'prev');
       }
     },
-    [emblaApi, scrollWithDebounce]
+    [emblaApi, scrollWithDebounce],
   );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
       if (e.key === 'ArrowDown' || e.key === 'j') {
@@ -231,10 +266,14 @@ export function WalkerCarousel({
   }, [scrollWithDebounce]);
 
   return (
-    <div className="embla absolute inset-0 w-full h-full overflow-hidden" ref={emblaRef} onWheel={handleWheel}>
-      <div className="embla__container h-full flex flex-col">
+    <div
+      className='embla absolute inset-0 w-full h-full overflow-hidden'
+      ref={emblaRef}
+      onWheel={handleWheel}
+    >
+      <div className='embla__container h-full flex flex-col'>
         {showWelcome && (
-          <div className="embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative">
+          <div className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
             <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
           </div>
         )}
@@ -245,23 +284,31 @@ export function WalkerCarousel({
           const isNearby = difference >= -1 && difference <= lookaheadOffset;
 
           return (
-            <div key={`${item.id}-${index}`} className="embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative">
+            <div
+              key={`${item.id}-${index}`}
+              className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
+            >
               {isNearby && (
                 <img
-                  src={cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 })}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu"
+                  src={cdnImage(item.illustration_url, {
+                    width: WIDTHS.blur,
+                    quality: 50,
+                  })}
+                  alt=''
+                  loading='lazy'
+                  decoding='async'
+                  className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
                 />
               )}
-              <div className="absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80" />
+              <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
 
-              <div className="z-10 w-full h-full flex items-center justify-center">
+              <div className='z-10 w-full h-full flex items-center justify-center'>
                 <Postcard
                   item={item}
                   isActive={true}
-                  isPriority={slideIndex === currentSlideIndex || difference === 1}
+                  isPriority={
+                    slideIndex === currentSlideIndex || difference === 1
+                  }
                   isAdmin={isAdmin}
                   isNearby={isNearby}
                   favoriteIds={favoriteIds}
@@ -280,11 +327,17 @@ export function WalkerCarousel({
                               country: c.country,
                               category: c.category,
                             }));
-                            sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
+                            sessionStorage.setItem(
+                              AUTH_GATE_CARDS_KEY,
+                              JSON.stringify(heroCards),
+                            );
                           } catch {
                             /* quota exceeded */
                           }
-                          analytics.track('auth_gate_shown', { trigger: 'favorite', postcard_id: postcardId });
+                          analytics.track('auth_gate_shown', {
+                            trigger: 'favorite',
+                            postcard_id: postcardId,
+                          });
                         }
                       : undefined
                   }
@@ -295,8 +348,8 @@ export function WalkerCarousel({
         })}
 
         {isFetchingMore && (
-          <div className="embla__slide w-full h-[30vh] shrink-0 flex items-center justify-center relative">
-            <Loader2 className="w-6 h-6 text-indigo-900/50 animate-spin" />
+          <div className='embla__slide w-full h-[30vh] shrink-0 flex items-center justify-center relative'>
+            <Loader2 className='w-6 h-6 text-indigo-900/50 animate-spin' />
           </div>
         )}
       </div>
