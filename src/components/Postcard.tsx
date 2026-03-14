@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { WIDTHS, cdnUrl } from '../utils/imageUtils';
-import { useSignedImage, useSignedSrcSet } from '../utils/useSignedImage';
+import { WIDTHS } from '../utils/imageUtils';
+import { useSignedImage, useSignedSrcSet, useRawSignedImage } from '../utils/useSignedImage';
 import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import { PostcardFront } from './PostcardFront';
@@ -104,10 +104,13 @@ export function Postcard({
   const baseSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
   const basePolaroidUrl = useSignedImage(item.original_image_url, { width: WIDTHS.thumb });
 
+  const rawMainUrl = useRawSignedImage(item.illustration_url);
+  const rawPolaroidUrl = useRawSignedImage(item.original_image_url);
+
   // If fallback is triggered, bypass the signed transformations and use raw signed URLs
-  const mainImgUrl = fallbackEnabled ? cdnUrl(item.illustration_url) || item.illustration_url : baseMainUrl;
+  const mainImgUrl = fallbackEnabled ? rawMainUrl : baseMainUrl;
   const srcSetString = fallbackEnabled ? undefined : baseSrcSet;
-  const polaroidUrl = fallbackEnabled ? cdnUrl(item.original_image_url) || item.original_image_url : basePolaroidUrl;
+  const polaroidUrl = fallbackEnabled ? rawPolaroidUrl : basePolaroidUrl;
 
   return (
     <div

@@ -54,9 +54,8 @@ export function WalkerCarousel({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
 
-  const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>([]);
-  const [prevDisplayItems, setPrevDisplayItems] =
-    useState<FeedItem[]>(displayItems);
+  const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() => displayItems.slice(0, 2));
+  const [prevDisplayItems, setPrevDisplayItems] = useState<FeedItem[]>(displayItems);
 
   // Synchronously derive state during render to avoid cascading renders in useEffect
   if (displayItems !== prevDisplayItems) {
@@ -98,19 +97,14 @@ export function WalkerCarousel({
 
   useEffect(() => {
     if (displayItems.length === 0) return;
-
-    // We already calculated this during render, but we need it here to know if we should set the timeout
-    const prevIds = new Set(prevDisplayItems.map((i) => i.id));
-    const isNewFeed =
-      prevIds.size === 0 || !displayItems.some((i) => prevIds.has(i.id));
-
-    if (isNewFeed) {
+    
+    if (staggeredItems.length < displayItems.length) {
       const timer = setTimeout(() => {
         setStaggeredItems(displayItems);
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [displayItems, prevDisplayItems]);
+  }, [displayItems, staggeredItems.length]);
 
   const indexOffset = showWelcome ? 1 : 0;
 
@@ -235,7 +229,8 @@ export function WalkerCarousel({
     (e: React.WheelEvent<HTMLDivElement>) => {
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         if (!emblaApi) return;
-        e.preventDefault();
+        // React synthetic wheel events are passive, so preventDefault() throws a warning.
+        // Since the container is overflow-hidden, native scrolling doesn't happen anyway.
         if (Math.abs(e.deltaY) < 5) return;
         scrollWithDebounce(e.deltaY > 0 ? 'next' : 'prev');
       }

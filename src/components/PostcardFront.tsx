@@ -43,7 +43,6 @@ export function PostcardFront({
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(true);
   const [localAnimState, setLocalAnimState] = useState<
     'idle' | 'queued' | null
   >(null);
@@ -70,14 +69,14 @@ export function PostcardFront({
     >
       {/* The Illustration */}
       <div
-        className={cn(
-          "flex-1 relative overflow-hidden rounded-lg shadow-inner image-protected",
-          isImageLoading ? "bg-stone-200 animate-pulse" : "bg-stone-200/40"
-        )}
+        className="flex-1 relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onContextMenu={(e) => e.preventDefault()}
       >
+        {/* Shimmer Placeholder (Visible while image loads in front) */}
+        <div className="absolute inset-0 bg-stone-300/40 animate-pulse pointer-events-none z-0" />
+
         <img
           key={mainImgUrl}
           src={mainImgUrl}
@@ -88,14 +87,9 @@ export function PostcardFront({
           decoding="async"
           fetchPriority={isPriority ? 'high' : 'auto'}
           draggable={false}
-          onLoad={() => setIsImageLoading(false)}
-          onError={(e) => {
-            setIsImageLoading(false);
-            handleImageError(e);
-          }}
+          onError={handleImageError}
           className={cn(
-            'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-1',
-            isImageLoading ? 'opacity-0' : 'opacity-100',
+            'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-10',
             !item.video_url && 'hover:scale-105',
           )}
         />

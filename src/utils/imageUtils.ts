@@ -242,7 +242,11 @@ export function cdnImage(url: string, opts: TransformOptions = {}): string {
 export function cdnSrcSet(url: string, widths: number[]): string {
   if (!url) return '';
   return widths
-    .map((w) => `${cdnImage(url, { width: w })} ${w}w`)
+    .map((w) => {
+      const imgUrl = cdnImage(url, { width: w });
+      return imgUrl ? `${imgUrl} ${w}w` : '';
+    })
+    .filter(Boolean)
     .join(', ');
 }
 
