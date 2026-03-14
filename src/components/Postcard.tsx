@@ -165,6 +165,7 @@ export function Postcard({
             {/* Blur placeholder removed — WalkerFeed renders the 64px background blur behind each card */}
 
             <img
+              key={mainImgUrl}
               src={mainImgUrl}
               srcSet={srcSetString}
               sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
@@ -488,6 +489,7 @@ export function Postcard({
                 <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200 image-protected' onContextMenu={(e) => e.preventDefault()}>
                   {polaroidUrl && (
                     <img
+                      key={polaroidUrl}
                       src={polaroidUrl}
                       alt='Original reality'
                       loading='lazy'

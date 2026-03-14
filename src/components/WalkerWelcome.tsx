@@ -58,7 +58,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               {...anim.sway.back}
             >
               <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl2 && <img src={imgUrl2} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
+                {imgUrl2 && <img key={imgUrl2} src={imgUrl2} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
             </motion.div>
           )}
@@ -70,7 +70,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               {...anim.sway.middle}
             >
               <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl1 && <img src={imgUrl1} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
+                {imgUrl1 && <img key={imgUrl1} src={imgUrl1} alt="" className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
             </motion.div>
           )}
@@ -79,7 +79,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           {cards[0] && (
             <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
               <div className="w-full h-[calc(100%-24px)] overflow-hidden rounded-[2px] bg-stone-100">
-                {imgUrl0 && <img src={imgUrl0} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
+                {imgUrl0 && <img key={imgUrl0} src={imgUrl0} alt={cards[0].category} className="w-full h-full object-cover" loading="eager" onError={handleImageFallback} />}
               </div>
               <p className="text-center font-handwriting text-[10px] sm:text-xs text-stone-500 mt-1 truncate px-1">
                 {cards[0].city}, {cards[0].country}

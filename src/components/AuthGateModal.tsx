@@ -125,6 +125,7 @@ export function AuthGateModal({
                 <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
                   {imgUrl2 && (
                     <img
+                      key={imgUrl2}
                       src={imgUrl2}
                       alt=''
                       className='w-full h-full object-cover'
@@ -143,6 +144,7 @@ export function AuthGateModal({
                 <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
                   {imgUrl1 && (
                     <img
+                      key={imgUrl1}
                       src={imgUrl1}
                       alt=''
                       className='w-full h-full object-cover'
@@ -158,6 +160,7 @@ export function AuthGateModal({
                 <div className='w-full h-[calc(100%-24px)] overflow-hidden rounded-[2px] bg-stone-100'>
                   {imgUrl0 && (
                     <img
+                      key={imgUrl0}
                       src={imgUrl0}
                       alt={mainCard.category}
                       className='w-full h-full object-cover'
