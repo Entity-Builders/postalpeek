@@ -140,6 +140,7 @@ export function WalkerFeed({
     if (emblaApi) {
       emblaApi.scrollTo(0, true); // instant jump, no animation
     }
+    setCurrentSlideIndex(0);
   }, [showFavoritesOnly, emblaApi]);
 
   // Fetch unique locations and extract just the countries for the filter menu
@@ -582,6 +583,7 @@ export function WalkerFeed({
           setShowFavoritesOnly(false);
           // Clear state immediately to show loader and prevent stale feed
           setIsLoading(true);
+          setCurrentSlideIndex(0);
           loadedIdsRef.current = [];
 
           isFetchingRef.current = false;

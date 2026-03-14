@@ -194,8 +194,8 @@ export function Postcard({
 
           {/* Bottom margin (Title & Location) */}
           <div className='mt-3 md:mt-4 px-2 flex justify-between items-end'>
-            <div>
-              <h3 className='font-serif text-lg md:text-xl font-semibold tracking-tight leading-none mb-1' style={{ color: '#1a1a1a' }}>
+            <div className='flex-1 min-w-0 mr-3'>
+              <h3 className='font-serif text-lg md:text-xl font-semibold tracking-tight leading-none mb-1 truncate' style={{ color: '#1a1a1a' }}>
                 {item.category.replace(/[\u{1F300}-\u{1F9FF}]/u, '').trim()}
               </h3>
               <div className='flex items-center gap-1.5 min-w-0'>
@@ -205,7 +205,7 @@ export function Postcard({
                 </p>
               </div>
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 shrink-0'>
               <button
                 className={cn(
                   'p-2 md:p-2.5 rounded-full transition-colors',
