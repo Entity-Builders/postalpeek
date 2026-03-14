@@ -680,6 +680,7 @@ export function WalkerFeed({
                     <Postcard
                       item={item}
                       isActive={true}
+                      isPriority={slideIndex === currentSlideIndex || difference === 1}
                       isAdmin={isAdmin}
                       isNearby={isNearby}
                       favoriteIds={favoriteIds}

@@ -43,6 +43,8 @@ interface PostcardProps {
   isAdmin?: boolean;
   /** When false, images are not mounted to save bandwidth (off-screen slides) */
   isNearby?: boolean;
+  /** When true, network requests for this card's assets are prioritized */
+  isPriority?: boolean;
   /** Set of postcard IDs the current user has favorited */
   favoriteIds?: Set<string>;
   /** Called when an authenticated user toggles the heart */
@@ -56,6 +58,7 @@ export function Postcard({
   isActive,
   isAdmin = false,
   isNearby = true,
+  isPriority = false,
   favoriteIds,
   onToggleFavorite,
   onAuthRequired,
@@ -120,29 +123,35 @@ export function Postcard({
         <div className='absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'>
           {/* The Illustration */}
           <div
-            className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner image-protected'
+            className='flex-1 relative overflow-hidden rounded-lg bg-stone-200/40 shadow-inner image-protected'
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             onContextMenu={(e) => e.preventDefault()}
           >
-            {isNearby ? (
-              <img
-                src={cdnImage(item.illustration_url, { width: WIDTHS.desktop })}
-                srcSet={cdnSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop])}
-                sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
-                alt={item.category}
-                loading={isActive ? 'eager' : 'lazy'}
-                decoding='async'
-                fetchPriority={isActive ? 'high' : 'auto'}
-                draggable={false}
-                className={cn(
-                  'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
-                  !item.video_url && 'hover:scale-105',
-                )}
-              />
-            ) : (
-              <div className='absolute inset-0 w-full h-full bg-stone-200/50' />
-            )}
+            {/* The Cloudy Blur Placeholder (Cloudflare micro-image) */}
+            <img
+              src={cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 })}
+              alt=''
+              loading='eager' /* Micro-placeholder always eager */
+              decoding='async'
+              className='absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80'
+              style={{ transition: 'opacity 0.4s ease-out' }}
+            />
+
+            <img
+              src={cdnImage(item.illustration_url, { width: WIDTHS.desktop })}
+              srcSet={cdnSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop])}
+              sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
+              alt={item.category}
+              loading={isPriority ? 'eager' : 'lazy'}
+              decoding='async'
+              fetchPriority={isPriority ? 'high' : 'auto'}
+              draggable={false}
+              className={cn(
+                'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-1',
+                !item.video_url && 'hover:scale-105',
+              )}
+            />
 
             {item.video_url &&
               isHovered &&
