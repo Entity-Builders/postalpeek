@@ -101,6 +101,19 @@ interface Env {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // ── CORS preflight — must be handled before any path validation ──
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+
     const url = new URL(request.url);
     const userAgent = request.headers.get('user-agent') || '';
 
@@ -177,7 +190,7 @@ export default {
     }
 
     // Grace period: allow unsigned access if ALLOW_UNSIGNED=true
-    if (env.ALLOW_UNSIGNED === 'true') {
+    if (env.ALLOW_UNSIGNED?.trim() === 'true') {
       return serveFromR2(env, objectPath, request);
     }
 
@@ -217,6 +230,8 @@ async function serveFromR2(
   headers.set('Content-Disposition', 'inline'); // Never trigger download
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('X-Content-Type-Options', 'nosniff');
+  // CORS — allow cross-origin image loading (prevents ERR_BLOCKED_BY_ORB)
+  headers.set('Access-Control-Allow-Origin', '*');
 
   // Prevent hotlinking from other domains
   const referer = request.headers.get('referer');

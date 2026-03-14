@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
       extensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js'],
     },
     optimizeDeps: {
+      exclude: ['@cloudflare/unenv-preset'],
       // Tell esbuild to also respect our aliasing during dep pre-bundling
       esbuildOptions: {
         resolveExtensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js'],

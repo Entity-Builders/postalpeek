@@ -1,0 +1,12 @@
+{
+  "name": "postalpeek-image-proxy",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "secret": "wrangler secret"
+  },
+  "devDependencies": {
+    "wrangler": "^4.73.0"
+  }
+}
