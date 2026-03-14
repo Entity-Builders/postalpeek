@@ -101,13 +101,18 @@ export function Postcard({
   };
 
   const handleImageError = () => {
-    setImageError(true);
+    analytics.captureError(new Error('Image failed to load'), {
+      postcard_id: item.id,
+      image_url: item.original_image_url,
+    });
   };
 
   // Derive non-blocking signed Cloudflare URLs for the images
-  const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
+  // NOTE: The blur placeholder is NOT rendered here — WalkerFeed already renders
+  // a full-bleed 64px blur behind each card, so duplicating it wastes a CF transform request.
   const mainImgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
-  const srcSetString = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet, WIDTHS.desktop]);
+  // Only mobile + tablet in srcSet — desktop (1024) is already covered by mainImgUrl above
+  const srcSetString = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
 
   return (
     <div
@@ -142,15 +147,7 @@ export function Postcard({
             onMouseLeave={() => setIsHovered(false)}
             onContextMenu={(e) => e.preventDefault()}
           >
-            {/* The Cloudy Blur Placeholder (Cloudflare micro-image) */}
-            <img
-              src={placeholderUrl}
-              alt=''
-              loading='eager' /* Micro-placeholder always eager */
-              decoding='async'
-              className='absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80'
-              style={{ transition: 'opacity 0.4s ease-out' }}
-            />
+            {/* Blur placeholder removed — WalkerFeed renders the 64px background blur behind each card */}
 
             <img
               src={mainImgUrl}

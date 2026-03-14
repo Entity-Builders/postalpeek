@@ -501,29 +501,12 @@ export function WalkerFeed({
     };
   }, [emblaApi, hasMore, fetchMoreFeed, items, selectedCountry, user, showWelcome, indexOffset]);
 
-  // Preload the next 2 slides illustrations so they are ready before the user scrolls
-  useEffect(() => {
-    const preloadAhead = 2; // load up to 2 items ahead
-    for (let i = 1; i <= preloadAhead; i++) {
-        const nextItemIndex = currentSlideIndex - indexOffset + i;
-        const nextItem = items[nextItemIndex];
-        if (!nextItem?.illustration_url) continue;
-
-        const url = cdnImage(nextItem.illustration_url, { width: WIDTHS.desktop });
-        
-        // Only preload if not already in document to prevent duplicates
-        if (!document.querySelector(`link[rel="preload"][href="${url}"]`)) {
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.as = 'image';
-            link.href = url;
-            document.head.appendChild(link);
-            
-            // Clean up old preloads might be too aggressive, leaving them attached for now
-            // NextJS and Vite generally leave them
-        }
-    }
-  }, [currentSlideIndex, items, indexOffset, lookaheadOffset]);
+  // NOTE: We previously had a `<link rel="preload">` useEffect here, but it was removed because:
+  // 1. `cdnImage()` is synchronous — if `preSignUrls()` hasn't finished yet, it generates UNSIGNED
+  //    URLs that Cloudflare rejects (403) or rate-limits (429).
+  // 2. The Postcard component already handles eager loading for nearby slides via the `isPriority`
+  //    prop (sets `loading="eager"` + `fetchPriority="high"`) and uses the `useSignedImage` hook
+  //    which correctly waits for signed URLs before rendering.
 
   // Expand the lookahead window when the user stays idle on a card
   useEffect(() => {
