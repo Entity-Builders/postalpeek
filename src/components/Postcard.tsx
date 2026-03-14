@@ -120,9 +120,10 @@ export function Postcard({
         <div className='absolute inset-0 w-full h-full backface-hidden bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'>
           {/* The Illustration */}
           <div
-            className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner'
+            className='flex-1 relative overflow-hidden rounded-lg bg-black/5 shadow-inner image-protected'
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {isNearby ? (
               <img
@@ -133,6 +134,7 @@ export function Postcard({
                 loading={isActive ? 'eager' : 'lazy'}
                 decoding='async'
                 fetchPriority={isActive ? 'high' : 'auto'}
+                draggable={false}
                 className={cn(
                   'absolute inset-0 w-full h-full object-cover transition-transform duration-700',
                   !item.video_url && 'hover:scale-105',
@@ -176,8 +178,8 @@ export function Postcard({
                 <Play className='w-3.5 h-3.5 fill-white/80' />
               </div>
             )}
-            {/* Stamp overlay effect */}
-            <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none'>
+            {/* Stamp overlay effect — z-3 to stay above the protection overlay */}
+            <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none z-[3]'>
               <span className='text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12'>
                 POST
               </span>
@@ -444,12 +446,13 @@ export function Postcard({
                   );
                 }}
               >
-                <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200'>
+                <div className='relative aspect-square overflow-hidden bg-stone-100 outline outline-1 outline-stone-200 image-protected' onContextMenu={(e) => e.preventDefault()}>
                   <img
                     src={cdnImage(item.original_image_url, { width: WIDTHS.thumb })}
                     alt='Original reality'
                     loading='lazy'
                     decoding='async'
+                    draggable={false}
                     className='w-full h-full object-cover'
                   />
                   <div className='absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]'>

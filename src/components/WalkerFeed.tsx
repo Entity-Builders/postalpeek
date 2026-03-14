@@ -12,7 +12,7 @@ import { WalkerLoadingState, WalkerEmptyState, WalkerFavoritesEmptyState } from 
 import { AuthGateModal } from './AuthGateModal';
 import { WalkerWelcome } from './WalkerWelcome';
 import { hasSeenWelcome, markWelcomeSeen } from '../utils/welcomeStorage';
-import { cdnImage, WIDTHS } from '../utils/imageUtils';
+import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
 
 import { analytics } from '../lib/analytics';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -171,6 +171,8 @@ export function WalkerFeed({
     if (cached && cached.length > 0) {
       prefetchCacheRef.current.delete(cacheKey);
       loadedIdsRef.current = cached.map(item => item.id);
+      // Pre-sign URLs for cached items
+      await preSignUrls(cached.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean)));
       setItems(cached);
       setHasMore(cached.length === PAGE_SIZE);
       setIsLoading(false);
@@ -253,6 +255,11 @@ export function WalkerFeed({
         setHasMore(false);
       }
 
+      // Pre-sign all image URLs in the batch
+      const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems)
+        .flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
+      await preSignUrls(allUrls);
+
       if (sharedCard) {
         setItems([sharedCard, ...fetchedItems]);
       } else {
@@ -321,6 +328,8 @@ export function WalkerFeed({
 
 
       if (newItems.length > 0) {
+        // Pre-sign URLs for new batch
+        await preSignUrls(newItems.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean)));
         loadedIdsRef.current = [
           ...loadedIdsRef.current,
           ...newItems.map((item) => item.id),
@@ -361,6 +370,8 @@ export function WalkerFeed({
             const newItem = payload.new as FeedItem;
             // Only prepend if it matches the current country filter (or no filter is set)
             if (!selectedCountry || newItem.country === selectedCountry) {
+              // Pre-sign URLs for new realtime item (fire and forget)
+              preSignUrls([newItem.illustration_url, newItem.original_image_url].filter(Boolean));
               setItems((prev) => [newItem, ...prev]);
             }
           }

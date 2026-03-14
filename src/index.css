@@ -171,3 +171,27 @@ h6 {
 @utility perspective-1000 {
   perspective: 1000px;
 }
+
+/* ── Image Download Protection ────────────────────────── */
+.image-protected {
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none; /* Prevents iOS long-press "Save Image" */
+}
+
+.image-protected img,
+.image-protected video {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Transparent overlay that captures all clicks/right-clicks */
+.image-protected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
