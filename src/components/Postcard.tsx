@@ -103,13 +103,19 @@ export function Postcard({
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Prevent infinite loop if the fallback itself fails
+    if (fallbackEnabled) return;
+    
     const currentSrc = e.currentTarget.src;
     
     // If the failed image was attempting a Cloudflare transformation, it's likely a 429 Free Tier limit.
     // Trigger the React-level fallback which will instantly re-render all images on this card with raw URLs.
     if (currentSrc.includes('/cdn-cgi/image/')) {
       console.warn(`[Image Fallback] Cloudflare Limit (429) detected. Falling back to raw R2 images for card ${item.id}`);
-      setFallbackEnabled(true);
+      // Defer state update to avoid synchronous cascading re-renders during commit phase
+      setTimeout(() => {
+        setFallbackEnabled(true);
+      }, 0);
       return;
     }
 
@@ -125,9 +131,9 @@ export function Postcard({
   const basePolaroidUrl = useSignedImage(item.original_image_url, { width: WIDTHS.thumb });
 
   // If fallback is triggered, bypass the signed transformations and use raw signed URLs
-  const mainImgUrl = fallbackEnabled ? cdnUrl(item.illustration_url) : baseMainUrl;
+  const mainImgUrl = fallbackEnabled ? cdnUrl(item.illustration_url) || item.illustration_url : baseMainUrl;
   const srcSetString = fallbackEnabled ? undefined : baseSrcSet;
-  const polaroidUrl = fallbackEnabled ? cdnUrl(item.original_image_url) : basePolaroidUrl;
+  const polaroidUrl = fallbackEnabled ? cdnUrl(item.original_image_url) || item.original_image_url : basePolaroidUrl;
 
   return (
     <div
