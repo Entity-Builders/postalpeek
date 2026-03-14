@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { WIDTHS } from '../utils/imageUtils';
@@ -8,91 +8,103 @@ interface WalkerWelcomeProps {
   /** First postcards from the feed to display as stacked preview */
   previewCards: FeedItem[];
 }
+
 /**
  * First-visit onboarding slide introducing "Kyle Walker" — the digital wanderer
  * behind PostalPeek. Appears as the first slide in the Embla carousel.
- * Controlled by localStorage so it only shows once per device.
+ *
+ * Cinematic reveal strategy:
+ * 1. Text content renders instantly (zero delay, zero white flash).
+ * 2. Postcards load in the background via signed Cloudflare URLs.
+ * 3. Once the hero image (front card) finishes loading, the entire
+ *    postcard stack fades + zooms in gracefully over 800ms.
  */
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const cards = previewCards.slice(0, 3);
+  const [imagesReady, setImagesReady] = useState(false);
 
-  // We can safely call hooks here because card count is deterministic (3).
-  // If we have fewer than 3, we just pass null/undefined which the hook handles gracefully.
-  const blurUrl2 = useSignedImage(cards[2]?.illustration_url, {
-    width: WIDTHS.thumb,
-  });
+  // Deterministic hook calls (always 3 — pass undefined for missing cards)
+  const imgUrl2 = useSignedImage(cards[2]?.illustration_url, { width: WIDTHS.thumb });
   const srcSet2 = useSignedSrcSet(cards[2]?.illustration_url, [WIDTHS.thumb]);
 
-  const blurUrl1 = useSignedImage(cards[1]?.illustration_url, {
-    width: WIDTHS.thumb,
-  });
+  const imgUrl1 = useSignedImage(cards[1]?.illustration_url, { width: WIDTHS.thumb });
   const srcSet1 = useSignedSrcSet(cards[1]?.illustration_url, [WIDTHS.thumb]);
 
-  const blurUrl0 = useSignedImage(cards[0]?.illustration_url, {
-    width: WIDTHS.thumb,
-  });
+  const imgUrl0 = useSignedImage(cards[0]?.illustration_url, { width: WIDTHS.thumb });
   const srcSet0 = useSignedSrcSet(cards[0]?.illustration_url, [WIDTHS.thumb]);
 
+  // When the hero (front) image finishes loading, reveal all postcards at once
+  const handleHeroLoad = useCallback(() => {
+    setImagesReady(true);
+  }, []);
+
   return (
-    <div className='w-full h-full flex flex-col items-center justify-between px-6 py-10 select-none overflow-hidden'>
+    <div className="w-full h-full flex flex-col items-center justify-between px-6 py-10 select-none overflow-hidden">
       {/* ─── Top spacer (push content down from notch area) ─── */}
-      <div className='flex-shrink-0 h-4 sm:h-8' />
+      <div className="flex-shrink-0 h-4 sm:h-8" />
 
       {/* ─── Main Content ─── */}
-      <div className='flex flex-col items-center justify-center flex-1 min-h-0'>
-        {/* ─── Stacked Postcards (subtle preview) ─── */}
+      <div className="flex flex-col items-center justify-center flex-1 min-h-0">
+        {/* ─── Stacked Postcards — hidden until hero image loads ─── */}
         {cards.length > 0 && (
-          <div className='relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-4 sm:mb-8 opacity-80 flex-shrink-0 animate-in fade-in zoom-in-95 duration-1000 ease-out fill-mode-both delay-150'>
+          <div
+            className="relative w-[120px] h-[140px] sm:w-[190px] sm:h-[210px] mb-4 sm:mb-8 flex-shrink-0 transition-all duration-[800ms] ease-out"
+            style={{
+              opacity: imagesReady ? 0.8 : 0,
+              transform: imagesReady ? 'scale(1) translateY(0)' : 'scale(0.92) translateY(12px)',
+            }}
+          >
             {/* Card 3 (back) */}
             {cards[2] && (
-              <div className='absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40'>
-                <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
+              <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md rotate-[7deg] translate-x-3 -translate-y-1 opacity-40">
+                <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
                   <img
-                    src={blurUrl2}
+                    src={imgUrl2}
                     srcSet={srcSet2}
-                    alt=''
-                    className='w-full h-full object-cover'
-                    loading='lazy'
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="eager"
                   />
                 </div>
               </div>
             )}
             {/* Card 2 (middle) */}
             {cards[1] && (
-              <div className='absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60'>
-                <div className='w-full h-full overflow-hidden rounded-[2px] bg-stone-100'>
+              <div className="absolute inset-0 bg-white p-1.5 rounded-sm shadow-md -rotate-[5deg] -translate-x-3 translate-y-1 opacity-60">
+                <div className="w-full h-full overflow-hidden rounded-[2px] bg-stone-100">
                   <img
-                    src={blurUrl1}
+                    src={imgUrl1}
                     srcSet={srcSet1}
-                    alt=''
-                    className='w-full h-full object-cover'
-                    loading='lazy'
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="eager"
                   />
                 </div>
               </div>
             )}
             {/* Card 1 (front — hero) */}
             {cards[0] && (
-              <div className='absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]'>
-                <div className='w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px] bg-stone-100'>
+              <div className="absolute inset-0 bg-white p-1.5 pb-6 rounded-sm shadow-xl -rotate-[1.5deg]">
+                <div className="w-full h-[calc(100%-18px)] overflow-hidden rounded-[2px] bg-stone-100">
                   <img
-                    src={blurUrl0}
+                    src={imgUrl0}
                     srcSet={srcSet0}
                     alt={cards[0].category}
-                    className='w-full h-full object-cover'
-                    loading='eager' // Hero card needs to be eager
+                    className="w-full h-full object-cover"
+                    loading="eager"
+                    onLoad={handleHeroLoad}
                   />
                 </div>
-                <p className='text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1'>
+                <p className="text-center font-handwriting text-[9px] text-stone-500 mt-1 truncate px-1">
                   {cards[0].city}, {cards[0].country}
                 </p>
               </div>
             )}
 
             {/* Postmark stamp */}
-            <div className='absolute -top-2 -right-2 w-10 h-10 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20'>
-              <div className='w-8 h-8 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm'>
-                <span className='font-mono text-[5px] text-stone-600 uppercase tracking-wider text-center leading-tight'>
+            <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20">
+              <div className="w-8 h-8 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
+                <span className="font-mono text-[5px] text-stone-600 uppercase tracking-wider text-center leading-tight">
                   Postal
                   <br />
                   Peek
@@ -102,20 +114,20 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           </div>
         )}
 
-        {/* ─── Walker Introduction (hero content) ─── */}
-        <p className='text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-3 sm:mb-5 text-center'>
+        {/* ─── Walker Introduction (hero content — renders INSTANTLY) ─── */}
+        <p className="text-stone-500 text-[10px] sm:text-[11px] font-mono tracking-[0.3em] uppercase mb-3 sm:mb-5 text-center">
           Entity Builders presents
         </p>
         <h1
-          className='font-serif text-4xl sm:text-6xl text-stone-900 tracking-tight mb-2 sm:mb-3 text-center'
+          className="font-serif text-4xl sm:text-6xl text-stone-900 tracking-tight mb-2 sm:mb-3 text-center"
           style={{ textShadow: '0 1px 8px rgba(255,255,255,0.5)' }}
         >
           Kyle Walker
         </h1>
-        <p className='text-stone-600 text-sm sm:text-base tracking-wide mb-4 sm:mb-8 font-medium text-center'>
+        <p className="text-stone-600 text-sm sm:text-base tracking-wide mb-4 sm:mb-8 font-medium text-center">
           Digital Agent · Photographer · Watercolor Artist
         </p>
-        <p className='text-stone-700 text-base sm:text-xl text-center leading-relaxed max-w-[400px] mb-6 sm:mb-10 px-2'>
+        <p className="text-stone-700 text-base sm:text-xl text-center leading-relaxed max-w-[400px] mb-6 sm:mb-10 px-2">
           I travel the world and paint what I see.
           <br />
           Every street, every café, every hidden corner
@@ -123,17 +135,17 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           becomes a watercolor postcard.
         </p>
 
-        <div className='w-20 h-px bg-stone-400/60 mb-4 sm:mb-8' />
+        <div className="w-20 h-px bg-stone-400/60 mb-4 sm:mb-8" />
 
-        <p className='text-stone-600 text-base sm:text-lg font-light italic font-serif text-center'>
+        <p className="text-stone-600 text-base sm:text-lg font-light italic font-serif text-center">
           These postcards are for you.
         </p>
       </div>
 
       {/* ─── Scroll Hint (in flow, not overlapping) ─── */}
-      <div className='flex-shrink-0 flex flex-col items-center gap-1 sm:gap-2 text-stone-500 animate-bounce pt-4 pb-2'>
-        <ChevronDown className='w-5 h-5' />
-        <span className='text-xs tracking-[0.2em] uppercase font-semibold'>
+      <div className="flex-shrink-0 flex flex-col items-center gap-1 sm:gap-2 text-stone-500 animate-bounce pt-4 pb-2">
+        <ChevronDown className="w-5 h-5" />
+        <span className="text-xs tracking-[0.2em] uppercase font-semibold">
           Scroll to explore
         </span>
       </div>
