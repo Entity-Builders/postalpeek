@@ -12,6 +12,7 @@ import { AuthGateModal } from './AuthGateModal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
+import { preSignUrls } from '../utils/imageUtils';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -67,6 +68,18 @@ export function WalkerFeed({
   useEffect(() => {
     if (!user) setShowFavoritesOnly(false);
   }, [user]);
+
+  useEffect(() => {
+    if (favoriteItems.length > 0) {
+      preSignUrls(
+        favoriteItems.flatMap((i) =>
+          [i.illustration_url, i.original_image_url].filter(Boolean),
+        ),
+      ).catch((err) =>
+        console.error('Failed to pre-sign favorite items URLs', err),
+      );
+    }
+  }, [favoriteItems]);
 
   const displayItems = useMemo(() => {
     if (!showFavoritesOnly) return items;
