@@ -1,13 +1,36 @@
 import React from 'react';
-import { Loader2, Map, Heart } from 'lucide-react';
+import { Map, Heart } from 'lucide-react';
 
 export function WalkerLoadingState() {
   return (
-    <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-4 z-20'>
-      <Loader2 className='w-8 h-8 text-indigo-400 animate-spin' />
-      <p className='text-indigo-200 font-light tracking-widest text-sm uppercase animate-pulse'>
-        Synching with Serendipitous Post...
-      </p>
+    <div className='absolute inset-0 z-20 w-full h-full flex flex-col items-center justify-center pointer-events-none'>
+       {/* Background subtle pulse mimicking the environment light */}
+      <div className='absolute inset-0 bg-stone-300/10 blur-3xl animate-pulse -z-10' />
+
+      {/* Wrapper matching Postcard flex container */}
+      <div className='w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] mx-auto flex items-center justify-center opacity-80'>
+        <div className='w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-stone-100'>
+          
+          {/* Image Placeholder Skeleton */}
+          <div className='flex-1 relative overflow-hidden rounded-lg bg-stone-200/50 shadow-inner animate-pulse'>
+             {/* Fake stamp outline */}
+             <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-stone-300/40 border-dashed rounded -rotate-6' />
+          </div>
+
+          {/* Bottom Margin Skeleton */}
+          <div className='mt-3 md:mt-4 px-2 flex justify-between items-end'>
+            <div className='flex-1 min-w-0 mr-3 flex flex-col gap-2.5 pb-1'>
+              <div className='h-5 md:h-6 w-3/4 rounded-sm bg-stone-200 animate-pulse' />
+              <div className='h-4 md:h-4 w-1/2 rounded-full bg-stone-200 animate-pulse' />
+            </div>
+            <div className='flex items-center gap-2 shrink-0'>
+              <div className='w-8 h-8 md:w-10 md:h-10 rounded-full bg-stone-200 animate-pulse' />
+              <div className='w-8 h-8 md:w-10 md:h-10 rounded-full bg-stone-200 animate-pulse' />
+              <div className='w-8 h-8 md:w-10 md:h-10 rounded-full bg-stone-200 animate-pulse' />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
