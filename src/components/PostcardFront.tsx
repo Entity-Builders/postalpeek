@@ -25,6 +25,7 @@ interface PostcardFrontProps {
   onAuthRequired?: (postcardId: string) => void;
   onFlipCard: () => void;
   mainImgUrl: string;
+  placeholderUrl?: string;
   srcSetString?: string;
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
 }
@@ -38,6 +39,7 @@ export function PostcardFront({
   onAuthRequired,
   onFlipCard,
   mainImgUrl,
+  placeholderUrl,
   srcSetString,
   handleImageError,
 }: PostcardFrontProps) {
@@ -76,6 +78,18 @@ export function PostcardFront({
       >
         {/* Shimmer Placeholder (Visible while image loads in front) */}
         <div className="absolute inset-0 bg-stone-300/40 animate-pulse pointer-events-none z-0" />
+
+        {/* The Cloudy Blur Placeholder (Cloudflare micro-image) */}
+        {placeholderUrl && (
+          <img
+            src={placeholderUrl}
+            alt=''
+            loading='eager' /* Micro-placeholder always eager */
+            decoding='async'
+            className='absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80'
+            style={{ transition: 'opacity 0.4s ease-out' }}
+          />
+        )}
 
         <img
           key={mainImgUrl}

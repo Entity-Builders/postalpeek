@@ -100,6 +100,7 @@ export function Postcard({
   };
 
   // Derive non-blocking signed Cloudflare URLs for the images
+  const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
   const baseMainUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
   const baseSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
   const basePolaroidUrl = useSignedImage(item.original_image_url, { width: WIDTHS.thumb });
@@ -111,6 +112,7 @@ export function Postcard({
   const mainImgUrl = fallbackEnabled ? rawMainUrl : baseMainUrl;
   const srcSetString = fallbackEnabled ? undefined : baseSrcSet;
   const polaroidUrl = fallbackEnabled ? rawPolaroidUrl : basePolaroidUrl;
+  const finalPlaceholder = fallbackEnabled ? undefined : placeholderUrl;
 
   return (
     <div
@@ -142,6 +144,7 @@ export function Postcard({
           onAuthRequired={onAuthRequired}
           onFlipCard={() => setIsFlipped(true)}
           mainImgUrl={mainImgUrl}
+          placeholderUrl={finalPlaceholder}
           srcSetString={srcSetString}
           handleImageError={handleImageError}
         />

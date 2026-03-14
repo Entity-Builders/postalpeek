@@ -161,9 +161,11 @@ function resolveObjectPath(objectPath: string): string {
  */
 export function cdnUrl(url: string): string {
   if (!url) return url;
+  
+  // Aggressively replace the legacy R2 host to prevent 429 dev limits
   const normalized = url.replace(LEGACY_R2_HOST, CDN_HOST);
 
-  // Only sign URLs on our CDN domain
+  // If this somehow isn't on our CDN (e.g. an external avatar), return as-is
   if (!normalized.includes(CDN_HOST)) return normalized;
 
   const objectPath = normalized.replace(CDN_ORIGIN, '').replace(/^\//, '');
