@@ -3,7 +3,11 @@ import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
-import { WalkerLoadingState, WalkerEmptyState, WalkerFavoritesEmptyState } from './WalkerFeedStates';
+import {
+  WalkerLoadingState,
+  WalkerEmptyState,
+  WalkerFavoritesEmptyState,
+} from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -37,12 +41,15 @@ export function WalkerFeed({
     prefetchCountry,
     loadedIdsRef,
     isFetchingRef,
+    hasSharedCard,
   } = useWalkerFeed();
 
   const [showAuthGate, setShowAuthGate] = useState(() => {
     return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
   });
-  const [pendingFavoriteId, setPendingFavoriteId] = useState<string | null>(null);
+  const [pendingFavoriteId, setPendingFavoriteId] = useState<string | null>(
+    null,
+  );
   const [showWelcome] = useState(() => !hasSeenWelcome());
   const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
 
@@ -50,7 +57,11 @@ export function WalkerFeed({
     onWelcomeChange?.(isOnWelcome);
   }, [isOnWelcome, onWelcomeChange]);
 
-  const { favoriteIds, favoriteItems, toggle: toggleFavorite } = useFavorites(user ?? null);
+  const {
+    favoriteIds,
+    favoriteItems,
+    toggle: toggleFavorite,
+  } = useFavorites(user ?? null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
@@ -63,7 +74,7 @@ export function WalkerFeed({
   }, [items, showFavoritesOnly, favoriteItems]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden">
+    <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
       {!isOnWelcome && (
         <WalkerFilterMenu
           isIdle={isIdle}
@@ -100,7 +111,10 @@ export function WalkerFeed({
             if (country === null) {
               window.history.pushState({}, '', '/');
             } else {
-              const countrySlug = encodeURIComponent(country).replace(/%20/g, '-');
+              const countrySlug = encodeURIComponent(country).replace(
+                /%20/g,
+                '-',
+              );
               window.history.pushState({}, '', `/${countrySlug}`);
             }
           }}
@@ -110,7 +124,11 @@ export function WalkerFeed({
       {isLoading && !showWelcome ? (
         <WalkerLoadingState />
       ) : displayItems.length === 0 && !showWelcome ? (
-        showFavoritesOnly ? <WalkerFavoritesEmptyState /> : <WalkerEmptyState />
+        showFavoritesOnly ? (
+          <WalkerFavoritesEmptyState />
+        ) : (
+          <WalkerEmptyState />
+        )
       ) : (
         <WalkerCarousel
           items={items}
@@ -130,6 +148,7 @@ export function WalkerFeed({
           setShowAuthGate={setShowAuthGate}
           setPendingFavoriteId={setPendingFavoriteId}
           showFavoritesOnly={showFavoritesOnly}
+          hasSharedCard={hasSharedCard}
         />
       )}
 
@@ -153,7 +172,9 @@ export function WalkerFeed({
                   try {
                     const cached = sessionStorage.getItem(AUTH_GATE_CARDS_KEY);
                     return cached ? JSON.parse(cached) : [];
-                  } catch { return []; }
+                  } catch {
+                    return [];
+                  }
                 })()
           }
         />

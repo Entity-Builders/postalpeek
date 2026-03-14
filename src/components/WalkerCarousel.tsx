@@ -31,6 +31,7 @@ interface WalkerCarouselProps {
   setShowAuthGate: (val: boolean) => void;
   setPendingFavoriteId: (id: string | null) => void;
   showFavoritesOnly: boolean;
+  hasSharedCard: boolean;
 }
 
 export function WalkerCarousel({
@@ -50,6 +51,7 @@ export function WalkerCarousel({
   setShowAuthGate,
   setPendingFavoriteId,
   showFavoritesOnly,
+  hasSharedCard,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -109,7 +111,29 @@ export function WalkerCarousel({
     }
   }, [displayItems, staggeredItems.length]);
 
-  const indexOffset = showWelcome ? 1 : 0;
+  const slides = React.useMemo(() => {
+    const arr: Array<{ type: 'welcome' } | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }> = [];
+    
+    if (showWelcome) {
+      if (hasSharedCard && staggeredItems.length > 0) {
+        arr.push({ type: 'postcard', item: staggeredItems[0], index: 0, isFirstShared: true });
+        arr.push({ type: 'welcome' });
+        for (let i = 1; i < staggeredItems.length; i++) {
+          arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+        }
+      } else {
+        arr.push({ type: 'welcome' });
+        for (let i = 0; i < staggeredItems.length; i++) {
+          arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+        }
+      }
+    } else {
+      for (let i = 0; i < staggeredItems.length; i++) {
+        arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+      }
+    }
+    return arr;
+  }, [staggeredItems, showWelcome, hasSharedCard]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -118,18 +142,24 @@ export function WalkerCarousel({
       const currentIndex = emblaApi.selectedScrollSnap();
       setCurrentSlideIndex(currentIndex);
 
-      if (showWelcome && currentIndex === 0) {
+      const slide = slides[currentIndex];
+      
+      if (slide && slide.type === 'welcome') {
         setIsOnWelcome(true);
+        if (currentIndex > 0) markWelcomeSeen(); // E.g., saw the shared card (idx 0), then swiped down to welcome (idx 1)
         return;
       } else if (showWelcome) {
         setIsOnWelcome(false);
       }
 
-      if (showWelcome && currentIndex >= 1) {
+      const welcomeIndex = slides.findIndex(s => s.type === 'welcome');
+      if (showWelcome && welcomeIndex !== -1 && currentIndex > welcomeIndex) {
         markWelcomeSeen();
       }
 
-      const itemIndex = currentIndex - indexOffset;
+      if (!slide || slide.type !== 'postcard') return;
+
+      const itemIndex = slide.index;
 
       if (itemIndex >= 0 && itemIndex < items.length) {
         const activeItem = items[itemIndex];
@@ -197,9 +227,10 @@ export function WalkerCarousel({
     selectedCountry,
     user,
     showWelcome,
-    indexOffset,
+    slides,
     setIsOnWelcome,
     setShowAuthGate,
+    isFetchingRef,
   ]);
 
   useEffect(() => {
@@ -269,20 +300,22 @@ export function WalkerCarousel({
       onWheel={handleWheel}
     >
       <div className='embla__container h-full flex flex-col'>
-        {showWelcome && (
-          <div className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
-            <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
-          </div>
-        )}
+        {slides.map((slide, slideIndex) => {
+          if (slide.type === 'welcome') {
+            return (
+              <div key="welcome-slide" className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
+                <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
+              </div>
+            );
+          }
 
-        {staggeredItems.map((item, index) => {
-          const slideIndex = index + indexOffset;
+          const { item, index: itemIndex, isFirstShared } = slide;
           const difference = slideIndex - currentSlideIndex;
           const isNearby = difference >= -1 && difference <= lookaheadOffset;
 
           return (
             <div
-              key={`${item.id}-${index}`}
+              key={`${item.id}-${itemIndex}`}
               className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
             >
               {isNearby && (
@@ -303,9 +336,7 @@ export function WalkerCarousel({
                 <Postcard
                   item={item}
                   isActive={true}
-                  isPriority={
-                    slideIndex === currentSlideIndex || difference === 1
-                  }
+                  isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
                   isAdmin={isAdmin}
                   isNearby={isNearby}
                   favoriteIds={favoriteIds}

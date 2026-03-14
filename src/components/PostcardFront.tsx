@@ -44,6 +44,7 @@ export function PostcardFront({
   handleImageError,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [localAnimState, setLocalAnimState] = useState<
     'idle' | 'queued' | null
@@ -211,25 +212,50 @@ export function PostcardFront({
                 ? 'bg-indigo-50 text-indigo-500'
                 : 'bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500',
             )}
-            onClick={(e) => {
+            disabled={isSharing}
+            onClick={async (e) => {
               e.stopPropagation();
-              const shortHash = encodeUuidToHash(item.id);
-              const shareLink = `${window.location.origin}/${shortHash}`;
-              navigator.clipboard
-                .writeText(shareLink)
-                .then(() => {
-                  setIsCopied(true);
-                  setTimeout(() => setIsCopied(false), 2000);
-                  analytics.track('postcard_shared', {
-                    postcard_id: item.id,
-                    country: item.country,
-                    share_link: shareLink,
-                  });
-                })
-                .catch((err) => console.log('Share failed:', err));
+              if (isSharing) return;
+              setIsSharing(true);
+              
+              try {
+                // Generate a unique 1-time share link
+                const { data, error } = await supabase
+                  .from('postalpeek_shares')
+                  .insert({ postcard_id: item.id })
+                  .select('id')
+                  .single();
+
+                if (error) throw error;
+                if (!data) throw new Error('No share record created');
+
+                const shortHash = encodeUuidToHash(data.id);
+                const shareLink = `${window.location.origin}/${shortHash}`;
+                
+                await navigator.clipboard.writeText(shareLink);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
+                
+                analytics.track('postcard_shared', {
+                  postcard_id: item.id,
+                  country: item.country,
+                  share_link: shareLink,
+                });
+              } catch (err) {
+                console.log('Share failed:', err);
+                analytics.captureError(err instanceof Error ? err : new Error(String(err)), {
+                  event_type: 'share_failed',
+                  postcard_id: item.id,
+                });
+                alert('Failed to generate share link. Please try again.');
+              } finally {
+                setIsSharing(false);
+              }
             }}
           >
-            {isCopied ? (
+            {isSharing ? (
+              <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+            ) : isCopied ? (
               <Check className="w-4 h-4 md:w-5 md:h-5 scale-110 transition-transform" />
             ) : (
               <Share2 className="w-4 h-4 md:w-5 md:h-5 transition-transform" />

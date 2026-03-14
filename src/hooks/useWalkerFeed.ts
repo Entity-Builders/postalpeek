@@ -14,6 +14,7 @@ export function useWalkerFeed() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [hasSharedCard, setHasSharedCard] = useState(false);
 
   const loadedIdsRef = useRef<string[]>([]);
   const isFetchingRef = useRef(false);
@@ -100,19 +101,64 @@ export function useWalkerFeed() {
         const minUuid = `${sharedCardPrefix}-0000-0000-0000-000000000000`;
         const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
 
-        const { data: sharedData, error: sharedError } = await supabase
-          .from('postalpeek_postcards')
-          .select('*')
+        // First, check if this prefix belongs to a share link
+        const { data: shareData, error: shareError } = await supabase
+          .from('postalpeek_shares')
+          .select('id, postcard_id')
           .gte('id', minUuid)
           .lte('id', maxUuid)
+          .eq('is_used', false)
           .limit(1)
           .single();
 
-        if (!sharedError && sharedData) {
-          sharedCard = sharedData;
-        } else if (sharedError) {
-          console.error('Failed to load shared card:', sharedError);
+        let targetPostcardId: string | null = null;
+
+        if (shareData && !shareError) {
+          targetPostcardId = shareData.postcard_id;
+          
+          // Mark as used immediately (fire and forget)
+          supabase
+            .from('postalpeek_shares')
+            .update({ is_used: true })
+            .eq('id', shareData.id)
+            .then(({ error }) => {
+               if (error) console.error('Failed to mark share as used:', error);
+            });
         }
+
+        // Fetch the actual postcard data
+        if (targetPostcardId) {
+           const { data: pData, error: pError } = await supabase
+            .from('postalpeek_postcards')
+            .select('*')
+            .eq('id', targetPostcardId)
+            .single();
+            
+           if (pData && !pError) {
+             sharedCard = pData;
+             setHasSharedCard(true);
+           } else {
+             setHasSharedCard(false);
+           }
+        } else {
+           // Fallback: Check if the prefix belongs directly to a postcard ID (Legacy/Admin Links)
+           const { data: pData, error: pError } = await supabase
+            .from('postalpeek_postcards')
+            .select('*')
+            .gte('id', minUuid)
+            .lte('id', maxUuid)
+            .limit(1)
+            .single();
+
+           if (pData && !pError) {
+             sharedCard = pData;
+             setHasSharedCard(true);
+           } else {
+             setHasSharedCard(false);
+           }
+        }
+      } else {
+        setHasSharedCard(false);
       }
 
       const excludeIds = sharedCard ? [sharedCard.id] : [];
@@ -271,5 +317,6 @@ export function useWalkerFeed() {
     prefetchCountry,
     loadedIdsRef,
     isFetchingRef,
+    hasSharedCard,
   };
 }
