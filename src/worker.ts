@@ -1,4 +1,4 @@
-import Hashids from 'hashids';
+import { decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
 
 /**
  * Cloudflare Worker that intercepts requests from social media crawlers
@@ -6,23 +6,6 @@ import Hashids from 'hashids';
  *
  * For normal users, it serves the SPA as-is via the asset handler.
  */
-
-// ─── Hash decode (inlined from @eb-packages/logic/src/hash) ─────
-const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
-const hashids = new Hashids('Entity-Builders-Magic-Salt', 0, ALPHABET);
-
-function decodeHashToUuidPrefix(hash: string): string | null {
-  try {
-    if (hash.length === 36 && hash.includes('-')) {
-      return hash.split('-')[0];
-    }
-    const hex = hashids.decodeHex(hash);
-    if (!hex || typeof hex !== 'string') return null;
-    return hex.padStart(8, '0');
-  } catch {
-    return null;
-  }
-}
 
 // ─── Bot detection ──────────────────────────────────────────────
 const BOT_UA_PATTERNS = [
@@ -51,8 +34,8 @@ async function queryPostcard(
   minUuid: string,
   maxUuid: string,
 ): Promise<Record<string, string> | null> {
-  // Supabase REST API requires both gte AND lte as separate params on the same column
-  const restUrl = `${supabaseUrl}/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`;
+  // PostgREST requires the `and=()` filter for multiple conditions on the same column
+  const restUrl = `${supabaseUrl}/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&and=(id.gte.${minUuid},id.lte.${maxUuid})&limit=1`;
 
   const res = await fetch(restUrl, {
     headers: {
@@ -81,42 +64,9 @@ export default {
     const url = new URL(request.url);
     const userAgent = request.headers.get('user-agent') || '';
 
-    // ── Temporary debug endpoint ──
-    if (url.pathname.startsWith('/_debug/')) {
-      const debugHash = url.pathname.replace('/_debug/', '');
-      const supabaseUrl = env.SUPABASE_URL;
-      const supabaseKey = env.SUPABASE_ANON_KEY;
-      const debug: Record<string, unknown> = {
-        hash: debugHash,
-        supabaseUrl: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'EMPTY',
-        supabaseKey: supabaseKey ? 'SET (' + supabaseKey.length + ' chars)' : 'EMPTY',
-      };
-
-      try {
-        const prefix = decodeHashToUuidPrefix(debugHash);
-        debug.prefix = prefix;
-        if (prefix && supabaseUrl && supabaseKey) {
-          const minUuid = `${prefix}-0000-0000-0000-000000000000`;
-          const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
-          debug.minUuid = minUuid;
-          debug.maxUuid = maxUuid;
-          const postcard = await queryPostcard(supabaseUrl, supabaseKey, minUuid, maxUuid);
-          debug.postcard = postcard;
-        }
-      } catch (e) {
-        debug.error = String(e);
-      }
-
-      return new Response(JSON.stringify(debug, null, 2), {
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-
     // Only intercept bot requests for postcard URLs (not static assets)
     const segments = url.pathname.split('/').filter(Boolean);
     const hasPostcardHash = segments.length >= 1 && !segments[0].includes('.');
-
-    console.log('[Worker] UA:', userAgent, '| isBot:', isBot(userAgent), '| path:', url.pathname, '| hasHash:', hasPostcardHash);
 
     if (!isBot(userAgent) || !hasPostcardHash) {
       // Try to serve the static asset first
@@ -131,7 +81,7 @@ export default {
       const supabaseUrl = env.SUPABASE_URL;
       const supabaseKey = env.SUPABASE_ANON_KEY;
 
-      console.log('[Worker] Supabase URL:', supabaseUrl ? 'SET' : 'EMPTY', '| Key:', supabaseKey ? 'SET' : 'EMPTY');
+
 
       if (!supabaseUrl || !supabaseKey) {
         console.warn('[Worker] Missing SUPABASE_URL or SUPABASE_ANON_KEY — serving default OG');
@@ -141,7 +91,7 @@ export default {
       // The hash is the last segment (e.g., /QywJ9rK or /japan/QywJ9rK)
       const hash = segments[segments.length - 1];
       const prefix = decodeHashToUuidPrefix(hash);
-      console.log('[Worker] Hash:', hash, '| Prefix:', prefix);
+
 
       let postcard: Record<string, string> | null = null;
 
@@ -149,7 +99,7 @@ export default {
         const minUuid = `${prefix}-0000-0000-0000-000000000000`;
         const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
         postcard = await queryPostcard(supabaseUrl, supabaseKey, minUuid, maxUuid);
-        console.log('[Worker] Postcard found:', postcard ? 'YES' : 'NO', postcard ? JSON.stringify(postcard).slice(0, 200) : '');
+
       }
 
       // Get the base HTML from assets
@@ -157,7 +107,7 @@ export default {
         new Request(new URL('/', url.origin), request),
       );
       let html = await assetResponse.text();
-      console.log('[Worker] HTML length:', html.length, '| has __OG_IMAGE__:', html.includes('__OG_IMAGE__'));
+
 
       if (postcard) {
         const title = `${postcard.category} — ${postcard.city}, ${postcard.country} | PostalPeek`;

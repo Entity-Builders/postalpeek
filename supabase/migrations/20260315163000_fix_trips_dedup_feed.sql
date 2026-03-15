@@ -17,18 +17,13 @@ BEGIN
   -- The frontend then loads all trip siblings inside the card's inner carousel.
   IF p_trips_only THEN
     RETURN QUERY
-    SELECT p.*
-    FROM public.postalpeek_postcards p
-    INNER JOIN (
-      SELECT DISTINCT ON (trip_id) id
-      FROM public.postalpeek_postcards
-      WHERE trip_id IS NOT NULL
-        AND (p_country IS NULL OR country = p_country)
-        AND id != ALL(p_exclude_ids)
-      ORDER BY trip_id, trip_sequence ASC
-    ) first_stops ON first_stops.id = p.id
-    ORDER BY p.created_at DESC
-    LIMIT p_limit;
+    SELECT DISTINCT ON (trip_id) *
+    FROM public.postalpeek_postcards
+    WHERE
+      trip_id IS NOT NULL
+      AND (p_country IS NULL OR country = p_country)
+      AND id != ALL(p_exclude_ids)
+    ORDER BY trip_id, trip_sequence ASC;
     RETURN;
   END IF;
 
