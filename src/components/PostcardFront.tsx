@@ -13,6 +13,7 @@ import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
+import { preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
@@ -26,6 +27,7 @@ interface PostcardFrontProps {
   onToggleFavorite?: (postcardId: string) => void;
   onAuthRequired?: (postcardId: string) => void;
   onFlipCard: (view?: 'info' | 'coupon') => void;
+  onSlideChange?: (item: FeedItem) => void;
   mainImgUrl: string;
   placeholderUrl?: string;
   srcSetString?: string;
@@ -41,6 +43,7 @@ export function PostcardFront({
   onToggleFavorite,
   onAuthRequired,
   onFlipCard,
+  onSlideChange,
   mainImgUrl,
   placeholderUrl,
   srcSetString,
@@ -80,10 +83,17 @@ export function PostcardFront({
       .from('postalpeek_postcards')
       .select('*')
       .eq('trip_id', item.trip_id)
+      .not('illustration_url', 'is', null)
       .order('trip_sequence', { ascending: true })
       .then(({ data }) => {
         if (mounted && data) {
           const items = data as FeedItem[];
+          
+          // Pre-sign the fetched trip URLs to ensure they display correctly
+          preSignUrls(items.flatMap((i) => [i.illustration_url, i.original_image_url].filter(Boolean))).catch((err) => 
+            console.error('Failed to pre-sign trip item images', err)
+          );
+
           if (items.some((i) => i.id === item.id)) setTripItems(items);
           else
             setTripItems(
@@ -136,6 +146,12 @@ export function PostcardFront({
 
   const isTrip = !!item.trip_id;
   const storytelling = activeSlideItem.generation_metadata?.storytelling;
+
+  React.useEffect(() => {
+    if (onSlideChange) {
+      onSlideChange(activeSlideItem);
+    }
+  }, [activeSlideItem, onSlideChange]);
 
   return (
     <div

@@ -58,7 +58,13 @@ export function Postcard({
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
+  const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
   const isLiked = favoriteIds?.has(item.id) ?? false;
+
+  // React to item updates from feed navigation
+  React.useEffect(() => {
+    setActiveSlideItem(item);
+  }, [item]);
 
   // If the postcard is no longer active (user navigating the feed), ensure it resets to front face
   React.useEffect(() => {
@@ -105,14 +111,15 @@ export function Postcard({
     });
   };
 
-  // Derive non-blocking signed Cloudflare URLs for the images
+  // Derive non-blocking signed Cloudflare URLs for the main item images
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
   const baseMainUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
   const baseSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
-  const basePolaroidUrl = useSignedImage(item.original_image_url, { width: WIDTHS.thumb });
-
   const rawMainUrl = useRawSignedImage(item.illustration_url);
-  const rawPolaroidUrl = useRawSignedImage(item.original_image_url);
+
+  // Derive polaroid URLs dynamically from the activeSlideItem
+  const basePolaroidUrl = useSignedImage(activeSlideItem.original_image_url, { width: WIDTHS.thumb });
+  const rawPolaroidUrl = useRawSignedImage(activeSlideItem.original_image_url);
 
   // If fallback is triggered, bypass the signed transformations and use raw signed URLs
   const mainImgUrl = fallbackEnabled ? rawMainUrl : baseMainUrl;
@@ -152,6 +159,7 @@ export function Postcard({
             setBackView(view);
             setIsFlipped(true);
           }}
+          onSlideChange={setActiveSlideItem}
           mainImgUrl={mainImgUrl}
           placeholderUrl={finalPlaceholder}
           srcSetString={srcSetString}
@@ -159,10 +167,10 @@ export function Postcard({
           fallbackEnabled={fallbackEnabled}
         />
         {backView === 'coupon' ? (
-          <PostcardCoupon item={item} />
+          <PostcardCoupon item={activeSlideItem} />
         ) : (
           <PostcardBack
-            item={item}
+            item={activeSlideItem}
             polaroidUrl={polaroidUrl}
             handleImageError={handleImageError}
           />
