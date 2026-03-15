@@ -27,28 +27,62 @@ function isBot(userAgent: string): boolean {
   return BOT_UA_PATTERNS.some((bot) => ua.includes(bot.toLowerCase()));
 }
 
-// ─── Supabase REST helper (avoids bundling full SDK) ────────────
-async function queryPostcard(
+// ─── Supabase REST helpers (avoids bundling full SDK) ───────────
+
+/** Generic PostgREST fetch */
+async function supabaseGet(
   supabaseUrl: string,
   supabaseKey: string,
-  minUuid: string,
-  maxUuid: string,
-): Promise<Record<string, string> | null> {
-  // PostgREST requires the `and=()` filter for multiple conditions on the same column
-  const restUrl = `${supabaseUrl}/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&and=(id.gte.${minUuid},id.lte.${maxUuid})&limit=1`;
-
-  const res = await fetch(restUrl, {
+  path: string,
+): Promise<Record<string, string>[] | null> {
+  const res = await fetch(`${supabaseUrl}${path}`, {
     headers: {
       apikey: supabaseKey,
       Authorization: `Bearer ${supabaseKey}`,
       Accept: 'application/json',
     },
   });
-
   if (!res.ok) return null;
+  return (await res.json()) as Record<string, string>[];
+}
 
-  const rows = (await res.json()) as Record<string, string>[];
-  return rows[0] || null;
+/**
+ * Resolve a share hash to postcard data.
+ * Share links encode a `postalpeek_shares.id`, not the postcard ID.
+ * 1. Look up the share record to get `postcard_id`
+ * 2. Fetch the actual postcard by that ID
+ * 3. Fallback: check if the hash maps directly to a postcard (legacy/admin links)
+ */
+async function queryPostcard(
+  supabaseUrl: string,
+  supabaseKey: string,
+  minUuid: string,
+  maxUuid: string,
+): Promise<Record<string, string> | null> {
+  // Step 1: Check postalpeek_shares for a matching share record
+  const shares = await supabaseGet(
+    supabaseUrl,
+    supabaseKey,
+    `/rest/v1/postalpeek_shares?select=postcard_id&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
+  );
+
+  if (shares && shares.length > 0 && shares[0].postcard_id) {
+    // Step 2: Fetch the actual postcard by its real ID
+    const postcards = await supabaseGet(
+      supabaseUrl,
+      supabaseKey,
+      `/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=eq.${shares[0].postcard_id}&limit=1`,
+    );
+    if (postcards && postcards.length > 0) return postcards[0];
+  }
+
+  // Fallback: check if the hash maps directly to a postcard (legacy/admin links)
+  const directMatch = await supabaseGet(
+    supabaseUrl,
+    supabaseKey,
+    `/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
+  );
+  return directMatch && directMatch.length > 0 ? directMatch[0] : null;
 }
 
 // ─── Worker ─────────────────────────────────────────────────────
