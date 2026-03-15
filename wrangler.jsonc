@@ -7,14 +7,10 @@
     "enabled": true
   },
   "assets": {
-    "not_found_handling": "single-page-application",
+    "not_found_handling": "none",
     "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ],
-  "vars": {
-    "SUPABASE_URL": "",
-    "SUPABASE_ANON_KEY": ""
-  }
+  ]
 }

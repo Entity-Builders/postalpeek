@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map, Heart } from 'lucide-react';
+import { Map, Heart, Route } from 'lucide-react';
 
 export function WalkerLoadingState() {
   return (
@@ -57,6 +57,20 @@ export function WalkerFavoritesEmptyState() {
       </p>
       <p className='text-sm font-light text-center text-stone-400'>
         Tap the <span className='text-rose-400'>♥</span> on postcards you love!
+      </p>
+    </div>
+  );
+}
+
+export function WalkerTripsEmptyState() {
+  return (
+    <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-3 z-20'>
+      <Route className='w-16 h-16 mb-1 text-amber-400/80' />
+      <p className='text-lg font-medium tracking-wide text-center text-stone-600'>
+        No trips yet
+      </p>
+      <p className='text-sm font-light text-center text-stone-400'>
+        The Walker hasn't started any journeys in this region yet.
       </p>
     </div>
   );

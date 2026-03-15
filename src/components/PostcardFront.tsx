@@ -5,7 +5,6 @@ import {
   Heart,
   Share2,
   Check,
-  Play,
   Wand2,
   Loader2,
   Ticket,
@@ -15,7 +14,9 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
-import { cdnUrl } from '../utils/imageUtils';
+import useEmblaCarousel from 'embla-carousel-react';
+import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
+import { TripSlide } from './TripSlide';
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -29,6 +30,7 @@ interface PostcardFrontProps {
   placeholderUrl?: string;
   srcSetString?: string;
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+  fallbackEnabled?: boolean;
 }
 
 export function PostcardFront({
@@ -43,6 +45,7 @@ export function PostcardFront({
   placeholderUrl,
   srcSetString,
   handleImageError,
+  fallbackEnabled,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -61,11 +64,82 @@ export function PostcardFront({
           ? 'queued'
           : 'idle';
 
-  const isBusiness = item.generation_metadata?.strategy === 'Zigzag Shared Place';
+  const isBusiness =
+    item.generation_metadata?.strategy === 'Zigzag Shared Place';
+
+  // State and logic for Trip Galleries
+  const [tripItems, setTripItems] = useState<FeedItem[]>([item]);
+  const [tripStops, setTripStops] = useState<Record<number, { stop_name: string; stop_description?: string }>>({});
+
+  React.useEffect(() => {
+    if (!item.trip_id) return;
+    let mounted = true;
+
+    // Fetch postcards for this trip
+    supabase
+      .from('postalpeek_postcards')
+      .select('*')
+      .eq('trip_id', item.trip_id)
+      .order('trip_sequence', { ascending: true })
+      .then(({ data }) => {
+        if (mounted && data) {
+          const items = data as FeedItem[];
+          if (items.some((i) => i.id === item.id)) setTripItems(items);
+          else
+            setTripItems(
+              [item, ...items].sort(
+                (a, b) => (a.trip_sequence || 0) - (b.trip_sequence || 0),
+              ),
+            );
+        }
+      });
+
+    // Fetch stop metadata (names, descriptions)
+    supabase
+      .from('postalpeek_trip_stops')
+      .select('sequence, stop_name, stop_description')
+      .eq('trip_id', item.trip_id)
+      .order('sequence', { ascending: true })
+      .then(({ data }) => {
+        if (mounted && data) {
+          const map: Record<number, { stop_name: string; stop_description?: string }> = {};
+          for (const stop of data) {
+            map[stop.sequence] = { stop_name: stop.stop_name, stop_description: stop.stop_description };
+          }
+          setTripStops(map);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [item]);
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false }, [
+    WheelGesturesPlugin(),
+  ]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  React.useEffect(() => {
+    if (!emblaApi) return;
+    const initialIndex = tripItems.findIndex((i) => i.id === item.id);
+    if (initialIndex > 0) emblaApi.scrollTo(initialIndex, true);
+
+    const onSelect = () => setCurrentIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on('select', onSelect);
+    return () => {
+      emblaApi.off('select', onSelect);
+    };
+  }, [emblaApi, tripItems, item.id]);
+
+  const activeSlideItem = tripItems[currentIndex] || item;
+
+  const isTrip = !!item.trip_id;
+  const storytelling = activeSlideItem.generation_metadata?.storytelling;
 
   return (
     <div
-      className="absolute inset-0 w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50"
+      className='absolute inset-0 w-full h-full'
       style={{
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
@@ -73,328 +147,410 @@ export function PostcardFront({
         WebkitTransform: 'rotateY(0deg) translateZ(1px)',
       }}
     >
-      {/* The Illustration */}
-      <div
-        className="flex-1 relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        {/* Shimmer Placeholder (Visible while image loads in front) */}
-        <div className="absolute inset-0 bg-stone-300/40 animate-pulse pointer-events-none z-0" />
-
-        {/* The Cloudy Blur Placeholder (Cloudflare micro-image) */}
-        {placeholderUrl && (
-          <img
-            src={placeholderUrl}
-            alt=''
-            loading='eager' /* Micro-placeholder always eager */
-            decoding='async'
-            className='absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80'
-            style={{ transition: 'opacity 0.4s ease-out' }}
+      {/* Stacked cards behind for trips */}
+      {isTrip && (
+        <>
+          <div
+            className='absolute inset-0 bg-white rounded-sm md:rounded-md border border-stone-200/60 shadow-md'
+            style={{ transform: 'rotate(2.5deg) translate(4px, 3px)', zIndex: 0 }}
           />
-        )}
+          <div
+            className='absolute inset-0 bg-white rounded-sm md:rounded-md border border-stone-200/40 shadow-sm'
+            style={{ transform: 'rotate(-1.5deg) translate(-3px, 5px)', zIndex: 0 }}
+          />
+        </>
+      )}
 
-        <img
-          key={mainImgUrl}
-          src={mainImgUrl}
-          srcSet={srcSetString}
-          sizes="(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px"
-          alt={item.category}
-          loading={isPriority ? 'eager' : 'lazy'}
-          decoding="async"
-          fetchPriority={isPriority ? 'high' : 'auto'}
-          draggable={false}
-          onError={handleImageError}
+      {/* Main card */}
+      <div
+        className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'
+        style={{ zIndex: 1 }}
+      >
+        {/* The Illustration */}
+        <div
           className={cn(
-            'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-10',
-            !item.video_url && 'hover:scale-105',
+            'relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200',
+            storytelling ? 'flex-[2]' : 'flex-1',
           )}
-        />
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {isTrip ? (
+            <>
+              <div className='absolute top-2 left-2 right-2 z-30 pointer-events-none drop-shadow-md'>
+                <span className='bg-black/60 text-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-medium border border-white/20 shadow-lg'>
+                  🛫{' '}
+                  {item.generation_metadata?.tripContext?.title ||
+                    'Viaje en progreso'}
+                </span>
+              </div>
 
-        {item.video_url &&
-          isHovered &&
-          (item.video_url.toLowerCase().includes('.gif') ? (
-            <img
-              key={item.video_url}
-              src={cdnUrl(item.video_url!)}
-              alt="Animated Scene"
-              className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
-            />
-          ) : (
-            <video
-              key={item.video_url}
-              src={cdnUrl(item.video_url!)}
-              autoPlay
-              muted
-              loop
-              playsInline
-              disablePictureInPicture
-              controls={false}
-              onContextMenu={(e) => e.preventDefault()}
-              onLoadedData={(e) => {
-                e.currentTarget.play().catch(() => {});
-              }}
-              className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 pointer-events-none"
-            />
-          ))}
+              <div className='overflow-hidden w-full h-full relative z-10' ref={emblaRef}>
+                <div className='flex w-full h-full'>
+                  {tripItems.map((slideItem) => (
+                    <TripSlide
+                      key={slideItem.id}
+                      slideItem={slideItem}
+                      isPriority={isPriority && slideItem.id === item.id}
+                      handleImageError={handleImageError}
+                      fallbackEnabled={fallbackEnabled}
+                      isHovered={isHovered}
+                      setIsHovered={setIsHovered}
+                      preloadedMainUrl={
+                        slideItem.id === item.id ? mainImgUrl : undefined
+                      }
+                      preloadedPlaceholder={
+                        slideItem.id === item.id ? placeholderUrl : undefined
+                      }
+                      preloadedSrcSet={
+                        slideItem.id === item.id ? srcSetString : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
 
-        {/* Subtle Play Icon indicator */}
-        {item.video_url && !isHovered && (
-          <div className="absolute bottom-3 left-3 bg-black/40 backdrop-blur-md rounded-full p-1.5 text-white/90 z-20 pointer-events-none transition-opacity duration-300">
-            <Play className="w-3.5 h-3.5 fill-white/80" />
-          </div>
-        )}
-        {/* Stamp overlay effect */}
-        <div className="absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none z-[3]">
-          <span className="text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12">
-            POST
-          </span>
-          <span className="text-[8px] md:text-[10px] text-white/90 font-mono mt-1 drop-shadow-md">
-            {new Date(item.created_at).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-            })}
-          </span>
-        </div>
-      </div>
-
-      {/* Bottom margin (Title & Location) */}
-      <div className="mt-3 md:mt-4 px-2 flex justify-between items-end">
-        <div className="flex-1 min-w-0 mr-3">
-          <h3
-            className="font-serif text-lg md:text-xl font-semibold tracking-tight leading-none mb-1 truncate"
-            style={{ color: '#1a1a1a' }}
-          >
-            {item.category.replace(/[\u{1F300}-\u{1F9FF}]/u, '').trim()}
-          </h3>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-            <p className="text-sm md:text-base text-neutral-600 tracking-wide truncate">
-              {item.city}, {item.country}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            className={cn(
-              'p-2 md:p-2.5 rounded-full transition-colors',
-              isLiked
-                ? 'bg-rose-100 text-rose-500'
-                : 'bg-stone-100/80 hover:bg-rose-50 text-stone-400 hover:text-rose-500',
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onAuthRequired && !onToggleFavorite) {
-                onAuthRequired(item.id);
-                return;
-              }
-              if (onToggleFavorite) {
-                onToggleFavorite(item.id);
-              }
-              if (!isLiked) {
-                analytics.track('postcard_liked', {
-                  postcard_id: item.id,
-                  country: item.country,
-                });
-              }
-            }}
-          >
-            <Heart
-              className={cn(
-                'w-4 h-4 md:w-5 md:h-5 transition-transform',
-                isLiked && 'fill-current scale-110',
+              {/* Pagination Dots */}
+              {tripItems.length > 1 && (
+                <div className='absolute bottom-4 left-0 right-0 z-30 flex justify-center gap-1.5 pointer-events-none'>
+                  {tripItems.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        'h-1.5 rounded-full transition-all duration-300 shadow',
+                        idx === currentIndex
+                          ? 'w-4 bg-white'
+                          : 'w-1.5 bg-white/50',
+                      )}
+                    />
+                  ))}
+                </div>
               )}
+            </>
+          ) : (
+            <TripSlide
+              slideItem={item}
+              isPriority={isPriority}
+              handleImageError={handleImageError}
+              fallbackEnabled={fallbackEnabled}
+              isHovered={isHovered}
+              setIsHovered={setIsHovered}
+              preloadedMainUrl={mainImgUrl}
+              preloadedPlaceholder={placeholderUrl}
+              preloadedSrcSet={srcSetString}
             />
-          </button>
+          )}
+        </div>
 
-          <button
-            className={cn(
-              'p-2 md:p-2.5 rounded-full transition-colors',
-              isCopied
-                ? 'bg-indigo-50 text-indigo-500'
-                : 'bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500',
-            )}
-            disabled={isSharing}
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (isSharing) return;
-              setIsSharing(true);
-              
-              try {
-                // Generate a unique 1-time share link
-                const { data, error } = await supabase
-                  .from('postalpeek_shares')
-                  .insert({ postcard_id: item.id })
-                  .select('id')
-                  .single();
-
-                if (error) throw error;
-                if (!data) throw new Error('No share record created');
-
-                const shortHash = encodeUuidToHash(data.id);
-                const shareLink = `${window.location.origin}/${shortHash}`;
-                
-                await navigator.clipboard.writeText(shareLink);
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2000);
-                
-                analytics.track('postcard_shared', {
-                  postcard_id: item.id,
-                  country: item.country,
-                  share_link: shareLink,
-                });
-              } catch (err) {
-                console.log('Share failed:', err);
-                analytics.captureError(err instanceof Error ? err : new Error(String(err)), {
-                  event_type: 'share_failed',
-                  postcard_id: item.id,
-                });
-                alert('Failed to generate share link. Please try again.');
-              } finally {
-                setIsSharing(false);
-              }
-            }}
-          >
-            {isSharing ? (
-              <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-            ) : isCopied ? (
-              <Check className="w-4 h-4 md:w-5 md:h-5 scale-110 transition-transform" />
-            ) : (
-              <Share2 className="w-4 h-4 md:w-5 md:h-5 transition-transform" />
-            )}
-          </button>
-
-          {isAdmin && animationState !== 'completed' && (
+        {/* Title + Buttons row */}
+        <div className='mt-3 md:mt-4 px-2 flex justify-between items-end'>
+          <div className='flex-1 min-w-0 mr-3'>
+            {/* Trip stop indicator */}
+            {activeSlideItem.trip_id && activeSlideItem.trip_sequence != null && (() => {
+              const stopMeta = tripStops[activeSlideItem.trip_sequence!];
+              const tripCtx = activeSlideItem.generation_metadata?.tripContext;
+              const totalStops = tripCtx?.totalStops || Object.keys(tripStops).length || tripItems.length;
+              return (
+                <div className='mb-1'>
+                  <p className='text-[10px] md:text-xs text-stone-400 font-medium tracking-wider uppercase'>
+                    📍 Stop {activeSlideItem.trip_sequence}
+                    {totalStops ? ` of ${totalStops}` : ''}
+                    {stopMeta?.stop_name ? ` — ${stopMeta.stop_name}` : ''}
+                  </p>
+                  {stopMeta?.stop_description && (
+                    <p className='text-[9px] md:text-[10px] text-stone-400/80 mt-0.5 line-clamp-1'>
+                      {stopMeta.stop_description}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+            <h3
+              className={cn(
+                'font-serif font-semibold tracking-tight leading-none mb-1 truncate',
+                storytelling ? 'text-base md:text-lg' : 'text-lg md:text-xl',
+              )}
+              style={{ color: '#1a1a1a' }}
+            >
+              {activeSlideItem.category
+                .replace(/[\u{1F300}-\u{1F9FF}]/u, '')
+                .trim()}
+            </h3>
+            <div className='flex items-center gap-1.5 min-w-0'>
+              <MapPin className='w-3.5 h-3.5 text-stone-400 shrink-0' />
+              <p className='text-sm md:text-base text-neutral-600 tracking-wide truncate'>
+                {activeSlideItem.city}, {activeSlideItem.country}
+              </p>
+            </div>
+          </div>
+          <div className='flex items-center gap-2 shrink-0'>
             <button
               className={cn(
                 'p-2 md:p-2.5 rounded-full transition-colors',
-                animationState === 'processing'
-                  ? 'bg-amber-100 text-amber-500 cursor-not-allowed'
-                  : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600',
+                isLiked
+                  ? 'bg-rose-100 text-rose-500'
+                  : 'bg-stone-100/80 hover:bg-rose-50 text-stone-400 hover:text-rose-500',
               )}
-              disabled={animationState === 'processing'}
-              onClick={async (e) => {
+              onClick={(e) => {
                 e.stopPropagation();
-                if (animationState === 'processing') return;
-
-                setLocalAnimState('queued');
-
-                try {
-                  const { data, error } = await supabase.functions.invoke(
-                    'postalpeek-video-trigger',
-                    { body: { postcardId: item.id } },
-                  );
-
-                  if (error) {
-                    let reason = 'Unknown error';
-                    let provider: string | undefined;
-                    let httpStatus: number | undefined;
-                    try {
-                      const body =
-                        typeof error === 'object' && error.context
-                          ? await error.context.json()
-                          : null;
-                      if (body) {
-                        reason = body.reason || body.error || reason;
-                        provider = body.provider;
-                        httpStatus = body.httpStatus;
-                      }
-                    } catch {
-                      // ignore
-                    }
-
-                    analytics.captureError(
-                      error instanceof Error ? error : new Error(reason),
-                      {
-                        event_type: 'video_trigger_failed',
-                        postcard_id: item.id,
-                        country: item.country,
-                        city: item.city,
-                        reason,
-                        provider,
-                        upstream_http_status: httpStatus,
-                      },
-                    );
-                    analytics.track('video_trigger_failed', {
-                      postcard_id: item.id,
-                      country: item.country,
-                      reason,
-                      provider,
-                      upstream_http_status: httpStatus,
-                    });
-
-                    setLocalAnimState(null);
-                    alert(
-                      provider
-                        ? `Video provider (${provider}) is temporarily unavailable. Try again later.`
-                        : 'Failed to trigger video generation. Try again later.',
-                    );
-                    return;
-                  }
-
-                  console.log('[Postcard] Video triggered:', data);
-                  analytics.track('video_trigger_success', {
+                if (onAuthRequired && !onToggleFavorite) {
+                  onAuthRequired(item.id);
+                  return;
+                }
+                if (onToggleFavorite) {
+                  onToggleFavorite(item.id);
+                }
+                if (!isLiked) {
+                  analytics.track('postcard_liked', {
                     postcard_id: item.id,
                     country: item.country,
-                    task_id: data?.taskId,
                   });
-                  setLocalAnimState(null);
+                }
+              }}
+            >
+              <Heart
+                className={cn(
+                  'w-4 h-4 md:w-5 md:h-5 transition-transform',
+                  isLiked && 'fill-current scale-110',
+                )}
+              />
+            </button>
+
+            <button
+              className={cn(
+                'p-2 md:p-2.5 rounded-full transition-colors',
+                isCopied
+                  ? 'bg-indigo-50 text-indigo-500'
+                  : 'bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500',
+              )}
+              disabled={isSharing}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (isSharing) return;
+                setIsSharing(true);
+
+                try {
+                  // Generate a unique 1-time share link
+                  const { data, error } = await supabase
+                    .from('postalpeek_shares')
+                    .insert({ postcard_id: item.id })
+                    .select('id')
+                    .single();
+
+                  if (error) throw error;
+                  if (!data) throw new Error('No share record created');
+
+                  const shortHash = encodeUuidToHash(data.id);
+                  const shareLink = `${window.location.origin}/${shortHash}`;
+
+                  await navigator.clipboard.writeText(shareLink);
+                  setIsCopied(true);
+                  setTimeout(() => setIsCopied(false), 2000);
+
+                  analytics.track('postcard_shared', {
+                    postcard_id: item.id,
+                    country: item.country,
+                    share_link: shareLink,
+                  });
                 } catch (err) {
+                  console.log('Share failed:', err);
                   analytics.captureError(
                     err instanceof Error ? err : new Error(String(err)),
                     {
-                      event_type: 'video_trigger_exception',
+                      event_type: 'share_failed',
                       postcard_id: item.id,
-                      country: item.country,
-                      city: item.city,
                     },
                   );
-                  console.error('Failed to trigger video generation', err);
-                  setLocalAnimState(null);
-                  alert('Failed to trigger video generation');
+                  alert('Failed to generate share link. Please try again.');
+                } finally {
+                  setIsSharing(false);
                 }
               }}
-              title={
-                animationState === 'processing'
-                  ? 'Processing Video...'
-                  : 'Generate Video Animation'
-              }
             >
-              {animationState === 'processing' ||
-              animationState === 'queued' ? (
-                <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+              {isSharing ? (
+                <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+              ) : isCopied ? (
+                <Check className='w-4 h-4 md:w-5 md:h-5 scale-110 transition-transform' />
               ) : (
-                <Wand2 className="w-4 h-4 md:w-5 md:h-5" />
+                <Share2 className='w-4 h-4 md:w-5 md:h-5 transition-transform' />
               )}
             </button>
-          )}
 
-          {isBusiness && (
+            {isAdmin && animationState !== 'completed' && (
+              <button
+                className={cn(
+                  'p-2 md:p-2.5 rounded-full transition-colors',
+                  animationState === 'processing'
+                    ? 'bg-amber-100 text-amber-500 cursor-not-allowed'
+                    : 'bg-violet-100/80 hover:bg-violet-200 text-violet-500 hover:text-violet-600',
+                )}
+                disabled={animationState === 'processing'}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (animationState === 'processing') return;
+
+                  setLocalAnimState('queued');
+
+                  try {
+                    const { data, error } = await supabase.functions.invoke(
+                      'postalpeek-video-trigger',
+                      { body: { postcardId: item.id } },
+                    );
+
+                    if (error) {
+                      let reason = 'Unknown error';
+                      let provider: string | undefined;
+                      let httpStatus: number | undefined;
+                      try {
+                        const body =
+                          typeof error === 'object' && error.context
+                            ? await error.context.json()
+                            : null;
+                        if (body) {
+                          reason = body.reason || body.error || reason;
+                          provider = body.provider;
+                          httpStatus = body.httpStatus;
+                        }
+                      } catch {
+                        // ignore
+                      }
+
+                      analytics.captureError(
+                        error instanceof Error ? error : new Error(reason),
+                        {
+                          event_type: 'video_trigger_failed',
+                          postcard_id: item.id,
+                          country: item.country,
+                          city: item.city,
+                          reason,
+                          provider,
+                          upstream_http_status: httpStatus,
+                        },
+                      );
+                      analytics.track('video_trigger_failed', {
+                        postcard_id: item.id,
+                        country: item.country,
+                        reason,
+                        provider,
+                        upstream_http_status: httpStatus,
+                      });
+
+                      setLocalAnimState(null);
+                      alert(
+                        provider
+                          ? `Video provider (${provider}) is temporarily unavailable. Try again later.`
+                          : 'Failed to trigger video generation. Try again later.',
+                      );
+                      return;
+                    }
+
+                    console.log('[Postcard] Video triggered:', data);
+                    analytics.track('video_trigger_success', {
+                      postcard_id: item.id,
+                      country: item.country,
+                      task_id: data?.taskId,
+                    });
+                    setLocalAnimState(null);
+                  } catch (err) {
+                    analytics.captureError(
+                      err instanceof Error ? err : new Error(String(err)),
+                      {
+                        event_type: 'video_trigger_exception',
+                        postcard_id: item.id,
+                        country: item.country,
+                        city: item.city,
+                      },
+                    );
+                    console.error('Failed to trigger video generation', err);
+                    setLocalAnimState(null);
+                    alert('Failed to trigger video generation');
+                  }
+                }}
+                title={
+                  animationState === 'processing'
+                    ? 'Processing Video...'
+                    : 'Generate Video Animation'
+                }
+              >
+                {animationState === 'processing' ||
+                animationState === 'queued' ? (
+                  <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+                ) : (
+                  <Wand2 className='w-4 h-4 md:w-5 md:h-5' />
+                )}
+              </button>
+            )}
+
+            {isBusiness && (
+              <button
+                className='p-2 md:p-2.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-500 hover:text-rose-600 transition-colors'
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFlipCard('coupon');
+                  analytics.track('coupon_viewed', { postcard_id: item.id });
+                }}
+                title='Special Offer'
+              >
+                <Ticket className='w-4 h-4 md:w-5 md:h-5' />
+              </button>
+            )}
+
             <button
-              className="p-2 md:p-2.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-500 hover:text-rose-600 transition-colors"
+              className='p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors'
               onClick={(e) => {
                 e.stopPropagation();
-                onFlipCard('coupon');
-                analytics.track('coupon_viewed', { postcard_id: item.id });
+                onFlipCard('info');
               }}
-              title="Special Offer"
             >
-              <Ticket className="w-4 h-4 md:w-5 md:h-5" />
+              <Info className='w-4 h-4 md:w-5 md:h-5' />
             </button>
-          )}
-
-          <button
-            className="p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onFlipCard('info');
-            }}
-          >
-            <Info className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
+          </div>
         </div>
+
+        {/* Storytelling section — trip postcards only */}
+        {storytelling && (
+          <div className='mt-2.5 mx-1 flex-1 min-h-0 rounded-lg border-l-[3px] border-amber-400/70 overflow-hidden'>
+            <div className='bg-amber-50/60 px-3.5 py-3 h-full overflow-y-auto'>
+              <span className='inline-block text-[10px] md:text-xs font-semibold text-amber-800/80 bg-amber-100/80 px-2 py-0.5 rounded-full mb-1.5'>
+                {factTypeEmoji(storytelling.fact_type)}{' '}
+                {factTypeLabel(storytelling.fact_type)}
+              </span>
+              <p className='text-xs md:text-sm text-stone-700 leading-relaxed'>
+                💡 {storytelling.did_you_know}
+              </p>
+              {storytelling.narrative_link && (
+                <p className='text-[10px] md:text-xs text-amber-700/60 italic mt-1.5'>
+                  {storytelling.narrative_link}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+function factTypeEmoji(type: string): string {
+  const map: Record<string, string> = {
+    historical: '🏛️',
+    architectural: '🏗️',
+    cultural: '🎭',
+    gastronomic: '🍽️',
+    natural: '🌿',
+    artistic: '🎨',
+  };
+  return map[type] || '📖';
+}
+
+function factTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    historical: 'Dato Histórico',
+    architectural: 'Arquitectura',
+    cultural: 'Cultura',
+    gastronomic: 'Gastronomía',
+    natural: 'Naturaleza',
+    artistic: 'Arte',
+  };
+  return map[type] || 'Dato Curioso';
+}
+

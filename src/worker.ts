@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import Hashids from 'hashids';
 
 /**
  * Cloudflare Worker that intercepts requests from social media crawlers
@@ -7,7 +7,24 @@ import { createClient } from '@supabase/supabase-js';
  * For normal users, it serves the SPA as-is via the asset handler.
  */
 
-// Bot User-Agent patterns that need OG tags
+// ─── Hash decode (inlined from @eb-packages/logic/src/hash) ─────
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+const hashids = new Hashids('Entity-Builders-Magic-Salt', 0, ALPHABET);
+
+function decodeHashToUuidPrefix(hash: string): string | null {
+  try {
+    if (hash.length === 36 && hash.includes('-')) {
+      return hash.split('-')[0];
+    }
+    const hex = hashids.decodeHex(hash);
+    if (!hex || typeof hex !== 'string') return null;
+    return hex.padStart(8, '0');
+  } catch {
+    return null;
+  }
+}
+
+// ─── Bot detection ──────────────────────────────────────────────
 const BOT_UA_PATTERNS = [
   'facebookexternalhit',
   'Facebot',
@@ -27,7 +44,31 @@ function isBot(userAgent: string): boolean {
   return BOT_UA_PATTERNS.some((bot) => ua.includes(bot.toLowerCase()));
 }
 
+// ─── Supabase REST helper (avoids bundling full SDK) ────────────
+async function queryPostcard(
+  supabaseUrl: string,
+  supabaseKey: string,
+  minUuid: string,
+  maxUuid: string,
+): Promise<Record<string, string> | null> {
+  // Supabase REST API requires both gte AND lte as separate params on the same column
+  const restUrl = `${supabaseUrl}/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`;
 
+  const res = await fetch(restUrl, {
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) return null;
+
+  const rows = (await res.json()) as Record<string, string>[];
+  return rows[0] || null;
+}
+
+// ─── Worker ─────────────────────────────────────────────────────
 
 interface Env {
   ASSETS: { fetch: typeof fetch };
@@ -40,13 +81,49 @@ export default {
     const url = new URL(request.url);
     const userAgent = request.headers.get('user-agent') || '';
 
+    // ── Temporary debug endpoint ──
+    if (url.pathname.startsWith('/_debug/')) {
+      const debugHash = url.pathname.replace('/_debug/', '');
+      const supabaseUrl = env.SUPABASE_URL;
+      const supabaseKey = env.SUPABASE_ANON_KEY;
+      const debug: Record<string, unknown> = {
+        hash: debugHash,
+        supabaseUrl: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'EMPTY',
+        supabaseKey: supabaseKey ? 'SET (' + supabaseKey.length + ' chars)' : 'EMPTY',
+      };
+
+      try {
+        const prefix = decodeHashToUuidPrefix(debugHash);
+        debug.prefix = prefix;
+        if (prefix && supabaseUrl && supabaseKey) {
+          const minUuid = `${prefix}-0000-0000-0000-000000000000`;
+          const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
+          debug.minUuid = minUuid;
+          debug.maxUuid = maxUuid;
+          const postcard = await queryPostcard(supabaseUrl, supabaseKey, minUuid, maxUuid);
+          debug.postcard = postcard;
+        }
+      } catch (e) {
+        debug.error = String(e);
+      }
+
+      return new Response(JSON.stringify(debug, null, 2), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     // Only intercept bot requests for postcard URLs (not static assets)
     const segments = url.pathname.split('/').filter(Boolean);
     const hasPostcardHash = segments.length >= 1 && !segments[0].includes('.');
 
+    console.log('[Worker] UA:', userAgent, '| isBot:', isBot(userAgent), '| path:', url.pathname, '| hasHash:', hasPostcardHash);
+
     if (!isBot(userAgent) || !hasPostcardHash) {
-      // Serve the SPA normally via Cloudflare Pages assets
-      return env.ASSETS.fetch(request);
+      // Try to serve the static asset first
+      const assetRes = await env.ASSETS.fetch(request);
+      if (assetRes.status !== 404) return assetRes;
+      // SPA fallback: serve index.html for unknown paths (client-side routing)
+      return env.ASSETS.fetch(new Request(new URL('/', url.origin), request));
     }
 
     // It's a bot requesting a postcard URL — inject OG tags
@@ -54,38 +131,25 @@ export default {
       const supabaseUrl = env.SUPABASE_URL;
       const supabaseKey = env.SUPABASE_ANON_KEY;
 
-      if (!supabaseUrl || !supabaseKey) {
-        // No Supabase config — serve with default OG tags
-        return env.ASSETS.fetch(request);
-      }
+      console.log('[Worker] Supabase URL:', supabaseUrl ? 'SET' : 'EMPTY', '| Key:', supabaseKey ? 'SET' : 'EMPTY');
 
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      if (!supabaseUrl || !supabaseKey) {
+        console.warn('[Worker] Missing SUPABASE_URL or SUPABASE_ANON_KEY — serving default OG');
+        return env.ASSETS.fetch(new Request(new URL('/', url.origin), request));
+      }
 
       // The hash is the last segment (e.g., /QywJ9rK or /japan/QywJ9rK)
       const hash = segments[segments.length - 1];
+      const prefix = decodeHashToUuidPrefix(hash);
+      console.log('[Worker] Hash:', hash, '| Prefix:', prefix);
 
-      // Use the RPC to find the postcard by hash prefix
-      // For now, we'll do a simple query using the hash decode logic
-      const { decodeHashToUuidPrefix: decode } = await import(
-        '@eb-packages/logic/src/hash'
-      );
-      const prefix = decode(hash);
-
-      let postcard = null;
+      let postcard: Record<string, string> | null = null;
 
       if (prefix) {
         const minUuid = `${prefix}-0000-0000-0000-000000000000`;
         const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
-
-        const { data } = await supabase
-          .from('postalpeek_postcards')
-          .select('id, illustration_url, category, description, city, country')
-          .gte('id', minUuid)
-          .lte('id', maxUuid)
-          .limit(1)
-          .single();
-
-        postcard = data;
+        postcard = await queryPostcard(supabaseUrl, supabaseKey, minUuid, maxUuid);
+        console.log('[Worker] Postcard found:', postcard ? 'YES' : 'NO', postcard ? JSON.stringify(postcard).slice(0, 200) : '');
       }
 
       // Get the base HTML from assets
@@ -93,6 +157,7 @@ export default {
         new Request(new URL('/', url.origin), request),
       );
       let html = await assetResponse.text();
+      console.log('[Worker] HTML length:', html.length, '| has __OG_IMAGE__:', html.includes('__OG_IMAGE__'));
 
       if (postcard) {
         const title = `${postcard.category} — ${postcard.city}, ${postcard.country} | PostalPeek`;
@@ -136,8 +201,8 @@ export default {
       });
     } catch (error) {
       console.error('[Worker] OG injection error:', error);
-      // Fallback to normal SPA
-      return env.ASSETS.fetch(request);
+      // Fallback to normal SPA (serve index.html)
+      return env.ASSETS.fetch(new Request(new URL('/', url.origin), request));
     }
   },
 };

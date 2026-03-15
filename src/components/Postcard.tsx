@@ -22,6 +22,8 @@ export interface FeedItem {
   created_at: string;
   streetview_pov?: any;
   generation_metadata?: any;
+  trip_id?: string;
+  trip_sequence?: number;
   video_url?: string;
   video_generation_status?: 'idle' | 'processing' | 'completed' | 'failed';
   imagine_task_id?: string;
@@ -154,6 +156,7 @@ export function Postcard({
           placeholderUrl={finalPlaceholder}
           srcSetString={srcSetString}
           handleImageError={handleImageError}
+          fallbackEnabled={fallbackEnabled}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={item} />

@@ -7,6 +7,7 @@ import {
   WalkerLoadingState,
   WalkerEmptyState,
   WalkerFavoritesEmptyState,
+  WalkerTripsEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
@@ -29,6 +30,8 @@ export function WalkerFeed({
   user?: User | null;
   onWelcomeChange?: (isOnWelcome: boolean) => void;
 }) {
+  const [showTripsOnly, setShowTripsOnly] = useState(false);
+
   const {
     items,
     availableCountries,
@@ -43,7 +46,7 @@ export function WalkerFeed({
     loadedIdsRef,
     isFetchingRef,
     hasSharedCard,
-  } = useWalkerFeed();
+  } = useWalkerFeed(showTripsOnly);
 
   const [showAuthGate, setShowAuthGate] = useState(() => {
     return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
@@ -67,6 +70,7 @@ export function WalkerFeed({
 
   useEffect(() => {
     if (!user) setShowFavoritesOnly(false);
+    // trips filter is independent of auth, no reset needed
   }, [user]);
 
   useEffect(() => {
@@ -82,8 +86,8 @@ export function WalkerFeed({
   }, [favoriteItems]);
 
   const displayItems = useMemo(() => {
-    if (!showFavoritesOnly) return items;
-    return favoriteItems;
+    if (showFavoritesOnly) return favoriteItems;
+    return items;
   }, [items, showFavoritesOnly, favoriteItems]);
 
   return (
@@ -97,7 +101,17 @@ export function WalkerFeed({
           onToggleFavorites={() => {
             setShowFavoritesOnly((prev) => {
               const next = !prev;
+              if (next) setShowTripsOnly(false);
               analytics.track('filter_changed', { favorites_only: next });
+              return next;
+            });
+          }}
+          showTripsOnly={showTripsOnly}
+          onToggleTrips={() => {
+            setShowTripsOnly((prev) => {
+              const next = !prev;
+              if (next) setShowFavoritesOnly(false);
+              analytics.track('filter_changed', { trips_only: next });
               return next;
             });
           }}
@@ -109,6 +123,7 @@ export function WalkerFeed({
               return;
             }
             setShowFavoritesOnly(false);
+            setShowTripsOnly(false);
             setIsLoading(true);
             loadedIdsRef.current = [];
             isFetchingRef.current = false;
@@ -139,6 +154,8 @@ export function WalkerFeed({
       ) : displayItems.length === 0 && !showWelcome ? (
         showFavoritesOnly ? (
           <WalkerFavoritesEmptyState />
+        ) : showTripsOnly ? (
+          <WalkerTripsEmptyState />
         ) : (
           <WalkerEmptyState />
         )

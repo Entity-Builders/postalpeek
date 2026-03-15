@@ -7,7 +7,7 @@ import type { FeedItem } from '../components/Postcard';
 
 const PAGE_SIZE = 10;
 
-export function useWalkerFeed() {
+export function useWalkerFeed(tripsOnly = false) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,6 +167,7 @@ export function useWalkerFeed() {
         p_limit: PAGE_SIZE,
         p_country: country,
         p_exclude_ids: excludeIds,
+        p_trips_only: tripsOnly,
       });
 
       if (fetchId !== currentFetchIdRef.current) return;
@@ -202,7 +203,7 @@ export function useWalkerFeed() {
         isFetchingRef.current = false;
       }
     }
-  }, []);
+  }, [tripsOnly]);
 
   const prefetchCountry = useCallback(
     async (country: string | null) => {
@@ -214,6 +215,7 @@ export function useWalkerFeed() {
           p_limit: PAGE_SIZE,
           p_country: country,
           p_exclude_ids: [],
+          p_trips_only: tripsOnly,
         });
         if (data) {
           prefetchCacheRef.current.set(cacheKey, data as FeedItem[]);
@@ -228,7 +230,7 @@ export function useWalkerFeed() {
         // Silent fail — prefetch is best-effort
       }
     },
-    [selectedCountry]
+    [selectedCountry, tripsOnly]
   );
 
   const fetchMoreFeed = useCallback(async () => {
@@ -244,6 +246,7 @@ export function useWalkerFeed() {
         p_limit: PAGE_SIZE,
         p_country: selectedCountry,
         p_exclude_ids: excludeIds,
+        p_trips_only: tripsOnly,
       });
 
       if (fetchId !== currentFetchIdRef.current) return;
@@ -269,12 +272,12 @@ export function useWalkerFeed() {
         isFetchingRef.current = false;
       }
     }
-  }, [hasMore, selectedCountry]);
+  }, [hasMore, selectedCountry, tripsOnly]);
 
   // Initial load when filter changes
   useEffect(() => {
     fetchInitialFeed(selectedCountry);
-  }, [fetchInitialFeed, selectedCountry]);
+  }, [fetchInitialFeed, selectedCountry, tripsOnly]);
 
   // Realtime Subscription
   useEffect(() => {

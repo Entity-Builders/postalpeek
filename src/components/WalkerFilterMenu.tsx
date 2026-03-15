@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Map, MapPin, Heart } from 'lucide-react';
+import { Map, MapPin, Heart, Route } from 'lucide-react';
 import { cn } from './SearchBar';
 
 interface WalkerFilterMenuProps {
@@ -10,6 +10,8 @@ interface WalkerFilterMenuProps {
   onHoverCountry?: (country: string) => void;
   showFavoritesOnly: boolean;
   onToggleFavorites: () => void;
+  showTripsOnly: boolean;
+  onToggleTrips: () => void;
   isLoggedIn: boolean;
 }
 
@@ -21,6 +23,8 @@ export function WalkerFilterMenu({
   onHoverCountry,
   showFavoritesOnly,
   onToggleFavorites,
+  showTripsOnly,
+  onToggleTrips,
   isLoggedIn,
 }: WalkerFilterMenuProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -80,6 +84,19 @@ export function WalkerFilterMenu({
         >
           <Map className='w-3.5 h-3.5 md:w-4 md:h-4' />
           Everywhere
+        </button>
+
+        <button
+          onClick={onToggleTrips}
+          className={cn(
+            'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
+            showTripsOnly
+              ? 'bg-amber-500/90 text-white border-amber-400 shadow-lg'
+              : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
+          )}
+        >
+          <Route className={cn('w-3 h-3 md:w-3.5 md:h-3.5', showTripsOnly ? 'fill-current' : '')} />
+          Trips
         </button>
 
         {isLoggedIn && (
