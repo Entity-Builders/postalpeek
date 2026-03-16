@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trophy } from 'lucide-react';
+import { Trophy, MapPin } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { Album } from '../hooks/useAlbums';
@@ -20,7 +20,7 @@ function AlbumCard({
   index: number;
   onClick: () => void;
 }) {
-  const coverUrl = useSignedImage(album.cover_image_url, { width: WIDTHS.thumb });
+  const coverUrl = useSignedImage(album.cover_image_url, { width: WIDTHS.mobile });
   const isComplete = album.completed_at !== null;
   const progress = album.total_slots > 0
     ? Math.round((album.collected_slots / album.total_slots) * 100)
@@ -28,18 +28,18 @@ function AlbumCard({
 
   return (
     <motion.button
-      className={`shrink-0 w-44 md:w-52 rounded-xl overflow-hidden text-left transition-all snap-start ${
+      className={`shrink-0 w-48 md:w-56 rounded-xl overflow-hidden text-left transition-all snap-start ${
         isComplete
-          ? 'ring-2 ring-amber-400 shadow-lg shadow-amber-200/30'
-          : 'shadow-md hover:shadow-lg'
+          ? 'ring-2 ring-amber-400 shadow-lg shadow-amber-400/20'
+          : 'shadow-md hover:shadow-xl hover:scale-[1.02]'
       }`}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
       onClick={onClick}
     >
-      {/* Cover */}
-      <div className='relative h-24 md:h-28 bg-stone-200 overflow-hidden'>
+      {/* Cover image with overlay */}
+      <div className='relative h-36 md:h-44 bg-stone-800 overflow-hidden'>
         {coverUrl ? (
           <img
             src={coverUrl}
@@ -48,10 +48,13 @@ function AlbumCard({
             loading='lazy'
           />
         ) : (
-          <div className='w-full h-full bg-gradient-to-br from-stone-300 to-stone-200 flex items-center justify-center'>
-            <Trophy className='w-8 h-8 text-stone-400' />
+          <div className='w-full h-full bg-gradient-to-br from-amber-600/30 via-stone-700 to-stone-900 flex items-center justify-center'>
+            <Trophy className='w-10 h-10 text-amber-500/40' />
           </div>
         )}
+
+        {/* Dark gradient overlay for text readability */}
+        <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent' />
 
         {/* Completed badge */}
         {isComplete && (
@@ -62,31 +65,30 @@ function AlbumCard({
 
         {/* Country pill */}
         {album.country && (
-          <div className='absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full'>
+          <div className='absolute top-2 left-2 bg-white/20 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1'>
+            <MapPin className='w-2.5 h-2.5' />
             {album.country}
           </div>
         )}
-      </div>
 
-      {/* Info */}
-      <div className='bg-white p-3'>
-        <h4 className='font-serif text-xs md:text-sm text-stone-800 font-medium line-clamp-1 mb-1.5'>
-          {album.title}
-        </h4>
-
-        {/* Progress bar */}
-        <div className='flex items-center gap-2'>
-          <div className='flex-1 bg-stone-100 rounded-full h-1.5 overflow-hidden'>
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                isComplete ? 'bg-amber-500' : 'bg-stone-400'
-              }`}
-              style={{ width: `${progress}%` }}
-            />
+        {/* Title + progress overlaid on image */}
+        <div className='absolute bottom-0 left-0 right-0 p-3'>
+          <h4 className='font-display text-sm md:text-base text-white font-semibold line-clamp-1 mb-2 drop-shadow-md'>
+            {album.title}
+          </h4>
+          <div className='flex items-center gap-2'>
+            <div className='flex-1 bg-white/20 rounded-full h-1.5 overflow-hidden backdrop-blur-sm'>
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isComplete ? 'bg-amber-400' : 'bg-white/80'
+                }`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className='text-[10px] text-white/80 font-mono shrink-0'>
+              {album.collected_slots}/{album.total_slots}
+            </span>
           </div>
-          <span className='text-[10px] text-stone-400 font-mono shrink-0'>
-            {album.collected_slots}/{album.total_slots}
-          </span>
         </div>
       </div>
     </motion.button>
@@ -99,7 +101,7 @@ export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
       <div className='px-4 pb-3'>
         <div className='flex gap-3 overflow-hidden'>
           {[1, 2, 3].map((i) => (
-            <div key={i} className='shrink-0 w-44 md:w-52 h-36 rounded-xl bg-white/60 animate-pulse' />
+            <div key={i} className='shrink-0 w-48 md:w-56 h-40 rounded-xl bg-white/5 animate-pulse' />
           ))}
         </div>
       </div>
@@ -111,12 +113,12 @@ export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
   return (
     <div className='pb-4'>
       {/* Section header */}
-      <div className='flex items-center justify-between px-4 mb-2'>
-        <h3 className='font-serif text-sm text-stone-600 tracking-tight flex items-center gap-1.5'>
-          <Trophy className='w-3.5 h-3.5 text-amber-500' />
+      <div className='flex items-center justify-between px-4 mb-3'>
+        <h3 className='font-display text-sm text-white/90 tracking-tight flex items-center gap-1.5'>
+          <Trophy className='w-3.5 h-3.5 text-amber-400' />
           Álbumes
         </h3>
-        <span className='text-[10px] text-stone-400'>
+        <span className='text-[10px] text-white/40'>
           {albums.filter(a => a.completed_at).length}/{albums.length} completos
         </span>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
 import { useClaimPostcard } from '../hooks/useClaimPostcard';
@@ -19,6 +20,7 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
+import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';
@@ -79,34 +81,92 @@ export function WalkerFeed({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // ── Collectibles ──
-  const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(user?.id);
-  const { collection, isLoading: isCollectionLoading, refetch: refetchCollection } = useCollection(user?.id);
-  const [showCollection, setShowCollection] = useState(false);
-  const [claimLimitInfo, setClaimLimitInfo] = useState<{ type: 'daily' | 'monthly'; used: number; limit: number } | null>(null);
+  const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(
+    user?.id,
+  );
+  const {
+    collection,
+    isLoading: isCollectionLoading,
+    refetch: refetchCollection,
+  } = useCollection(user?.id);
+  // URL-driven navigation
+  const navigate = useNavigate();
+  const location = useLocation();
+  const showCollection = location.pathname === '/collection';
+  const urlAlbumId = location.pathname.startsWith('/album/') ? location.pathname.split('/')[2] : null;
+  const [claimLimitInfo, setClaimLimitInfo] = useState<{
+    type: 'daily' | 'monthly';
+    used: number;
+    limit: number;
+  } | null>(null);
+  const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
   // ── Albums ──
-  const { albums, isLoading: isLoadingAlbums, refetch: refetchAlbums } = useAlbums(user?.id);
-  const { detail: albumDetail, isLoading: isAlbumDetailLoading, fetchDetail: fetchAlbumDetail, reset: resetAlbumDetail } = useAlbumDetail();
-  const [albumPostcardIds, setAlbumPostcardIds] = useState<Set<string>>(new Set());
+  const {
+    albums,
+    isLoading: isLoadingAlbums,
+    refetch: refetchAlbums,
+  } = useAlbums(user?.id);
+  const {
+    detail: albumDetail,
+    isLoading: isAlbumDetailLoading,
+    fetchDetail: fetchAlbumDetail,
+    reset: resetAlbumDetail,
+  } = useAlbumDetail();
+  const [albumPostcardIds, setAlbumPostcardIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Fetch which postcards belong to albums (needed for confetti on claim)
   useEffect(() => {
-    supabase.from('postalpeek_album_slots').select('postcard_id').then(({ data }) => {
-      if (data) setAlbumPostcardIds(new Set(data.map((r: { postcard_id: string }) => r.postcard_id)));
-    });
+    supabase
+      .from('postalpeek_album_slots')
+      .select('postcard_id')
+      .then(({ data }) => {
+        if (data)
+          setAlbumPostcardIds(
+            new Set(data.map((r: { postcard_id: string }) => r.postcard_id)),
+          );
+      });
   }, [albums]);
 
-  const handleClaimPostcard = useCallback(async (postcardId: string) => {
-    const result = await claim(postcardId);
-    if (result.success) {
-      refetchCollection();
-      refetchAlbums(); // album progress may have changed
-    } else if (result.error === 'DAILY_LIMIT_REACHED') {
-      setClaimLimitInfo({ type: 'daily', used: result.daily_used ?? 10, limit: result.daily_limit ?? 10 });
-    } else if (result.error === 'MONTHLY_LIMIT_REACHED') {
-      setClaimLimitInfo({ type: 'monthly', used: result.monthly_used ?? 200, limit: result.monthly_limit ?? 200 });
+  // Auto-open album detail when URL is /album/:id
+  useEffect(() => {
+    if (urlAlbumId && !albumDetail) {
+      fetchAlbumDetail(urlAlbumId);
+    } else if (!urlAlbumId && albumDetail) {
+      resetAlbumDetail();
     }
-  }, [claim, refetchCollection, refetchAlbums]);
+  }, [urlAlbumId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleClaimPostcard = useCallback(
+    async (postcardId: string) => {
+      const result = await claim(postcardId);
+      if (result.success) {
+        refetchCollection();
+        refetchAlbums(); // album progress may have changed
+
+        // Show album toast whenever an album postcard is claimed
+        if (albumPostcardIds.has(postcardId)) {
+          setShowWelcomeToast(true);
+          setTimeout(() => setShowWelcomeToast(false), 8000);
+        }
+      } else if (result.error === 'DAILY_LIMIT_REACHED') {
+        setClaimLimitInfo({
+          type: 'daily',
+          used: result.daily_used ?? 10,
+          limit: result.daily_limit ?? 10,
+        });
+      } else if (result.error === 'MONTHLY_LIMIT_REACHED') {
+        setClaimLimitInfo({
+          type: 'monthly',
+          used: result.monthly_used ?? 200,
+          limit: result.monthly_limit ?? 200,
+        });
+      }
+    },
+    [claim, refetchCollection, refetchAlbums, albumPostcardIds],
+  );
 
   useEffect(() => {
     if (!user) setShowFavoritesOnly(false);
@@ -157,11 +217,15 @@ export function WalkerFeed({
             });
           }}
           isLoggedIn={!!user}
-          onToggleCollection={user ? () => {
-            setShowCollection(true);
-            refetchCollection();
-            analytics.track('collection_opened');
-          } : undefined}
+          onToggleCollection={
+            user
+              ? () => {
+                  navigate('/collection');
+                  refetchCollection();
+                  analytics.track('collection_opened');
+                }
+              : undefined
+          }
           onHoverCountry={prefetchCountry}
           onSelectCountry={(country) => {
             if (country === selectedCountry) {
@@ -196,7 +260,11 @@ export function WalkerFeed({
       )}
 
       {isLoading && !showWelcome ? (
-        showTripsOnly ? <TripCoverLoadingState /> : <WalkerLoadingState />
+        showTripsOnly ? (
+          <TripCoverLoadingState />
+        ) : (
+          <WalkerLoadingState />
+        )
       ) : displayItems.length === 0 && !showWelcome ? (
         showFavoritesOnly ? (
           <WalkerFavoritesEmptyState />
@@ -245,6 +313,14 @@ export function WalkerFeed({
                 setPendingFavoriteId(null);
               }, 500);
             }
+            // First-time user: show welcome toast after a short delay
+            if (showWelcome) {
+              setTimeout(() => {
+                setShowWelcomeToast(true);
+                // Auto-dismiss after 8s
+                setTimeout(() => setShowWelcomeToast(false), 8000);
+              }, 1500);
+            }
           }}
           viewedItems={
             items.length > 0
@@ -278,10 +354,10 @@ export function WalkerFeed({
             collection={collection}
             isLoading={isCollectionLoading}
             claimStatus={claimStatus}
-            onClose={() => setShowCollection(false)}
+            onClose={() => navigate('/')}
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
-            onOpenAlbum={(album) => fetchAlbumDetail(album.id)}
+            onOpenAlbum={(album) => navigate(`/album/${album.id}`)}
           />
         )}
       </AnimatePresence>
@@ -292,7 +368,28 @@ export function WalkerFeed({
           <AlbumDetail
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
-            onClose={resetAlbumDetail}
+            onClose={() => navigate(showCollection ? '/collection' : '/')}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Welcome Toast — after first login */}
+      <AnimatePresence>
+        {showWelcomeToast && (
+          <WelcomeToast
+            onOpenAlbums={() => {
+              setShowWelcomeToast(false);
+              // Open first album detail directly
+              if (albums.length > 0) {
+                navigate(`/album/${albums[0].id}`);
+              } else {
+                navigate('/collection');
+                refetchCollection();
+              }
+              refetchAlbums();
+              analytics.track('welcome_toast_albums_opened');
+            }}
+            onDismiss={() => setShowWelcomeToast(false)}
           />
         )}
       </AnimatePresence>

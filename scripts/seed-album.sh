@@ -52,6 +52,15 @@ BEGIN
   END LOOP;
 
   RAISE NOTICE 'Created album % with % slots', v_album_id, v_slot_order - 1;
+
+  -- Set cover image from first slot
+  UPDATE postalpeek_albums SET cover_image_url = (
+    SELECT p.illustration_url
+    FROM postalpeek_album_slots s
+    JOIN postalpeek_postcards p ON p.id = s.postcard_id
+    WHERE s.album_id = v_album_id AND p.illustration_url IS NOT NULL
+    ORDER BY s.slot_order LIMIT 1
+  ) WHERE id = v_album_id;
 END;
 \$\$;
 SQL

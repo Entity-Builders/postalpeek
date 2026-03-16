@@ -33,7 +33,7 @@ function CollectionCard({
   index: number;
   onClick?: () => void;
 }) {
-  const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.thumb });
+  const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.mobile });
 
   const rarityColors: Record<string, string> = {
     common: 'bg-stone-100 text-stone-500',

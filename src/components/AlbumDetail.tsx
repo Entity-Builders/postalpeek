@@ -20,7 +20,7 @@ function SlotCard({
 }) {
   const imgUrl = useSignedImage(
     slot.is_owned ? slot.illustration_url : null,
-    { width: WIDTHS.thumb },
+    { width: WIDTHS.mobile },
   );
 
   return (
