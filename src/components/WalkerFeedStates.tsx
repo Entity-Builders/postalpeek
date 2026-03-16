@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map, Route } from 'lucide-react';
+import { Map, Route, Compass } from 'lucide-react';
 
 export function WalkerLoadingState() {
   return (
@@ -99,15 +99,37 @@ export function TripCoverLoadingState() {
   );
 }
 
-export function WalkerEmptyState() {
+export function WalkerEmptyState({ onClearFilter }: { onClearFilter?: () => void }) {
   return (
-    <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full text-white/50 gap-4 glass-panel rounded-3xl bg-black/40 z-20'>
-      <Map className='w-12 h-12 mb-2 text-white/30' />
-      <p className='font-light tracking-wide text-center px-4'>
-        The Postmaster hasn't dispatched any mail for this region yet.
-        <br />
-        Please try another country or clear the filter.
-      </p>
+    <div className='absolute inset-0 z-20 w-full h-full flex flex-col items-center justify-center pointer-events-auto px-6'>
+      <div className='w-full max-w-[380px] bg-white/60 backdrop-blur-xl border border-white/80 shadow-2xl shadow-black/5 rounded-[32px] p-8 flex flex-col items-center text-center relative overflow-hidden'>
+        
+        {/* Subtle background glow */}
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl -z-10" />
+
+        <div className="relative w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-amber-50/80 to-amber-100/30 border border-amber-200/50 flex items-center justify-center shadow-inner">
+          <Compass className='w-12 h-12 text-amber-500/80 drop-shadow-sm z-10' strokeWidth={1.5} />
+        </div>
+        
+        <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-3 drop-shadow-sm'>
+          Región sin explorar
+        </h3>
+        
+        <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-8'>
+          Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.
+        </p>
+
+        {onClearFilter && (
+          <button 
+            onClick={onClearFilter}
+            className="group relative px-6 py-3.5 bg-stone-800 hover:bg-stone-900 transition-all duration-300 rounded-full flex items-center gap-2 overflow-hidden shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/10 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+            <Map className="w-4 h-4 text-amber-400 group-hover:-translate-y-0.5 transition-transform duration-300" strokeWidth={2.5} />
+            <span className="text-sm font-semibold text-white tracking-wide">Everywhere</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

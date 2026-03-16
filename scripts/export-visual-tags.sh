@@ -19,18 +19,19 @@ fi
 
 echo "🔍 Querying local DB for postcards with visual_tags..."
 
-# Export id + visual_tags as SQL UPDATE statements
+# Export illustration_url + visual_tags as SQL UPDATE statements
 psql "$LOCAL_DB" -t -A -F '|' -c "
-  SELECT id, visual_tags::text
+  SELECT illustration_url, visual_tags::text
   FROM postalpeek_postcards
   WHERE visual_tags IS NOT NULL
     AND visual_tags != '[]'::jsonb
     ${COUNTRY_FILTER}
   ORDER BY created_at DESC;
-" | while IFS='|' read -r id tags; do
-  # Escape single quotes in tags JSON
+" | while IFS='|' read -r url tags; do
+  # Escape single quotes in tags JSON and URL
   escaped_tags=$(echo "$tags" | sed "s/'/''/g")
-  echo "UPDATE postalpeek_postcards SET visual_tags = '${escaped_tags}'::jsonb WHERE id = '${id}';"
+  escaped_url=$(echo "$url" | sed "s/'/''/g")
+  echo "UPDATE postalpeek_postcards SET visual_tags = '${escaped_tags}'::jsonb WHERE illustration_url = '${escaped_url}';"
 done > "$OUTPUT_FILE"
 
 COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')

@@ -32,8 +32,6 @@ interface WalkerCarouselProps {
   toggleFavorite: (id: string) => void;
   setShowAuthGate: (val: boolean) => void;
   setPendingFavoriteId: (id: string | null) => void;
-
-  showTripsOnly: boolean;
   hasSharedCard: boolean;
   /** Collectibles */
   claimedIds: Set<string>;
@@ -58,8 +56,6 @@ export function WalkerCarousel({
   toggleFavorite,
   setShowAuthGate,
   setPendingFavoriteId,
-
-  showTripsOnly,
   hasSharedCard,
   claimedIds,
   onClaimPostcard,
@@ -116,7 +112,7 @@ export function WalkerCarousel({
       emblaApi.scrollTo(0, true);
     }
     setOpenedTrips(new Set());
-  }, [showTripsOnly, emblaApi]);
+  }, [emblaApi]);
 
   useEffect(() => {
     if (displayItems.length === 0) return;

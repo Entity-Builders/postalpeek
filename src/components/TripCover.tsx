@@ -38,7 +38,7 @@ export function TripCover({
 
   const tripCtx = item.generation_metadata?.tripContext;
   // Use embedded metadata immediately — no need to wait for Supabase
-  const title = tripMeta?.title || tripCtx?.title || 'Viaje en progreso';
+  const title = tripMeta?.title || tripCtx?.title || 'Álbum descubierto';
   const totalStops = tripCtx?.totalStops || stopThumbnails.length || '?';
   const summary = tripMeta?.itinerary_summary || '';
 
@@ -192,8 +192,8 @@ export function TripCover({
           {/* ─── Hero text overlays — always rendered using embedded feed data ─── */}
           {/* "VIAJE COMPLETO" badge */}
           <div className='absolute top-12 left-3 z-30'>
-            <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide'>
-              🗺️ Viaje Completo
+            <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide flex items-center gap-1.5'>
+              <span className="text-sm">📚</span> Álbum Disponible
             </span>
           </div>
 
@@ -213,7 +213,7 @@ export function TripCover({
           {/* Title + location overlayed on image bottom */}
           <div className='absolute bottom-0 left-0 right-0 z-30 px-4 pb-3'>
             <p className='text-[10px] text-white/70 font-bold tracking-widest uppercase mb-0.5'>
-              VIAJE COMPLETO · {totalStops} PARADAS
+              ÁLBUM · {totalStops} POSTALES
             </p>
             <h2 className='font-serif text-xl md:text-2xl font-bold leading-tight line-clamp-2 text-white drop-shadow-md'>
               {title}
@@ -291,7 +291,7 @@ export function TripCover({
                 onOpenTrip();
               }}
             >
-              Ver {totalStops} Postales
+              Abrir Álbum
               <ChevronRight className='w-4 h-4' />
             </button>
           </div>

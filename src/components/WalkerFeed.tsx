@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
@@ -10,14 +10,13 @@ import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
   WalkerLoadingState,
-  TripCoverLoadingState,
   WalkerEmptyState,
-  WalkerTripsEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
 import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
+import { AlbumsModal } from './AlbumsModal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -40,7 +39,7 @@ export function WalkerFeed({
   user?: User | null;
   onWelcomeChange?: (isOnWelcome: boolean) => void;
 }) {
-  const [showTripsOnly, setShowTripsOnly] = useState(false);
+  const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
 
   const {
     items,
@@ -56,7 +55,7 @@ export function WalkerFeed({
     loadedIdsRef,
     isFetchingRef,
     hasSharedCard,
-  } = useWalkerFeed(showTripsOnly);
+  } = useWalkerFeed();
 
   const [showAuthGate, setShowAuthGate] = useState(() => {
     return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
@@ -164,15 +163,6 @@ export function WalkerFeed({
     [claim, refetchCollection, refetchAlbums, albumPostcardIds],
   );
 
-
-
-
-
-  const displayItems = useMemo(() => {
-    if (showTripsOnly) return items.filter((item) => item.trip_id);
-    return items;
-  }, [items, showTripsOnly]);
-
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
       {!isOnWelcome && (
@@ -180,13 +170,9 @@ export function WalkerFeed({
           isIdle={isIdle}
           availableCountries={availableCountries}
           selectedCountry={selectedCountry}
-          showTripsOnly={showTripsOnly}
-          onToggleTrips={() => {
-            setShowTripsOnly((prev) => {
-              const next = !prev;
-              analytics.track('filter_changed', { trips_only: next });
-              return next;
-            });
+          onOpenAlbumsModal={() => {
+            setIsAlbumsModalOpen(true);
+            analytics.track('albums_opened');
           }}
           isLoggedIn={!!user}
           onToggleCollection={
@@ -203,7 +189,6 @@ export function WalkerFeed({
             if (country === selectedCountry) {
               return;
             }
-            setShowTripsOnly(false);
             setIsLoading(true);
             loadedIdsRef.current = [];
             isFetchingRef.current = false;
@@ -230,21 +215,20 @@ export function WalkerFeed({
       )}
 
       {isLoading && !showWelcome ? (
-        showTripsOnly ? (
-          <TripCoverLoadingState />
-        ) : (
-          <WalkerLoadingState />
-        )
-      ) : displayItems.length === 0 && !showWelcome ? (
-        showTripsOnly ? (
-          <WalkerTripsEmptyState />
-        ) : (
-          <WalkerEmptyState />
-        )
+        <WalkerLoadingState />
+      ) : items.length === 0 && !showWelcome ? (
+        <WalkerEmptyState 
+          onClearFilter={selectedCountry ? () => {
+            setIsLoading(true);
+            loadedIdsRef.current = [];
+            isFetchingRef.current = false;
+            setSelectedCountry(null);
+          } : undefined} 
+        />
       ) : (
         <WalkerCarousel
           items={items}
-          displayItems={displayItems}
+          displayItems={items}
           hasMore={hasMore}
           isFetchingMore={isFetchingMore}
           isFetchingRef={isFetchingRef}
@@ -259,8 +243,6 @@ export function WalkerFeed({
           toggleFavorite={toggleFavorite}
           setShowAuthGate={setShowAuthGate}
           setPendingFavoriteId={setPendingFavoriteId}
-
-          showTripsOnly={showTripsOnly}
           hasSharedCard={hasSharedCard}
           claimedIds={claimedIds}
           onClaimPostcard={handleClaimPostcard}
@@ -339,6 +321,20 @@ export function WalkerFeed({
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
             onClose={() => navigate(showCollection ? '/collection' : '/')}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isAlbumsModalOpen && (
+          <AlbumsModal
+            albums={albums}
+            isLoading={isLoadingAlbums}
+            onClose={() => setIsAlbumsModalOpen(false)}
+            onSelectAlbum={(album) => {
+              setIsAlbumsModalOpen(false);
+              navigate(`/album/${album.id}`);
+            }}
           />
         )}
       </AnimatePresence>

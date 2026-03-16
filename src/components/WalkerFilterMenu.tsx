@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Map, MapPin, Route, Gem } from 'lucide-react';
+import { Map, MapPin, Gem, Library } from 'lucide-react';
 import { cn } from './SearchBar';
 
 interface WalkerFilterMenuProps {
@@ -8,10 +8,9 @@ interface WalkerFilterMenuProps {
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
   onHoverCountry?: (country: string) => void;
-  showTripsOnly: boolean;
-  onToggleTrips: () => void;
   isLoggedIn: boolean;
   onToggleCollection?: () => void;
+  onOpenAlbumsModal: () => void;
 }
 
 export function WalkerFilterMenu({
@@ -20,10 +19,9 @@ export function WalkerFilterMenu({
   selectedCountry,
   onSelectCountry,
   onHoverCountry,
-  showTripsOnly,
-  onToggleTrips,
   isLoggedIn,
   onToggleCollection,
+  onOpenAlbumsModal,
 }: WalkerFilterMenuProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -85,16 +83,14 @@ export function WalkerFilterMenu({
         </button>
 
         <button
-          onClick={onToggleTrips}
+          onClick={onOpenAlbumsModal}
           className={cn(
             'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
-            showTripsOnly
-              ? 'bg-amber-500/90 text-white border-amber-400 shadow-lg'
-              : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
+            'bg-indigo-600/90 text-white border-indigo-400 shadow-lg hover:bg-indigo-500/90'
           )}
         >
-          <Route className={cn('w-3 h-3 md:w-3.5 md:h-3.5', showTripsOnly ? 'fill-current' : '')} />
-          Trips
+          <Library className="w-3 h-3 md:w-3.5 md:h-3.5" />
+          Álbumes
         </button>
 
 

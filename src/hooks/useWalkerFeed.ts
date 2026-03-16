@@ -7,7 +7,7 @@ import type { FeedItem } from '../components/Postcard';
 
 const PAGE_SIZE = 10;
 
-export function useWalkerFeed(tripsOnly = false) {
+export function useWalkerFeed() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,7 +170,6 @@ export function useWalkerFeed(tripsOnly = false) {
         p_limit: PAGE_SIZE,
         p_country: country,
         p_exclude_ids: excludeIds,
-        p_trips_only: tripsOnly,
       });
 
       if (fetchId !== currentFetchIdRef.current) return;
@@ -219,7 +218,7 @@ export function useWalkerFeed(tripsOnly = false) {
         isFetchingRef.current = false;
       }
     }
-  }, [tripsOnly]);
+  }, []);
 
   const prefetchCountry = useCallback(
     async (country: string | null) => {
@@ -231,7 +230,6 @@ export function useWalkerFeed(tripsOnly = false) {
           p_limit: PAGE_SIZE,
           p_country: country,
           p_exclude_ids: [],
-          p_trips_only: tripsOnly,
         });
         if (data) {
           const typedData = data as FeedItem[];
@@ -252,7 +250,7 @@ export function useWalkerFeed(tripsOnly = false) {
         // Silent fail — prefetch is best-effort
       }
     },
-    [selectedCountry, tripsOnly]
+    [selectedCountry]
   );
 
   const fetchMoreFeed = useCallback(async () => {
@@ -268,7 +266,6 @@ export function useWalkerFeed(tripsOnly = false) {
         p_limit: PAGE_SIZE,
         p_country: selectedCountry,
         p_exclude_ids: excludeIds,
-        p_trips_only: tripsOnly,
       });
 
       if (fetchId !== currentFetchIdRef.current) return;
@@ -294,12 +291,12 @@ export function useWalkerFeed(tripsOnly = false) {
         isFetchingRef.current = false;
       }
     }
-  }, [hasMore, selectedCountry, tripsOnly]);
+  }, [hasMore, selectedCountry]);
 
   // Initial load when filter changes
   useEffect(() => {
     fetchInitialFeed(selectedCountry);
-  }, [fetchInitialFeed, selectedCountry, tripsOnly]);
+  }, [fetchInitialFeed, selectedCountry]);
 
   // Realtime Subscription
   useEffect(() => {
