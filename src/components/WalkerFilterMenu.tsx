@@ -1,13 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { Map, MapPin, Gem, Library } from 'lucide-react';
+import { Map, MapPin, Gem, Library, Lock } from 'lucide-react';
 import { cn } from './SearchBar';
 
 interface WalkerFilterMenuProps {
   isIdle?: boolean;
   availableCountries: string[];
+  unlockedCountries: Set<string>;
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
-  onHoverCountry?: (country: string) => void;
   isLoggedIn: boolean;
   onToggleCollection?: () => void;
   onOpenAlbumsModal: () => void;
@@ -16,9 +16,9 @@ interface WalkerFilterMenuProps {
 export function WalkerFilterMenu({
   isIdle,
   availableCountries,
+  unlockedCountries,
   selectedCountry,
   onSelectCountry,
-  onHoverCountry,
   isLoggedIn,
   onToggleCollection,
   onOpenAlbumsModal,
@@ -79,7 +79,7 @@ export function WalkerFilterMenu({
           )}
         >
           <Map className='w-3.5 h-3.5 md:w-4 md:h-4' />
-          Everywhere
+          Global
         </button>
 
         <button
@@ -92,8 +92,6 @@ export function WalkerFilterMenu({
           <Library className="w-3 h-3 md:w-3.5 md:h-3.5" />
           Álbumes
         </button>
-
-
 
         {isLoggedIn && onToggleCollection && (
           <button
@@ -110,22 +108,33 @@ export function WalkerFilterMenu({
 
         <div className='w-px h-6 bg-white/20 mx-1 shrink-0' />
 
-        {availableCountries.map((country) => (
-          <button
-            key={country}
-            onClick={() => onSelectCountry(country)}
-            onMouseEnter={() => onHoverCountry?.(country)}
-            className={cn(
-              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
-              selectedCountry === country
-                ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
-                : 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white',
-            )}
-          >
-            <MapPin className='w-3 h-3 md:w-3.5 md:h-3.5 opacity-60' />
-            {country}
-          </button>
-        ))}
+        {availableCountries.map((country) => {
+          const isUnlocked = unlockedCountries.has(country);
+          return (
+            <button
+              key={country}
+              onClick={() => {
+                if (isUnlocked) onSelectCountry(country);
+                else alert(`¡Completa un álbum de ${country} para desbloquear este destino!`);
+              }}
+              className={cn(
+                'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
+                selectedCountry === country
+                  ? 'bg-white/90 text-indigo-950 border-white shadow-lg'
+                  : isUnlocked
+                    ? 'bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white'
+                    : 'bg-black/50 text-white/40 border-white/5 opacity-70 cursor-not-allowed',
+              )}
+            >
+              {isUnlocked ? (
+                <MapPin className='w-3 h-3 md:w-3.5 md:h-3.5 opacity-60' />
+              ) : (
+                <Lock className='w-3 h-3 md:w-3.5 md:h-3.5 opacity-60' />
+              )}
+              {country}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

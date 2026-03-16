@@ -6,7 +6,7 @@ import { useClaimPostcard } from '../hooks/useClaimPostcard';
 import { useCollection } from '../hooks/useCollection';
 import { useAlbums } from '../hooks/useAlbums';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
-import { WalkerCarousel } from './WalkerCarousel';
+import { WalkerCardStack } from './WalkerCardStack';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
   WalkerLoadingState,
@@ -48,13 +48,9 @@ export function WalkerFeed({
     setIsLoading,
     selectedCountry,
     setSelectedCountry,
-    isFetchingMore,
-    hasMore,
-    fetchMoreFeed,
-    prefetchCountry,
-    loadedIdsRef,
-    isFetchingRef,
     hasSharedCard,
+    popFromPack,
+    lastRefillAt,
   } = useWalkerFeed();
 
   const [showAuthGate, setShowAuthGate] = useState(() => {
@@ -103,6 +99,17 @@ export function WalkerFeed({
     isLoading: isLoadingAlbums,
     refetch: refetchAlbums,
   } = useAlbums(user?.id);
+
+  // Derived unlocked countries from completed albums
+  const unlockedCountries = React.useMemo(() => {
+    const set = new Set<string>();
+    albums.forEach((album) => {
+      if (album.completed_at && album.country) {
+        set.add(album.country);
+      }
+    });
+    return set;
+  }, [albums]);
   const {
     detail: albumDetail,
     isLoading: isAlbumDetailLoading,
@@ -169,7 +176,18 @@ export function WalkerFeed({
         <WalkerFilterMenu
           isIdle={isIdle}
           availableCountries={availableCountries}
+          unlockedCountries={unlockedCountries}
           selectedCountry={selectedCountry}
+          onSelectCountry={(country) => {
+            if (country === selectedCountry) return;
+            setIsLoading(true);
+            if (country === null) {
+              window.history.pushState({}, '', '/');
+            } else {
+              const countrySlug = encodeURIComponent(country).replace(/%20/g, '-');
+              window.history.pushState({}, '', `/${countrySlug}`);
+            }
+          }}
           onOpenAlbumsModal={() => {
             setIsAlbumsModalOpen(true);
             analytics.track('albums_opened');
@@ -184,33 +202,6 @@ export function WalkerFeed({
                 }
               : undefined
           }
-          onHoverCountry={prefetchCountry}
-          onSelectCountry={(country) => {
-            if (country === selectedCountry) {
-              return;
-            }
-            setIsLoading(true);
-            loadedIdsRef.current = [];
-            isFetchingRef.current = false;
-
-            setSelectedCountry((prev) => {
-              analytics.track('filter_changed', {
-                previous_country: prev,
-                country: country,
-              });
-              return country;
-            });
-
-            if (country === null) {
-              window.history.pushState({}, '', '/');
-            } else {
-              const countrySlug = encodeURIComponent(country).replace(
-                /%20/g,
-                '-',
-              );
-              window.history.pushState({}, '', `/${countrySlug}`);
-            }
-          }}
         />
       )}
 
@@ -220,19 +211,17 @@ export function WalkerFeed({
         <WalkerEmptyState 
           onClearFilter={selectedCountry ? () => {
             setIsLoading(true);
-            loadedIdsRef.current = [];
-            isFetchingRef.current = false;
             setSelectedCountry(null);
           } : undefined} 
+          lastRefillAt={lastRefillAt}
+          onUnlockMore={() => {
+             alert('¡Próximamente! Podrás abrir más sobres comprando un cafecito o invitando a tus amigos.');
+             analytics.track('unlock_feed_clicked');
+          }}
         />
       ) : (
-        <WalkerCarousel
+        <WalkerCardStack
           items={items}
-          displayItems={items}
-          hasMore={hasMore}
-          isFetchingMore={isFetchingMore}
-          isFetchingRef={isFetchingRef}
-          fetchMoreFeed={fetchMoreFeed}
           selectedCountry={selectedCountry}
           user={user}
           isAdmin={isAdmin}
@@ -248,6 +237,9 @@ export function WalkerFeed({
           onClaimPostcard={handleClaimPostcard}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
+          onSwipe={(item) => {
+            popFromPack(item.id);
+          }}
         />
       )}
 

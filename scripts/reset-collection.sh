@@ -16,12 +16,24 @@ if [ -n "$EMAIL" ]; then
 
     DELETE FROM postalpeek_claim_limits
     WHERE user_id = (SELECT id FROM auth.users WHERE email = '$EMAIL');
+
+    DELETE FROM postalpeek_favorites
+    WHERE user_id = (SELECT id FROM auth.users WHERE email = '$EMAIL');
+
+    DELETE FROM postalpeek_album_progress
+    WHERE user_id = (SELECT id FROM auth.users WHERE email = '$EMAIL');
+
+    DELETE FROM postalpeek_daily_feed_state
+    WHERE user_id = (SELECT id FROM auth.users WHERE email = '$EMAIL');
 SQL
 else
   echo "🗑️  Resetting ALL claims"
   psql "$SUPABASE_DB_URL" <<SQL
     UPDATE postalpeek_postcards SET owner_id = NULL, claimed_at = NULL WHERE owner_id IS NOT NULL;
     DELETE FROM postalpeek_claim_limits;
+    DELETE FROM postalpeek_favorites;
+    DELETE FROM postalpeek_album_progress;
+    DELETE FROM postalpeek_daily_feed_state;
 SQL
 fi
 

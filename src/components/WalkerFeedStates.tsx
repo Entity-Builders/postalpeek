@@ -99,7 +99,42 @@ export function TripCoverLoadingState() {
   );
 }
 
-export function WalkerEmptyState({ onClearFilter }: { onClearFilter?: () => void }) {
+export function WalkerEmptyState({
+  onClearFilter,
+  lastRefillAt,
+  onUnlockMore,
+}: {
+  onClearFilter?: () => void;
+  lastRefillAt?: string | null;
+  onUnlockMore?: () => void;
+}) {
+  const [timeLeft, setTimeLeft] = React.useState<string>('00:00:00');
+
+  React.useEffect(() => {
+    if (!lastRefillAt) return;
+    
+    const updateTimer = () => {
+      const refillDate = new Date(lastRefillAt);
+      refillDate.setHours(refillDate.getHours() + 24); // 24 hours later
+      const now = new Date();
+      const diff = refillDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeLeft('00:00:00');
+        return;
+      }
+
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const iv = setInterval(updateTimer, 1000);
+    return () => clearInterval(iv);
+  }, [lastRefillAt]);
+
   return (
     <div className='absolute inset-0 z-20 w-full h-full flex flex-col items-center justify-center pointer-events-auto px-6'>
       <div className='w-full max-w-[380px] bg-white/60 backdrop-blur-xl border border-white/80 shadow-2xl shadow-black/5 rounded-[32px] p-8 flex flex-col items-center text-center relative overflow-hidden'>
@@ -111,22 +146,47 @@ export function WalkerEmptyState({ onClearFilter }: { onClearFilter?: () => void
           <Compass className='w-12 h-12 text-amber-500/80 drop-shadow-sm z-10' strokeWidth={1.5} />
         </div>
         
-        <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-3 drop-shadow-sm'>
-          Región sin explorar
-        </h3>
-        
-        <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-8'>
-          Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.
-        </p>
+        {lastRefillAt ? (
+           <>
+             <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-2 drop-shadow-sm'>
+               ¡Sobre vacío!
+             </h3>
+             <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-6'>
+               Te quedaste sin postales por hoy. Volvé mañana para abrir un nuevo sobre.
+             </p>
+             <div className='px-6 py-3 bg-white/50 border border-amber-200/50 rounded-2xl mb-6 shadow-inner'>
+               <p className='text-sm text-stone-500 font-medium mb-1 uppercase tracking-wider text-[10px]'>Nuevas postales en:</p>
+               <p className='text-3xl font-mono text-amber-600 font-bold tracking-tight'>{timeLeft}</p>
+             </div>
+             {onUnlockMore && (
+               <button 
+                 onClick={onUnlockMore}
+                 className="group relative w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 rounded-2xl flex items-center justify-center gap-2 overflow-hidden shadow-lg hover:shadow-indigo-500/30 active:scale-95 cursor-pointer mb-3"
+               >
+                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+                 <span className="text-sm font-semibold text-white tracking-wide">Desbloquear 3 sobres más</span>
+               </button>
+             )}
+           </>
+        ) : (
+           <>
+             <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-3 drop-shadow-sm'>
+               Región sin explorar
+             </h3>
+             <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-8'>
+               Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.
+             </p>
+           </>
+        )}
 
         {onClearFilter && (
           <button 
             onClick={onClearFilter}
-            className="group relative px-6 py-3.5 bg-stone-800 hover:bg-stone-900 transition-all duration-300 rounded-full flex items-center gap-2 overflow-hidden shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
+            className="group relative px-6 py-3.5 bg-stone-800 hover:bg-stone-900 transition-all duration-300 rounded-full flex items-center gap-2 overflow-hidden shadow-md hover:shadow-lg active:scale-95 cursor-pointer mt-2"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/10 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
             <Map className="w-4 h-4 text-amber-400 group-hover:-translate-y-0.5 transition-transform duration-300" strokeWidth={2.5} />
-            <span className="text-sm font-semibold text-white tracking-wide">Everywhere</span>
+            <span className="text-sm font-semibold text-white tracking-wide">Volver a todas</span>
           </button>
         )}
       </div>
