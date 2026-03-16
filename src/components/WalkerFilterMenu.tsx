@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Map, MapPin, Heart, Route } from 'lucide-react';
+import { Map, MapPin, Heart, Route, Gem } from 'lucide-react';
 import { cn } from './SearchBar';
 
 interface WalkerFilterMenuProps {
@@ -13,6 +13,7 @@ interface WalkerFilterMenuProps {
   showTripsOnly: boolean;
   onToggleTrips: () => void;
   isLoggedIn: boolean;
+  onToggleCollection?: () => void;
 }
 
 export function WalkerFilterMenu({
@@ -26,6 +27,7 @@ export function WalkerFilterMenu({
   showTripsOnly,
   onToggleTrips,
   isLoggedIn,
+  onToggleCollection,
 }: WalkerFilterMenuProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +113,19 @@ export function WalkerFilterMenu({
           >
             <Heart className={cn('w-3 h-3 md:w-3.5 md:h-3.5', showFavoritesOnly ? 'fill-current' : '')} />
             My Favorites
+          </button>
+        )}
+
+        {isLoggedIn && onToggleCollection && (
+          <button
+            onClick={onToggleCollection}
+            className={cn(
+              'flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-md border cursor-pointer',
+              'bg-black/30 text-white/70 border-white/10 hover:bg-amber-500/80 hover:text-white hover:border-amber-400',
+            )}
+          >
+            <Gem className='w-3 h-3 md:w-3.5 md:h-3.5' />
+            Mi Colección
           </button>
         )}
 

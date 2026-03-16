@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
+import { useClaimPostcard } from '../hooks/useClaimPostcard';
+import { useCollection } from '../hooks/useCollection';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
@@ -11,10 +13,13 @@ import {
   WalkerTripsEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
+import { ClaimLimitModal } from './ClaimLimitModal';
+import { CollectionGrid } from './CollectionGrid';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';
+import { AnimatePresence } from 'framer-motion';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -69,6 +74,24 @@ export function WalkerFeed({
   } = useFavorites(user ?? null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
+  // ── Collectibles ──
+  const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(user?.id);
+  const { collection, isLoading: isCollectionLoading, refetch: refetchCollection } = useCollection(user?.id);
+  const [showCollection, setShowCollection] = useState(false);
+  const [claimLimitInfo, setClaimLimitInfo] = useState<{ type: 'daily' | 'monthly'; used: number; limit: number } | null>(null);
+
+  const handleClaimPostcard = useCallback(async (postcardId: string) => {
+    const result = await claim(postcardId);
+    if (result.success) {
+      // Refetch collection in background
+      refetchCollection();
+    } else if (result.error === 'DAILY_LIMIT_REACHED') {
+      setClaimLimitInfo({ type: 'daily', used: result.daily_used ?? 10, limit: result.daily_limit ?? 10 });
+    } else if (result.error === 'MONTHLY_LIMIT_REACHED') {
+      setClaimLimitInfo({ type: 'monthly', used: result.monthly_used ?? 200, limit: result.monthly_limit ?? 200 });
+    }
+  }, [claim, refetchCollection]);
+
   useEffect(() => {
     if (!user) setShowFavoritesOnly(false);
     // trips filter is independent of auth, no reset needed
@@ -118,6 +141,11 @@ export function WalkerFeed({
             });
           }}
           isLoggedIn={!!user}
+          onToggleCollection={user ? () => {
+            setShowCollection(true);
+            refetchCollection();
+            analytics.track('collection_opened');
+          } : undefined}
           onHoverCountry={prefetchCountry}
           onSelectCountry={(country) => {
             if (country === selectedCountry) {
@@ -182,6 +210,9 @@ export function WalkerFeed({
           showFavoritesOnly={showFavoritesOnly}
           showTripsOnly={showTripsOnly}
           hasSharedCard={hasSharedCard}
+          claimedIds={claimedIds}
+          onClaimPostcard={handleClaimPostcard}
+          isClaimLoading={isClaiming}
         />
       )}
 
@@ -212,6 +243,28 @@ export function WalkerFeed({
           }
         />
       )}
+
+      {/* Claim Limit Modal */}
+      {claimLimitInfo && (
+        <ClaimLimitModal
+          type={claimLimitInfo.type}
+          used={claimLimitInfo.used}
+          limit={claimLimitInfo.limit}
+          onClose={() => setClaimLimitInfo(null)}
+        />
+      )}
+
+      {/* Collection Grid */}
+      <AnimatePresence>
+        {showCollection && (
+          <CollectionGrid
+            collection={collection}
+            isLoading={isCollectionLoading}
+            claimStatus={claimStatus}
+            onClose={() => setShowCollection(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

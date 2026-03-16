@@ -9,6 +9,8 @@ import {
   Loader2,
   Ticket,
   ChevronRight,
+  Gem,
+  ShieldCheck,
 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
@@ -35,6 +37,14 @@ interface PostcardFrontProps {
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
   fallbackEnabled?: boolean;
   onHeroLoad?: () => void;
+  /** Collectibles: whether this postcard is claimed by the current user */
+  isClaimedByMe?: boolean;
+  /** Collectibles: whether this postcard is claimed by anyone */
+  isClaimed?: boolean;
+  /** Collectibles: callback to claim this postcard */
+  onClaimPostcard?: (postcardId: string) => void;
+  /** Collectibles: whether a claim is currently in progress */
+  isClaimLoading?: boolean;
 }
 
 export function PostcardFront({
@@ -52,10 +62,15 @@ export function PostcardFront({
   handleImageError,
   fallbackEnabled,
   onHeroLoad,
+  isClaimedByMe = false,
+  isClaimed = false,
+  onClaimPostcard,
+  isClaimLoading = false,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showClaimedTooltip, setShowClaimedTooltip] = useState(false);
   const [localAnimState, setLocalAnimState] = useState<
     'idle' | 'queued' | null
   >(null);
@@ -351,6 +366,55 @@ export function PostcardFront({
                 )}
               />
             </button>
+
+            {/* 🃏 Claim area */}
+            {isClaimedByMe ? (
+              <button
+                className='p-2 md:p-2.5 rounded-full bg-amber-100 text-amber-600 cursor-default ring-1 ring-amber-300/50 transition-all'
+                title='Ya es tuya'
+              >
+                <ShieldCheck className='w-4 h-4 md:w-5 md:h-5' />
+              </button>
+            ) : (
+              <div className='relative'>
+                <button
+                  className='p-2 md:p-2.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600 hover:scale-105 transition-all'
+                  disabled={isClaimLoading}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isClaimed) {
+                      setShowClaimedTooltip((prev) => !prev);
+                      setTimeout(() => setShowClaimedTooltip(false), 2500);
+                      return;
+                    }
+                    if (!onClaimPostcard) {
+                      onAuthRequired?.(item.id);
+                      return;
+                    }
+                    onClaimPostcard(item.id);
+                  }}
+                  title={isClaimed ? undefined : 'Reclamar esta postal'}
+                >
+                  {isClaimLoading ? (
+                    <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+                  ) : (
+                    <Gem className='w-4 h-4 md:w-5 md:h-5' />
+                  )}
+                </button>
+                {showClaimedTooltip && (
+                  <div
+                    className='absolute bottom-full right-0 mb-2 px-3 py-2 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50'
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowClaimedTooltip(false);
+                    }}
+                  >
+                    Esta postal ya fue adquirida 🃏
+                    <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               className={cn(

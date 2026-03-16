@@ -35,6 +35,10 @@ interface WalkerCarouselProps {
   showFavoritesOnly: boolean;
   showTripsOnly: boolean;
   hasSharedCard: boolean;
+  /** Collectibles */
+  claimedIds: Set<string>;
+  onClaimPostcard?: (postcardId: string) => void;
+  isClaimLoading?: boolean;
 }
 
 export function WalkerCarousel({
@@ -56,6 +60,9 @@ export function WalkerCarousel({
   showFavoritesOnly,
   showTripsOnly,
   hasSharedCard,
+  claimedIds,
+  onClaimPostcard,
+  isClaimLoading = false,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -443,6 +450,10 @@ export function WalkerCarousel({
                         isNearby={isNearby}
                         favoriteIds={favoriteIds}
                         onToggleFavorite={user ? toggleFavorite : undefined}
+                        isClaimedByMe={claimedIds.has(item.id)}
+                        isClaimed={!!item.owner_id}
+                        onClaimPostcard={user ? onClaimPostcard : undefined}
+                        isClaimLoading={isClaimLoading}
                         onAuthRequired={
                           !user
                             ? (postcardId) => {

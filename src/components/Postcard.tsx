@@ -28,6 +28,9 @@ export interface FeedItem {
   video_generation_status?: 'idle' | 'processing' | 'completed' | 'failed';
   imagine_task_id?: string;
   should_animate?: boolean;
+  owner_id?: string | null;
+  claimed_at?: string | null;
+  rarity?: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
 interface PostcardProps {
@@ -44,6 +47,11 @@ interface PostcardProps {
   onToggleFavorite?: (postcardId: string) => void;
   /** Called when an unauthenticated user taps the heart */
   onAuthRequired?: (postcardId: string) => void;
+  /** Collectibles */
+  isClaimedByMe?: boolean;
+  isClaimed?: boolean;
+  onClaimPostcard?: (postcardId: string) => void;
+  isClaimLoading?: boolean;
 }
 
 export function Postcard({
@@ -55,6 +63,10 @@ export function Postcard({
   favoriteIds,
   onToggleFavorite,
   onAuthRequired,
+  isClaimedByMe = false,
+  isClaimed = false,
+  onClaimPostcard,
+  isClaimLoading = false,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -168,6 +180,10 @@ export function Postcard({
           handleImageError={handleImageError}
           fallbackEnabled={fallbackEnabled}
           onHeroLoad={() => setHeroReady(true)}
+          isClaimedByMe={isClaimedByMe}
+          isClaimed={isClaimed}
+          onClaimPostcard={onClaimPostcard}
+          isClaimLoading={isClaimLoading}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={activeSlideItem} />
