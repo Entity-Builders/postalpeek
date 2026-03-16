@@ -135,10 +135,10 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
 
         <motion.div className="w-16 h-px bg-stone-400/60 mb-3 sm:mb-4" {...anim.divider} />
 
-        {/* ─── Feature Pills: Collectibles + Albums ─── */}
-        <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4 px-2">
+        {/* ─── Feature Pill: Coleccioná ─── */}
+        <div className="flex items-center justify-center mb-3 sm:mb-4 px-2">
           <motion.div
-            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 shadow-sm"
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-sm"
             initial={anim.featurePill1.initial}
             animate={{
               ...anim.featurePill1.animate,
@@ -149,29 +149,10 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               y: { delay: 3.4, duration: 3, ease: 'easeInOut', repeat: Infinity },
             }}
           >
-            <span className="text-base sm:text-lg">🃏</span>
+            <span className="text-lg sm:text-xl">🃏</span>
             <div className="text-left">
-              <p className="text-stone-800 text-[10px] sm:text-xs font-semibold leading-tight">Coleccioná</p>
-              <p className="text-stone-500 text-[8px] sm:text-[10px] leading-tight">Postales únicas</p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 shadow-sm"
-            initial={anim.featurePill2.initial}
-            animate={{
-              ...anim.featurePill2.animate,
-              y: [0, -3, 0],
-            }}
-            transition={{
-              ...anim.featurePill2.transition,
-              y: { delay: 3.8, duration: 3.5, ease: 'easeInOut', repeat: Infinity },
-            }}
-          >
-            <span className="text-base sm:text-lg">📖</span>
-            <div className="text-left">
-              <p className="text-stone-800 text-[10px] sm:text-xs font-semibold leading-tight">Álbumes</p>
-              <p className="text-stone-500 text-[8px] sm:text-[10px] leading-tight">Completá y ganá</p>
+              <p className="text-stone-800 text-xs sm:text-sm font-semibold leading-tight">Coleccioná postales</p>
+              <p className="text-stone-500 text-[9px] sm:text-xs leading-tight">Cada una es un coleccionable único</p>
             </div>
           </motion.div>
         </div>
@@ -194,9 +175,9 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
             animate={{ y: [0, -4, 0] }}
             transition={{ delay: 4.0, duration: 1.2, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1.5 }}
           >
-            👆
+            👇
           </motion.span>
-          Tocá una postal para darla vuelta y descubrir su historia
+          Deslizá y reclamá tu primera postal
         </motion.p>
       </div>
 

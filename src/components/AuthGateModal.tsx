@@ -242,8 +242,8 @@ export function AuthGateModal({
           </h2>
           <p className='text-stone-500 text-sm mb-5 font-light text-center'>
             {step === 'email'
-              ? 'Enter your email to follow the journey.'
-              : 'Check your inbox for a 6-digit code.'}
+              ? 'Ya coleccionaste tu primera postal 🃏 Iniciá sesión para seguir coleccionando.'
+              : 'Revisá tu casilla — te enviamos un código de 6 dígitos.'}
           </p>
 
           {/* Auth form — warm palette */}

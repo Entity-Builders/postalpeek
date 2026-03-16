@@ -54,6 +54,8 @@ interface PostcardProps {
   isClaimLoading?: boolean;
   /** Dev-only: whether this postcard is in an album */
   isInAlbum?: boolean;
+  /** Tutorial: show pulsing claim guide on the first card */
+  showClaimGuide?: boolean;
 }
 
 export function Postcard({
@@ -70,6 +72,7 @@ export function Postcard({
   onClaimPostcard,
   isClaimLoading = false,
   isInAlbum = false,
+  showClaimGuide = false,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -188,6 +191,7 @@ export function Postcard({
           onClaimPostcard={onClaimPostcard}
           isClaimLoading={isClaimLoading}
           isInAlbum={isInAlbum}
+          showClaimGuide={showClaimGuide}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={activeSlideItem} />

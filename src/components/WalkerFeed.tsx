@@ -89,13 +89,12 @@ export function WalkerFeed({
   const { detail: albumDetail, isLoading: isAlbumDetailLoading, fetchDetail: fetchAlbumDetail, reset: resetAlbumDetail } = useAlbumDetail();
   const [albumPostcardIds, setAlbumPostcardIds] = useState<Set<string>>(new Set());
 
-  // Dev-only: fetch which postcards belong to albums
+  // Fetch which postcards belong to albums (needed for confetti on claim)
   useEffect(() => {
-    if (!isAdmin) return;
     supabase.from('postalpeek_album_slots').select('postcard_id').then(({ data }) => {
       if (data) setAlbumPostcardIds(new Set(data.map((r: { postcard_id: string }) => r.postcard_id)));
     });
-  }, [isAdmin, albums]);
+  }, [albums]);
 
   const handleClaimPostcard = useCallback(async (postcardId: string) => {
     const result = await claim(postcardId);

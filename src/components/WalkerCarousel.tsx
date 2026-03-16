@@ -457,6 +457,7 @@ export function WalkerCarousel({
                         onClaimPostcard={user ? onClaimPostcard : undefined}
                         isClaimLoading={isClaimLoading}
                         isInAlbum={albumPostcardIds.has(item.id)}
+                        showClaimGuide={showWelcome && claimedIds.size === 0 && itemIndex === 0}
                         onAuthRequired={
                           !user
                             ? (postcardId) => {
