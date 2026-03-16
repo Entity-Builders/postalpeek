@@ -33,6 +33,7 @@ interface WalkerCarouselProps {
   setShowAuthGate: (val: boolean) => void;
   setPendingFavoriteId: (id: string | null) => void;
   showFavoritesOnly: boolean;
+  showTripsOnly: boolean;
   hasSharedCard: boolean;
 }
 
@@ -53,6 +54,7 @@ export function WalkerCarousel({
   setShowAuthGate,
   setPendingFavoriteId,
   showFavoritesOnly,
+  showTripsOnly,
   hasSharedCard,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -97,12 +99,13 @@ export function WalkerCarousel({
     watchSlides: true,
   });
 
-  // Reset carousel to first slide when favorites filter changes
+  // Reset carousel to first slide when any filter changes
   useEffect(() => {
     if (emblaApi) {
       emblaApi.scrollTo(0, true);
     }
-  }, [showFavoritesOnly, emblaApi]);
+    setOpenedTrips(new Set());
+  }, [showFavoritesOnly, showTripsOnly, emblaApi]);
 
   useEffect(() => {
     if (displayItems.length === 0) return;

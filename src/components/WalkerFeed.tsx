@@ -87,8 +87,9 @@ export function WalkerFeed({
 
   const displayItems = useMemo(() => {
     if (showFavoritesOnly) return favoriteItems;
+    if (showTripsOnly) return items.filter((item) => item.trip_id);
     return items;
-  }, [items, showFavoritesOnly, favoriteItems]);
+  }, [items, showFavoritesOnly, showTripsOnly, favoriteItems]);
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
@@ -178,6 +179,7 @@ export function WalkerFeed({
           setShowAuthGate={setShowAuthGate}
           setPendingFavoriteId={setPendingFavoriteId}
           showFavoritesOnly={showFavoritesOnly}
+          showTripsOnly={showTripsOnly}
           hasSharedCard={hasSharedCard}
         />
       )}
