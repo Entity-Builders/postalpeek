@@ -31,6 +31,7 @@ export interface FeedItem {
   owner_id?: string | null;
   claimed_at?: string | null;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+  visual_tags?: string[];
 }
 
 interface PostcardProps {
@@ -56,6 +57,8 @@ interface PostcardProps {
   isInAlbum?: boolean;
   /** Tutorial: show pulsing claim guide on the first card */
   showClaimGuide?: boolean;
+  /** Called when the hero image finishes loading */
+  onHeroReady?: () => void;
 }
 
 export function Postcard({
@@ -73,6 +76,7 @@ export function Postcard({
   isClaimLoading = false,
   isInAlbum = false,
   showClaimGuide = false,
+  onHeroReady,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -185,7 +189,10 @@ export function Postcard({
           srcSetString={srcSetString}
           handleImageError={handleImageError}
           fallbackEnabled={fallbackEnabled}
-          onHeroLoad={() => setHeroReady(true)}
+          onHeroLoad={() => {
+            setHeroReady(true);
+            onHeroReady?.();
+          }}
           isClaimedByMe={isClaimedByMe}
           isClaimed={isClaimed}
           onClaimPostcard={onClaimPostcard}

@@ -1,14 +1,88 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Trophy, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Trophy, HelpCircle, Eye, Search, MapPin, Tag } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
-import type { AlbumSlot, AlbumDetailData } from '../hooks/useAlbumDetail';
+import type { AlbumSlot, AlbumDetailData, MatchRules } from '../hooks/useAlbumDetail';
 
 interface AlbumDetailProps {
   detail: AlbumDetailData;
   isLoading: boolean;
   onClose: () => void;
+}
+
+const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  easy:   { label: 'Fácil',   color: 'bg-emerald-100 text-emerald-700', icon: '🌿' },
+  medium: { label: 'Media',   color: 'bg-yellow-100 text-yellow-700',   icon: '⭐' },
+  hard:   { label: 'Difícil', color: 'bg-orange-100 text-orange-700',   icon: '🔥' },
+  epic:   { label: 'Épica',   color: 'bg-purple-100 text-purple-700',   icon: '💎' },
+};
+
+/** Build a human-readable description of what to look for */
+function CriteriaBanner({ rules, difficulty }: { rules: MatchRules; difficulty?: string }) {
+  const hasRules = rules && (rules.country || rules.city || rules.required_tags?.length || rules.any_tags?.length);
+  if (!hasRules && !difficulty) return null;
+
+  const parts: string[] = [];
+  if (rules.required_tags?.length) parts.push(rules.required_tags.join(', '));
+  if (rules.any_tags?.length) parts.push(rules.any_tags.join(' / '));
+
+  const locationParts: string[] = [];
+  if (rules.city) locationParts.push(rules.city);
+  if (rules.country) locationParts.push(rules.country);
+
+  const diff = difficulty ? DIFFICULTY_CONFIG[difficulty] : null;
+
+  return (
+    <div className='mt-3 bg-white/50 border border-stone-200/60 rounded-xl px-3.5 py-2.5 space-y-1.5'>
+      {/* Difficulty badge */}
+      {diff && (
+        <div className='flex items-center gap-1.5'>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${diff.color}`}>
+            {diff.icon} {diff.label}
+          </span>
+        </div>
+      )}
+
+      {/* What to look for */}
+      {parts.length > 0 && (
+        <div className='flex items-start gap-2'>
+          <Search className='w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0' />
+          <p className='text-[11px] text-stone-600'>
+            <span className='text-stone-400'>Buscá:</span>{' '}
+            <span className='font-semibold text-stone-700'>{parts.join(', ')}</span>
+          </p>
+        </div>
+      )}
+
+      {/* Location */}
+      {locationParts.length > 0 && (
+        <div className='flex items-start gap-2'>
+          <MapPin className='w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0' />
+          <p className='text-[11px] text-stone-600'>
+            <span className='text-stone-400'>En:</span>{' '}
+            <span className='font-semibold text-stone-700'>{locationParts.join(', ')}</span>
+          </p>
+        </div>
+      )}
+
+      {/* Tag pills */}
+      {(rules.required_tags?.length || rules.any_tags?.length) ? (
+        <div className='flex flex-wrap gap-1 pt-0.5'>
+          {rules.required_tags?.map(t => (
+            <span key={t} className='inline-flex items-center gap-0.5 bg-amber-100/80 text-amber-700 text-[9px] font-medium px-2 py-0.5 rounded-full'>
+              <Tag className='w-2.5 h-2.5' />{t}
+            </span>
+          ))}
+          {rules.any_tags?.map(t => (
+            <span key={t} className='inline-flex items-center gap-0.5 bg-stone-100 text-stone-500 text-[9px] font-medium px-2 py-0.5 rounded-full'>
+              <Tag className='w-2.5 h-2.5' />{t}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function SlotCard({
@@ -19,7 +93,7 @@ function SlotCard({
   index: number;
 }) {
   const imgUrl = useSignedImage(
-    slot.is_owned ? slot.illustration_url : null,
+    (slot.is_owned || slot.is_hint) ? slot.illustration_url : null,
     { width: WIDTHS.mobile },
   );
 
@@ -44,6 +118,21 @@ function SlotCard({
               decoding='async'
               className='w-full h-full object-cover'
             />
+          ) : slot.is_hint && imgUrl ? (
+            /* Hint slot — greyed-out example postcard */
+            <div className='w-full h-full relative'>
+              <img
+                src={imgUrl}
+                alt='Pista'
+                loading='lazy'
+                decoding='async'
+                className='w-full h-full object-cover grayscale opacity-30'
+              />
+              <div className='absolute inset-0 flex flex-col items-center justify-center gap-1'>
+                <Eye className='w-5 h-5 text-stone-500/70' />
+                <span className='text-[8px] text-stone-500/80 font-semibold'>Pista</span>
+              </div>
+            </div>
           ) : slot.is_claimed ? (
             /* Someone else has it — show dimmed silhouette */
             <div className='w-full h-full bg-gradient-to-br from-stone-200 to-stone-300 flex flex-col items-center justify-center gap-1'>
@@ -54,7 +143,7 @@ function SlotCard({
             /* Nobody has it yet */
             <div className='w-full h-full bg-gradient-to-br from-amber-50 to-stone-100 flex flex-col items-center justify-center gap-1'>
               <HelpCircle className='w-6 h-6 text-amber-400/60' />
-              <span className='text-[8px] text-amber-500/60'>Disponible</span>
+              <span className='text-[8px] text-amber-500/60'>???</span>
             </div>
           )}
 
@@ -112,6 +201,9 @@ export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
         {album.description && (
           <p className='text-xs text-stone-400 mt-0.5 line-clamp-2'>{album.description}</p>
         )}
+
+        {/* Criteria banner: what to look for */}
+        <CriteriaBanner rules={album.match_rules} difficulty={album.difficulty} />
 
         {/* Progress bar */}
         <div className='flex items-center gap-3 mt-3'>

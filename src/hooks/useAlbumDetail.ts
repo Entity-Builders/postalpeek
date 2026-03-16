@@ -11,6 +11,14 @@ export interface AlbumSlot {
   category: string | null;
   is_owned: boolean;
   is_claimed: boolean;
+  is_hint: boolean;
+}
+
+export interface MatchRules {
+  country?: string;
+  city?: string;
+  required_tags?: string[];
+  any_tags?: string[];
 }
 
 export interface AlbumDetailData {
@@ -22,7 +30,10 @@ export interface AlbumDetailData {
     category: string;
     country: string | null;
     city: string | null;
+    difficulty: 'easy' | 'medium' | 'hard' | 'epic';
+    match_rules: MatchRules;
     reward_claims: number;
+    target_slots: number;
   };
   slots: AlbumSlot[];
   completed_at: string | null;

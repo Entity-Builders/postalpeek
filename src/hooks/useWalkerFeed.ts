@@ -24,12 +24,15 @@ export function useWalkerFeed(tripsOnly = false) {
   // Parse Initial URL State (Slugs instead of query params)
   useEffect(() => {
     const segments = window.location.pathname.split('/').filter(Boolean);
+    const APP_ROUTES = ['collection', 'album'];
 
     if (segments.length === 2) {
+      if (APP_ROUTES.includes(segments[0])) return;
       // /country/hash
       const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
       setSelectedCountry(decodedCountry);
     } else if (segments.length === 1) {
+      if (APP_ROUTES.includes(segments[0])) return;
       // /country OR /hash
       const segment = segments[0];
       const maybePrefix = decodeHashToUuidPrefix(segment);

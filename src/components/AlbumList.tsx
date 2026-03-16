@@ -11,6 +11,13 @@ interface AlbumListProps {
   onOpenAlbum: (album: Album) => void;
 }
 
+const DIFFICULTY_CONFIG: Record<Album['difficulty'], { label: string; color: string; icon: string }> = {
+  easy:   { label: 'Fácil',   color: 'bg-emerald-500/80', icon: '🌿' },
+  medium: { label: 'Media',   color: 'bg-yellow-500/80',  icon: '⭐' },
+  hard:   { label: 'Difícil', color: 'bg-orange-500/80',  icon: '🔥' },
+  epic:   { label: 'Épica',   color: 'bg-purple-500/80',  icon: '💎' },
+};
+
 function AlbumCard({
   album,
   index,
@@ -63,13 +70,21 @@ function AlbumCard({
           </div>
         )}
 
-        {/* Country pill */}
-        {album.country && (
-          <div className='absolute top-2 left-2 bg-white/20 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1'>
-            <MapPin className='w-2.5 h-2.5' />
-            {album.country}
-          </div>
-        )}
+        {/* Difficulty + Country pills */}
+        <div className='absolute top-2 left-2 flex items-center gap-1.5'>
+          {album.difficulty && album.difficulty !== 'easy' && (
+            <div className={`${DIFFICULTY_CONFIG[album.difficulty].color} backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm`}>
+              <span>{DIFFICULTY_CONFIG[album.difficulty].icon}</span>
+              {DIFFICULTY_CONFIG[album.difficulty].label}
+            </div>
+          )}
+          {album.country && (
+            <div className='bg-white/20 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1'>
+              <MapPin className='w-2.5 h-2.5' />
+              {album.country}
+            </div>
+          )}
+        </div>
 
         {/* Title + progress overlaid on image */}
         <div className='absolute bottom-0 left-0 right-0 p-3'>

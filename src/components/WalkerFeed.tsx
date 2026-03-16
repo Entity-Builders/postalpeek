@@ -12,7 +12,6 @@ import {
   WalkerLoadingState,
   TripCoverLoadingState,
   WalkerEmptyState,
-  WalkerFavoritesEmptyState,
   WalkerTripsEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
@@ -23,7 +22,6 @@ import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
-import { preSignUrls } from '../utils/imageUtils';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence } from 'framer-motion';
 
@@ -78,7 +76,6 @@ export function WalkerFeed({
     favoriteItems,
     toggle: toggleFavorite,
   } = useFavorites(user ?? null);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // ── Collectibles ──
   const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(
@@ -117,15 +114,14 @@ export function WalkerFeed({
     new Set(),
   );
 
-  // Fetch which postcards belong to albums (needed for confetti on claim)
+  // Fetch which postcards belong to albums (slot-based + dynamic match_rules)
   useEffect(() => {
     supabase
-      .from('postalpeek_album_slots')
-      .select('postcard_id')
+      .rpc('postalpeek_get_album_postcard_ids')
       .then(({ data }) => {
-        if (data)
+        if (data && Array.isArray(data))
           setAlbumPostcardIds(
-            new Set(data.map((r: { postcard_id: string }) => r.postcard_id)),
+            new Set(data as string[]),
           );
       });
   }, [albums]);
@@ -168,28 +164,14 @@ export function WalkerFeed({
     [claim, refetchCollection, refetchAlbums, albumPostcardIds],
   );
 
-  useEffect(() => {
-    if (!user) setShowFavoritesOnly(false);
-    // trips filter is independent of auth, no reset needed
-  }, [user]);
 
-  useEffect(() => {
-    if (favoriteItems.length > 0) {
-      preSignUrls(
-        favoriteItems.flatMap((i) =>
-          [i.illustration_url, i.original_image_url].filter(Boolean),
-        ),
-      ).catch((err) =>
-        console.error('Failed to pre-sign favorite items URLs', err),
-      );
-    }
-  }, [favoriteItems]);
+
+
 
   const displayItems = useMemo(() => {
-    if (showFavoritesOnly) return favoriteItems;
     if (showTripsOnly) return items.filter((item) => item.trip_id);
     return items;
-  }, [items, showFavoritesOnly, showTripsOnly, favoriteItems]);
+  }, [items, showTripsOnly]);
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
@@ -198,20 +180,10 @@ export function WalkerFeed({
           isIdle={isIdle}
           availableCountries={availableCountries}
           selectedCountry={selectedCountry}
-          showFavoritesOnly={showFavoritesOnly}
-          onToggleFavorites={() => {
-            setShowFavoritesOnly((prev) => {
-              const next = !prev;
-              if (next) setShowTripsOnly(false);
-              analytics.track('filter_changed', { favorites_only: next });
-              return next;
-            });
-          }}
           showTripsOnly={showTripsOnly}
           onToggleTrips={() => {
             setShowTripsOnly((prev) => {
               const next = !prev;
-              if (next) setShowFavoritesOnly(false);
               analytics.track('filter_changed', { trips_only: next });
               return next;
             });
@@ -229,10 +201,8 @@ export function WalkerFeed({
           onHoverCountry={prefetchCountry}
           onSelectCountry={(country) => {
             if (country === selectedCountry) {
-              setShowFavoritesOnly(false);
               return;
             }
-            setShowFavoritesOnly(false);
             setShowTripsOnly(false);
             setIsLoading(true);
             loadedIdsRef.current = [];
@@ -266,9 +236,7 @@ export function WalkerFeed({
           <WalkerLoadingState />
         )
       ) : displayItems.length === 0 && !showWelcome ? (
-        showFavoritesOnly ? (
-          <WalkerFavoritesEmptyState />
-        ) : showTripsOnly ? (
+        showTripsOnly ? (
           <WalkerTripsEmptyState />
         ) : (
           <WalkerEmptyState />
@@ -291,7 +259,7 @@ export function WalkerFeed({
           toggleFavorite={toggleFavorite}
           setShowAuthGate={setShowAuthGate}
           setPendingFavoriteId={setPendingFavoriteId}
-          showFavoritesOnly={showFavoritesOnly}
+
           showTripsOnly={showTripsOnly}
           hasSharedCard={hasSharedCard}
           claimedIds={claimedIds}
@@ -358,6 +326,8 @@ export function WalkerFeed({
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
             onOpenAlbum={(album) => navigate(`/album/${album.id}`)}
+            favoriteItems={favoriteItems}
+            isFavoritesLoading={isLoading}
           />
         )}
       </AnimatePresence>

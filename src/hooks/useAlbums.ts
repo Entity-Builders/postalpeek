@@ -9,6 +9,7 @@ export interface Album {
   category: string;
   country: string | null;
   city: string | null;
+  difficulty: 'easy' | 'medium' | 'hard' | 'epic';
   reward_claims: number;
   total_slots: number;
   collected_slots: number;

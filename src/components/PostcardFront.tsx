@@ -226,7 +226,6 @@ export function PostcardFront({
         className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'
         style={{ zIndex: 1 }}
       >
-        {/* The Illustration */}
         <div
           className={cn(
             'relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200',

@@ -40,6 +40,16 @@ export function PostcardBack({
   const storytelling = item.generation_metadata?.storytelling;
   const isTrip = !!item.trip_id;
   const tripCtx = item.generation_metadata?.tripContext;
+  const visualTags: string[] = item.visual_tags || [];
+  const vibeInjected: string = item.generation_metadata?.vibe_injected || '';
+
+  // Debug log — inspect full postal data in browser console
+  console.log('[PostalPeek Debug]', item.id?.slice(0, 8), {
+    visual_tags: item.visual_tags,
+    generation_metadata: item.generation_metadata,
+    streetview_pov: item.streetview_pov,
+    category: item.category,
+  });
 
   return (
     <div
@@ -240,20 +250,29 @@ export function PostcardBack({
                 "{item.description}"
               </p>
 
-              <div className="mt-auto border-t border-stone-300/50 pt-3 sm:pt-4 flex flex-col gap-1.5 sm:gap-2 font-mono text-[9px] md:text-xs text-stone-400">
-                <p>
-                  Generation Strategy:{' '}
-                  <span className="text-stone-600 font-semibold">
-                    {item.generation_metadata?.strategy || 'Random Exploration'}
-                  </span>
-                </p>
-                <p>
-                  Photographic Lens:{' '}
-                  <span className="text-stone-600 font-semibold">
-                    {item.streetview_pov?.lens || 'Standard 90° FOV'}
-                  </span>
-                </p>
-                <p>Date: {new Date(item.created_at).toLocaleString()}</p>
+              {/* Visual Tags — what the AI saw */}
+              <div className="mt-auto border-t border-stone-300/50 pt-3 sm:pt-4">
+                {vibeInjected && (
+                  <p className="font-mono text-[9px] md:text-[10px] text-stone-400 uppercase tracking-wider mb-2">
+                    🎨 {vibeInjected}
+                  </p>
+                )}
+                {visualTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {visualTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-block px-2 py-0.5 bg-stone-100 text-stone-500 text-[9px] md:text-[10px] font-mono rounded-full border border-stone-200/80 tracking-wide"
+                      >
+                        {tag.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="font-mono text-[9px] md:text-xs text-stone-400">
+                    Date: {new Date(item.created_at).toLocaleString()}
+                  </p>
+                )}
               </div>
             </div>
           </div>
