@@ -205,11 +205,11 @@ function SwipeableCard({
   const discardOpacity = useTransform(x, [0, -100], [0, 1]);
 
   // Stack positioning (scale and Y offset for cards behind)
-  // To create a deck effect, the cards in the back should be scaled down and moved down.
   const scale = 1 - (indexPosition * 0.05);
-  // Base offset is how much we push the card down. Since we are in the center, 
-  // we push it down by a percentage or pixel amount.
+  // Base offset is how much we push the card down. 
   const yOffset = indexPosition * 14; 
+  // Add a slight rotation to the back cards to simulate a physical deck
+  const baseRotation = indexPosition === 1 ? -2 : indexPosition === 2 ? 2 : 0;
 
   const handleDragEnd = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 100;
@@ -233,12 +233,13 @@ function SwipeableCard({
 
   return (
     <motion.div
-      className='absolute w-[90vw] max-w-[480px] h-[80dvh] md:h-[85dvh] pointer-events-auto'
+      className='absolute w-[92vw] max-w-[420px] pointer-events-auto flex justify-center items-center'
       style={{
         x: isFront ? x : 0,
-        rotate: isFront ? rotate : 0,
+        rotate: isFront ? rotate : baseRotation,
         opacity: isFront ? opacity : undefined,
         zIndex: 10 - indexPosition,
+        aspectRatio: '4/5',
       }}
       initial={{ scale: 0.8, y: 50 }}
       animate={{ 
@@ -269,18 +270,15 @@ function SwipeableCard({
           </>
         )}
 
-        <div className='w-full h-full bg-transparent shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] rounded-xl relative'>
+        <div className='w-full h-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-2 pb-8 md:p-3 md:pb-10 rounded-xl md:rounded-2xl relative border border-slate-200 flex flex-col'>
             {isWelcome ? (
-              <div className='w-full h-full flex items-center justify-center bg-transparent rounded-xl'>
+              <div className='w-full h-full flex items-center justify-center bg-transparent rounded-lg overflow-hidden relative'>
                  <WalkerWelcome previewCards={items.slice(0, 3)} />
               </div>
             ) : item.trip_id && !openedTrips.has(item.trip_id) ? (
               <div 
-                className='w-full h-full bg-white rounded-md'
+                className='w-full h-full bg-transparent flex-1'
                 onPointerDown={() => {
-                   // Optional: If they click to open trip instead of dragging
-                   // Embla handled clicks vs drag. With Framer Motion, onDragEnd resolves swipes.
-                   // For now, we leave the drag handling to the parent motion.div.
                 }}
               >
                 <TripCover
@@ -297,13 +295,12 @@ function SwipeableCard({
                 />
               </div>
             ) : (
-              <div className='w-full h-full bg-white rounded-md flex flex-col'>
+              <div className='w-full h-full flex flex-col relative flex-1'>
                 <Postcard
                     item={item}
                     isActive={true}
                     isPriority={true}
                     isAdmin={isAdmin}
-                    isNearby={true}
                     favoriteIds={favoriteIds}
                     onToggleFavorite={user ? toggleFavorite : undefined}
                     isClaimedByMe={claimedIds.has(item.id)}

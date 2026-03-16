@@ -146,7 +146,7 @@ export function TripCover({
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[88dvh] md:max-h-[85dvh] cursor-pointer mx-auto ease-in-out',
+        'w-full max-w-[480px] cursor-pointer mx-auto ease-in-out',
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
         !isActive && 'scale-[0.85] opacity-40 pointer-events-none',
@@ -155,9 +155,9 @@ export function TripCover({
       onClick={onOpenTrip}
     >
       {/* Card shell — always rendered */}
-      <div className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col overflow-hidden border border-white/50'>
+      <div className='relative w-full h-full bg-white flex flex-col overflow-hidden'>
         {/* Hero image — ALWAYS mounted so images start loading immediately */}
-        <div className='relative flex-1 min-h-0 overflow-hidden bg-stone-200'>
+        <div className='relative flex-1 min-h-0 overflow-hidden bg-stone-200 rounded-md md:rounded-lg shadow-inner'>
           {/* Placeholder blur — loads in background even during skeleton */}
           {finalPlaceholder && (
             <img
@@ -229,7 +229,7 @@ export function TripCover({
 
         {/* Bottom section — skeleton or real content */}
         {!bottomReady ? (
-          <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
+          <div className='shrink-0 px-2 md:px-3 pt-3 flex flex-col gap-2'>
             <div className='flex flex-col gap-1.5'>
               <div className='h-3 w-full rounded-full bg-stone-200 animate-pulse' />
               <div className='h-3 w-5/6 rounded-full bg-stone-200 animate-pulse' />
@@ -245,7 +245,7 @@ export function TripCover({
             <div className='w-full h-10 rounded-xl bg-stone-200 animate-pulse' />
           </div>
         ) : (
-          <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
+          <div className='shrink-0 px-2 md:px-3 pt-3 flex flex-col gap-2'>
             {summary && (
               <p className='text-xs md:text-sm text-stone-600 leading-relaxed italic'>
                 {summary}

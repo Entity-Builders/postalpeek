@@ -20,7 +20,9 @@ export interface FeedItem {
   category: string;
   description: string;
   created_at: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   streetview_pov?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generation_metadata?: any;
   trip_id?: string;
   trip_sequence?: number;
@@ -38,8 +40,6 @@ interface PostcardProps {
   item: FeedItem;
   isActive: boolean;
   isAdmin?: boolean;
-  /** When false, images are not mounted to save bandwidth (off-screen slides) */
-  isNearby?: boolean;
   /** When true, network requests for this card's assets are prioritized */
   isPriority?: boolean;
   /** Set of postcard IDs the current user has favorited */
@@ -65,7 +65,6 @@ export function Postcard({
   item,
   isActive,
   isAdmin = false,
-  isNearby = true,
   isPriority = false,
   favoriteIds,
   onToggleFavorite,
@@ -153,12 +152,11 @@ export function Postcard({
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] perspective-1000 cursor-pointer mx-auto ease-in-out',
+        'w-full h-full perspective-1000 cursor-pointer mx-auto ease-in-out flex flex-col',
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
         !isActive && 'scale-[0.85] opacity-40 pointer-events-none',
       )}
-      style={{ transition: 'opacity 300ms ease-out, transform 700ms ease-in-out' }}
       onClick={handleFlip}
     >
       <motion.div

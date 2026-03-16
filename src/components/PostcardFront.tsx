@@ -223,16 +223,16 @@ export function PostcardFront({
 
       {/* Main card */}
       <div
-        className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col p-3 md:p-4 border border-white/50'
+        className='relative w-full h-full bg-white flex flex-col'
         style={{ zIndex: 1 }}
       >
-        <div
-          className={cn(
-            'relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200',
-            'flex-1',
-          )}
-          onContextMenu={(e) => e.preventDefault()}
-        >
+        <div className="flex-1 w-full min-h-0 relative p-1 pb-0 overflow-hidden flex flex-col bg-white">
+          <div
+            className={cn(
+              'relative overflow-hidden rounded shadow-inner image-protected bg-stone-200 flex-1 min-h-0',
+            )}
+            onContextMenu={(e) => e.preventDefault()}
+          >
           {/* Dev-only album badge (all postcards) */}
           {isAdmin && isInAlbum && (
             <span className='absolute top-2 left-2 z-40 inline-flex items-center gap-1 bg-amber-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm'>
@@ -308,9 +308,10 @@ export function PostcardFront({
             />
           )}
         </div>
-
+        </div>
+        
         {/* Title + Buttons row */}
-        <div className='mt-3 md:mt-4 px-2 flex justify-between items-end'>
+        <div className='mt-3 md:mt-4 px-1 pb-1 flex justify-between items-end shrink-0'>
           <div className='flex-1 min-w-0 mr-3'>
             {/* Trip stop indicator */}
             {activeSlideItem.trip_id && activeSlideItem.trip_sequence != null && (() => {
