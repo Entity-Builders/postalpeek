@@ -3,7 +3,11 @@ import { MapPin, ChevronRight } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from './SearchBar';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
-import { useSignedImage, useSignedSrcSet, useRawSignedImage } from '../utils/useSignedImage';
+import {
+  useSignedImage,
+  useSignedSrcSet,
+  useRawSignedImage,
+} from '../utils/useSignedImage';
 import type { FeedItem } from './Postcard';
 
 interface TripCoverProps {
@@ -69,7 +73,9 @@ export function TripCover({
       .order('trip_sequence', { ascending: true })
       .then(async ({ data }) => {
         if (mounted && data && data.length > 0) {
-          await preSignUrls(data.map((d) => d.illustration_url).filter(Boolean));
+          await preSignUrls(
+            data.map((d) => d.illustration_url).filter(Boolean),
+          );
 
           const { data: stops } = await supabase
             .from('postalpeek_trip_stops')
@@ -127,14 +133,17 @@ export function TripCover({
 
   // Compute thumbnail size based on count — fill all available width
   const thumbCount = stopThumbnails.length;
-  const thumbSize = thumbCount <= 3 ? 'w-16 h-16 md:w-20 md:h-20' 
-    : thumbCount <= 5 ? 'w-14 h-14 md:w-16 md:h-16' 
-    : 'w-11 h-11 md:w-14 md:h-14';
+  const thumbSize =
+    thumbCount <= 3
+      ? 'w-16 h-16 md:w-20 md:h-20'
+      : thumbCount <= 5
+        ? 'w-14 h-14 md:w-16 md:h-16'
+        : 'w-11 h-11 md:w-14 md:h-14';
 
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] cursor-pointer transition-all duration-700 mx-auto ease-in-out',
+        'w-[90vw] max-w-[480px] h-full max-h-[88dvh] md:max-h-[85dvh] cursor-pointer transition-all duration-700 mx-auto ease-in-out',
         isActive
           ? 'scale-100 opacity-100'
           : 'scale-[0.85] opacity-40 pointer-events-none',
@@ -142,19 +151,17 @@ export function TripCover({
       onClick={onOpenTrip}
     >
       {/* Clean card — no stacked cards behind */}
-      <div
-        className="relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col overflow-hidden border border-white/50"
-      >
-        {/* Hero image — top portion */}
-        <div className="relative flex-[1.1] overflow-hidden bg-stone-200">
+      <div className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col overflow-hidden border border-white/50'>
+        {/* Hero image — top portion, stays prominent */}
+        <div className='relative flex-1 min-h-0 overflow-hidden bg-stone-200'>
           {/* Placeholder blur */}
           {finalPlaceholder && (
             <img
               src={finalPlaceholder}
-              alt=""
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80"
+              alt=''
+              loading='eager'
+              decoding='async'
+              className='absolute inset-0 w-full h-full object-cover blur-xl scale-110 saturate-150 transform-gpu z-0 opacity-80'
             />
           )}
 
@@ -163,87 +170,80 @@ export function TripCover({
             <img
               src={mainImgUrl}
               srcSet={srcSetString}
-              sizes="(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px"
+              sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
               alt={title}
               loading={isPriority ? 'eager' : 'lazy'}
-              decoding="async"
+              decoding='async'
               fetchPriority={isPriority ? 'high' : 'auto'}
               draggable={false}
               onError={handleImageError}
-              className="absolute inset-0 w-full h-full object-cover z-10"
+              className='absolute inset-0 w-full h-full object-cover z-10'
             />
           )}
 
-          {/* Gradient overlay at bottom of image */}
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/30 to-transparent z-20" />
+          {/* Gradient overlay at bottom of image for text overlay */}
+          <div className='absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/60 via-black/25 to-transparent z-20' />
 
           {/* "VIAJE COMPLETO" badge */}
-          <div className="absolute top-3 left-3 z-30">
-            <span className="bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide">
+          <div className='absolute top-3 left-3 z-30'>
+            <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide'>
               🗺️ Viaje Completo
             </span>
           </div>
 
           {/* POST stamp */}
-          <div className="absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none z-30">
-            <span className="text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12">
+          <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none z-30'>
+            <span className='text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12'>
               POST
             </span>
-            <span className="text-[8px] md:text-[10px] text-white/90 font-mono mt-1 drop-shadow-md">
+            <span className='text-[8px] md:text-[10px] text-white/90 font-mono mt-1 drop-shadow-md'>
               {new Date(item.created_at).toLocaleDateString(undefined, {
                 month: 'short',
                 day: 'numeric',
               })}
             </span>
           </div>
-        </div>
 
-        {/* Editorial content — bottom */}
-        <div className="flex-1 px-4 md:px-5 py-3 md:py-4 flex flex-col justify-between min-h-0">
-          {/* Label + Title */}
-          <div>
-            <p className="text-[10px] md:text-xs text-stone-400 font-bold tracking-widest uppercase mb-1">
+          {/* Title + location overlayed on image bottom */}
+          <div className='absolute bottom-0 left-0 right-0 z-30 px-4 pb-3'>
+            <p className='text-[10px] text-white/70 font-bold tracking-widest uppercase mb-0.5'>
               VIAJE COMPLETO · {totalStops} PARADAS
             </p>
-
-            <h2
-              className="font-serif text-xl md:text-2xl font-bold leading-tight mb-1.5 line-clamp-2"
-              style={{ color: '#1a1a1a' }}
-            >
+            <h2 className='font-serif text-xl md:text-2xl font-bold leading-tight line-clamp-2 text-white drop-shadow-md'>
               {title}
             </h2>
-
-            {/* Location */}
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <p className="text-sm text-stone-500 truncate">
+            <div className='flex items-center gap-1.5 mt-1'>
+              <MapPin className='w-3 h-3 text-white/70 shrink-0' />
+              <p className='text-xs text-white/80 truncate'>
                 {item.city}, {item.country}
               </p>
             </div>
-
-            {/* Divider */}
-            <div className="w-full h-px bg-stone-200 mb-2.5" />
-
-            {/* Itinerary Summary — brief letter style */}
-            {summary && (
-              <p className="text-xs md:text-sm text-stone-600 leading-relaxed line-clamp-3 italic mb-2">
-                "{summary}"
-              </p>
-            )}
           </div>
+        </div>
 
-          {/* Stop Thumbnails Row — fills available width */}
+        {/* Editorial content — compact bottom section */}
+        <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
+          {/* Itinerary Summary — full text */}
+          {summary && (
+            <p className='text-xs md:text-sm text-stone-600 leading-relaxed italic'>
+              {summary}
+            </p>
+          )}
+
+          {/* Stop Thumbnails Row */}
           {stopThumbnails.length > 0 && (
-            <div className="flex items-start justify-around gap-1 mb-3 py-1">
+            <div className='flex items-start justify-around gap-1 py-1'>
               {stopThumbnails.map((thumb, idx) => (
                 <div
                   key={thumb.id}
-                  className="flex flex-col items-center flex-1 min-w-0"
+                  className='flex flex-col items-center flex-1 min-w-0'
                 >
-                  <div className={cn(
-                    'rounded-full overflow-hidden border-2 border-stone-200 shadow-sm bg-stone-100 mx-auto',
-                    thumbSize,
-                  )}>
+                  <div
+                    className={cn(
+                      'rounded-full overflow-hidden border-2 border-stone-200 shadow-sm bg-stone-100 mx-auto',
+                      thumbSize,
+                    )}
+                  >
                     <img
                       src={cdnImage(thumb.url, {
                         width: 160,
@@ -251,11 +251,11 @@ export function TripCover({
                         fit: 'cover',
                       })}
                       alt={thumb.stop_name || `Stop ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
+                      className='w-full h-full object-cover'
+                      loading='lazy'
                     />
                   </div>
-                  <span className="text-[8px] md:text-[9px] text-stone-500 mt-1 text-center w-full truncate font-medium px-0.5">
+                  <span className='text-[8px] md:text-[9px] text-stone-500 mt-1 text-center w-full truncate font-medium px-0.5'>
                     {thumb.stop_name || `Stop ${idx + 1}`}
                   </span>
                 </div>
@@ -265,14 +265,14 @@ export function TripCover({
 
           {/* CTA Button */}
           <button
-            className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
+            className='w-full py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm'
             onClick={(e) => {
               e.stopPropagation();
               onOpenTrip();
             }}
           >
             Ver {totalStops} Postales
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className='w-4 h-4' />
           </button>
         </div>
       </div>
