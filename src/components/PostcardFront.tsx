@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
   MapPin,
   Info,
   Heart,
   Share2,
   Check,
-  Wand2,
+  // Wand2, // commented out: video generation button hidden
   Loader2,
   Ticket,
   ChevronRight,
@@ -45,6 +46,8 @@ interface PostcardFrontProps {
   onClaimPostcard?: (postcardId: string) => void;
   /** Collectibles: whether a claim is currently in progress */
   isClaimLoading?: boolean;
+  /** Dev-only: postcard belongs to an album */
+  isInAlbum?: boolean;
 }
 
 export function PostcardFront({
@@ -66,24 +69,27 @@ export function PostcardFront({
   isClaimed = false,
   onClaimPostcard,
   isClaimLoading = false,
+  isInAlbum = false,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showClaimedTooltip, setShowClaimedTooltip] = useState(false);
-  const [localAnimState, setLocalAnimState] = useState<
-    'idle' | 'queued' | null
-  >(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  // Video generation state — commented out while button is hidden
+  // const [localAnimState, setLocalAnimState] = useState<
+  //   'idle' | 'queued' | null
+  // >(null);
 
-  const animationState = item.video_url
-    ? 'completed'
-    : item.video_generation_status === 'processing'
-      ? 'processing'
-      : localAnimState !== null
-        ? localAnimState
-        : item.should_animate
-          ? 'queued'
-          : 'idle';
+  // const animationState = item.video_url
+  //   ? 'completed'
+  //   : item.video_generation_status === 'processing'
+  //     ? 'processing'
+  //     : localAnimState !== null
+  //       ? localAnimState
+  //       : item.should_animate
+  //         ? 'queued'
+  //         : 'idle';
 
   const isBusiness =
     item.generation_metadata?.strategy === 'Zigzag Shared Place';
@@ -224,6 +230,13 @@ export function PostcardFront({
           )}
           onContextMenu={(e) => e.preventDefault()}
         >
+          {/* Dev-only album badge (all postcards) */}
+          {isAdmin && isInAlbum && (
+            <span className='absolute top-2 left-2 z-40 inline-flex items-center gap-1 bg-amber-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm'>
+              🏆 Album
+            </span>
+          )}
+
           {isTrip ? (
             <>
               <div className='absolute top-2 left-2 right-2 z-30 pointer-events-none drop-shadow-md'>
@@ -368,53 +381,83 @@ export function PostcardFront({
             </button>
 
             {/* 🃏 Claim area */}
-            {isClaimedByMe ? (
-              <button
-                className='p-2 md:p-2.5 rounded-full bg-amber-100 text-amber-600 cursor-default ring-1 ring-amber-300/50 transition-all'
-                title='Ya es tuya'
-              >
-                <ShieldCheck className='w-4 h-4 md:w-5 md:h-5' />
-              </button>
-            ) : (
-              <div className='relative'>
+            <div className='relative'>
+              {isClaimedByMe ? (
                 <button
-                  className='p-2 md:p-2.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600 hover:scale-105 transition-all'
-                  disabled={isClaimLoading}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isClaimed) {
-                      setShowClaimedTooltip((prev) => !prev);
-                      setTimeout(() => setShowClaimedTooltip(false), 2500);
-                      return;
-                    }
-                    if (!onClaimPostcard) {
-                      onAuthRequired?.(item.id);
-                      return;
-                    }
-                    onClaimPostcard(item.id);
-                  }}
-                  title={isClaimed ? undefined : 'Reclamar esta postal'}
+                  className='p-2 md:p-2.5 rounded-full bg-amber-100 text-amber-600 cursor-default ring-1 ring-amber-300/50 transition-all'
+                  title='Ya es tuya'
                 >
-                  {isClaimLoading ? (
-                    <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
-                  ) : (
-                    <Gem className='w-4 h-4 md:w-5 md:h-5' />
-                  )}
+                  <ShieldCheck className='w-4 h-4 md:w-5 md:h-5' />
                 </button>
-                {showClaimedTooltip && (
-                  <div
-                    className='absolute bottom-full right-0 mb-2 px-3 py-2 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50'
+              ) : (
+                <>
+                  <button
+                    className='p-2 md:p-2.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600 hover:scale-105 transition-all'
+                    disabled={isClaimLoading}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowClaimedTooltip(false);
+                      if (isClaimed) {
+                        setShowClaimedTooltip((prev) => !prev);
+                        setTimeout(() => setShowClaimedTooltip(false), 2500);
+                        return;
+                      }
+                      if (!onClaimPostcard) {
+                        onAuthRequired?.(item.id);
+                        return;
+                      }
+                      onClaimPostcard(item.id);
+                      if (isInAlbum) {
+                        setTimeout(() => {
+                          setShowConfetti(true);
+                          setTimeout(() => setShowConfetti(false), 1500);
+                        }, 200);
+                      }
                     }}
+                    title={isClaimed ? undefined : 'Reclamar esta postal'}
                   >
-                    Esta postal ya fue adquirida 🃏
-                    <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
-                  </div>
-                )}
-              </div>
-            )}
+                    {isClaimLoading ? (
+                      <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+                    ) : (
+                      <Gem className='w-4 h-4 md:w-5 md:h-5' />
+                    )}
+                  </button>
+                  {showClaimedTooltip && (
+                    <div
+                      className='absolute bottom-full right-0 mb-2 px-3 py-2 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowClaimedTooltip(false);
+                      }}
+                    >
+                      Esta postal ya fue adquirida 🃏
+                      <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Confetti Lottie — centered over the button, large enough to be visible */}
+              {showConfetti && (
+                <div
+                  className='pointer-events-none z-50'
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    width: 300,
+                    height: 300,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <DotLottieReact
+                    src='/confetti.lottie'
+                    autoplay
+                    loop={false}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </div>
+              )}
+            </div>
 
             <button
               className={cn(
@@ -476,6 +519,7 @@ export function PostcardFront({
               )}
             </button>
 
+            {/* --- Video generation button (varita mágica) — commented out for now ---
             {isAdmin && animationState !== 'completed' && (
               <button
                 className={cn(
@@ -580,6 +624,7 @@ export function PostcardFront({
                 )}
               </button>
             )}
+            --- end commented out video button --- */}
 
             {isBusiness && (
               <button

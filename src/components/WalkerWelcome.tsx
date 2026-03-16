@@ -14,9 +14,9 @@ interface WalkerWelcomeProps {
  * First-visit cinematic welcome screen.
  *
  * Layout uses flexbox with flex-grow ratios:
- *   - Postcards area: flex-[5] (takes ~45-50% of viewport)
- *   - Text area:      flex-[4] (takes ~35-40%)
- *   - Scroll hint:    flex-[1] (takes ~10%)
+ *   - Postcards area: flex-[4.5] (takes ~45% of viewport)
+ *   - Text area:      flex-[4.5] (takes ~45%)
+ *   - Scroll hint:    flex-[1]   (takes ~10%)
  *
  * This makes it fully responsive — no magic percentages or absolute positioning.
  */
@@ -116,30 +116,87 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
         </motion.h1>
 
         <motion.p
-          className="text-stone-600 text-xs sm:text-sm lg:text-base tracking-wide mb-3 sm:mb-5 font-medium text-center"
+          className="text-stone-600 text-xs sm:text-sm lg:text-base tracking-wide mb-3 sm:mb-4 font-medium text-center"
           {...anim.subtitle}
         >
-          Digital Agent · Photographer · Watercolor Artist
+          Tu artista digital viajero
         </motion.p>
 
         <motion.p
-          className="text-stone-700 text-sm sm:text-base lg:text-lg text-center leading-relaxed max-w-[400px] mb-3 sm:mb-6 px-2"
+          className="text-stone-700 text-sm sm:text-base lg:text-lg text-center leading-relaxed max-w-[400px] mb-3 sm:mb-4 px-2"
           {...anim.body}
         >
-          I travel the world and paint what I see.
+          Viajo por el mundo y pinto lo que veo.
           <br />
-          Every street, every café, every hidden corner
+          Cada calle, cada café, cada rincón
           <br />
-          becomes a watercolor postcard.
+          se convierte en una postal de acuarela.
         </motion.p>
 
-        <motion.div className="w-16 h-px bg-stone-400/60 mb-3 sm:mb-5" {...anim.divider} />
+        <motion.div className="w-16 h-px bg-stone-400/60 mb-3 sm:mb-4" {...anim.divider} />
 
+        {/* ─── Feature Pills: Collectibles + Albums ─── */}
+        <div className="flex items-center justify-center gap-3 sm:gap-4 mb-3 sm:mb-4 px-2">
+          <motion.div
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 shadow-sm"
+            initial={anim.featurePill1.initial}
+            animate={{
+              ...anim.featurePill1.animate,
+              y: [0, -3, 0],
+            }}
+            transition={{
+              ...anim.featurePill1.transition,
+              y: { delay: 3.4, duration: 3, ease: 'easeInOut', repeat: Infinity },
+            }}
+          >
+            <span className="text-base sm:text-lg">🃏</span>
+            <div className="text-left">
+              <p className="text-stone-800 text-[10px] sm:text-xs font-semibold leading-tight">Coleccioná</p>
+              <p className="text-stone-500 text-[8px] sm:text-[10px] leading-tight">Postales únicas</p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 shadow-sm"
+            initial={anim.featurePill2.initial}
+            animate={{
+              ...anim.featurePill2.animate,
+              y: [0, -3, 0],
+            }}
+            transition={{
+              ...anim.featurePill2.transition,
+              y: { delay: 3.8, duration: 3.5, ease: 'easeInOut', repeat: Infinity },
+            }}
+          >
+            <span className="text-base sm:text-lg">📖</span>
+            <div className="text-left">
+              <p className="text-stone-800 text-[10px] sm:text-xs font-semibold leading-tight">Álbumes</p>
+              <p className="text-stone-500 text-[8px] sm:text-[10px] leading-tight">Completá y ganá</p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ─── Tutorial hint ─── */}
         <motion.p
-          className="text-stone-600 text-sm sm:text-base lg:text-lg font-light italic font-serif text-center"
-          {...anim.tagline}
+          className="text-stone-600 text-xs sm:text-sm font-light italic font-serif text-center flex items-center justify-center gap-1.5"
+          initial={anim.tutorialHint.initial}
+          animate={{
+            ...anim.tutorialHint.animate,
+            opacity: [0, 1, 1, 0.6, 1],
+          }}
+          transition={{
+            ...anim.tutorialHint.transition,
+            opacity: { delay: 3.2, duration: 3, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1 },
+          }}
         >
-          These postcards are for you.
+          <motion.span
+            className="inline-block"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ delay: 4.0, duration: 1.2, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1.5 }}
+          >
+            👆
+          </motion.span>
+          Tocá una postal para darla vuelta y descubrir su historia
         </motion.p>
       </div>
 

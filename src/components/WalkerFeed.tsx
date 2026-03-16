@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
 import { useClaimPostcard } from '../hooks/useClaimPostcard';
 import { useCollection } from '../hooks/useCollection';
+import { useAlbums } from '../hooks/useAlbums';
+import { useAlbumDetail } from '../hooks/useAlbumDetail';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
@@ -15,10 +17,12 @@ import {
 import { AuthGateModal } from './AuthGateModal';
 import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
+import { AlbumDetail } from './AlbumDetail';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';
+import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence } from 'framer-motion';
 
 const FREE_CARD_LIMIT = 5;
@@ -80,17 +84,30 @@ export function WalkerFeed({
   const [showCollection, setShowCollection] = useState(false);
   const [claimLimitInfo, setClaimLimitInfo] = useState<{ type: 'daily' | 'monthly'; used: number; limit: number } | null>(null);
 
+  // ── Albums ──
+  const { albums, isLoading: isLoadingAlbums, refetch: refetchAlbums } = useAlbums(user?.id);
+  const { detail: albumDetail, isLoading: isAlbumDetailLoading, fetchDetail: fetchAlbumDetail, reset: resetAlbumDetail } = useAlbumDetail();
+  const [albumPostcardIds, setAlbumPostcardIds] = useState<Set<string>>(new Set());
+
+  // Dev-only: fetch which postcards belong to albums
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase.from('postalpeek_album_slots').select('postcard_id').then(({ data }) => {
+      if (data) setAlbumPostcardIds(new Set(data.map((r: { postcard_id: string }) => r.postcard_id)));
+    });
+  }, [isAdmin, albums]);
+
   const handleClaimPostcard = useCallback(async (postcardId: string) => {
     const result = await claim(postcardId);
     if (result.success) {
-      // Refetch collection in background
       refetchCollection();
+      refetchAlbums(); // album progress may have changed
     } else if (result.error === 'DAILY_LIMIT_REACHED') {
       setClaimLimitInfo({ type: 'daily', used: result.daily_used ?? 10, limit: result.daily_limit ?? 10 });
     } else if (result.error === 'MONTHLY_LIMIT_REACHED') {
       setClaimLimitInfo({ type: 'monthly', used: result.monthly_used ?? 200, limit: result.monthly_limit ?? 200 });
     }
-  }, [claim, refetchCollection]);
+  }, [claim, refetchCollection, refetchAlbums]);
 
   useEffect(() => {
     if (!user) setShowFavoritesOnly(false);
@@ -213,6 +230,7 @@ export function WalkerFeed({
           claimedIds={claimedIds}
           onClaimPostcard={handleClaimPostcard}
           isClaimLoading={isClaiming}
+          albumPostcardIds={albumPostcardIds}
         />
       )}
 
@@ -262,6 +280,20 @@ export function WalkerFeed({
             isLoading={isCollectionLoading}
             claimStatus={claimStatus}
             onClose={() => setShowCollection(false)}
+            albums={albums}
+            isLoadingAlbums={isLoadingAlbums}
+            onOpenAlbum={(album) => fetchAlbumDetail(album.id)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Album Detail */}
+      <AnimatePresence>
+        {albumDetail && (
+          <AlbumDetail
+            detail={albumDetail}
+            isLoading={isAlbumDetailLoading}
+            onClose={resetAlbumDetail}
           />
         )}
       </AnimatePresence>

@@ -117,15 +117,25 @@ export function useWelcomeAnimation(heroImageUrl: string) {
       animate: { opacity: 1, scaleX: 1 },
       transition: { duration: 0.6, ease, delay: 2.0 },
     },
-    tagline: {
+    featurePill1: {
+      initial: { opacity: 0, y: 12, scale: 0.95 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      transition: { duration: 0.6, ease, delay: 2.4 },
+    },
+    featurePill2: {
+      initial: { opacity: 0, y: 12, scale: 0.95 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      transition: { duration: 0.6, ease, delay: 2.7 },
+    },
+    tutorialHint: {
       initial: { opacity: 0, y: 10 },
       animate: { opacity: 1, y: 0 },
-      transition: { duration: 0.8, ease, delay: 2.4 },
+      transition: { duration: 0.8, ease, delay: 3.2 },
     },
     scrollHint: {
       initial: { opacity: 0 },
       animate: { opacity: 1 },
-      transition: { delay: 3.0, duration: 0.8 },
+      transition: { delay: 3.8, duration: 0.8 },
     },
   };
 }

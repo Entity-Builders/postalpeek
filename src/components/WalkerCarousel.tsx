@@ -39,6 +39,7 @@ interface WalkerCarouselProps {
   claimedIds: Set<string>;
   onClaimPostcard?: (postcardId: string) => void;
   isClaimLoading?: boolean;
+  albumPostcardIds?: Set<string>;
 }
 
 export function WalkerCarousel({
@@ -63,6 +64,7 @@ export function WalkerCarousel({
   claimedIds,
   onClaimPostcard,
   isClaimLoading = false,
+  albumPostcardIds = new Set(),
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -454,6 +456,7 @@ export function WalkerCarousel({
                         isClaimed={!!item.owner_id}
                         onClaimPostcard={user ? onClaimPostcard : undefined}
                         isClaimLoading={isClaimLoading}
+                        isInAlbum={albumPostcardIds.has(item.id)}
                         onAuthRequired={
                           !user
                             ? (postcardId) => {

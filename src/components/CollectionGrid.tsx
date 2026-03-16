@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Package } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
+import { AlbumList } from './AlbumList';
 import type { FeedItem } from './Postcard';
+import type { Album } from '../hooks/useAlbums';
 
 interface CollectionGridProps {
   collection: FeedItem[];
@@ -16,6 +18,10 @@ interface CollectionGridProps {
   };
   onClose: () => void;
   onSelectPostcard?: (item: FeedItem) => void;
+  /** Albums */
+  albums?: Album[];
+  isLoadingAlbums?: boolean;
+  onOpenAlbum?: (album: Album) => void;
 }
 
 function CollectionCard({
@@ -81,6 +87,9 @@ export function CollectionGrid({
   claimStatus,
   onClose,
   onSelectPostcard,
+  albums = [],
+  isLoadingAlbums = false,
+  onOpenAlbum,
 }: CollectionGridProps) {
   return (
     <motion.div
@@ -130,7 +139,20 @@ export function CollectionGrid({
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto px-4 pb-8">
+      <div className="flex-1 overflow-y-auto pb-8">
+        {/* Albums section */}
+        {(albums.length > 0 || isLoadingAlbums) && (
+          <div className='pt-2'>
+            <AlbumList
+              albums={albums}
+              isLoading={isLoadingAlbums}
+              onOpenAlbum={(a) => onOpenAlbum?.(a)}
+            />
+          </div>
+        )}
+
+        {/* Postcards grid */}
+        <div className='px-4'>
         {isLoading ? (
           <div className="flex items-center justify-center h-40">
             <div className="w-8 h-8 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
@@ -163,6 +185,7 @@ export function CollectionGrid({
             ))}
           </div>
         )}
+        </div>
       </div>
     </motion.div>
   );

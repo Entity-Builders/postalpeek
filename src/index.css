@@ -195,3 +195,25 @@ h6 {
   inset: 0;
   z-index: 2;
 }
+
+/* Confetti burst for album claims */
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(
+      calc(-50% + var(--confetti-x, 0px)),
+      calc(-50% + var(--confetti-y, -20px))
+    ) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + var(--confetti-x, 0px) * 1.5),
+      calc(-50% + var(--confetti-y, -20px) + 10px)
+    ) scale(0.6);
+  }
+}
