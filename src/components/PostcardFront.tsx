@@ -8,6 +8,7 @@ import {
   Wand2,
   Loader2,
   Ticket,
+  ChevronRight,
 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
@@ -163,17 +164,33 @@ export function PostcardFront({
         WebkitTransform: 'rotateY(0deg) translateZ(1px)',
       }}
     >
-      {/* Stacked cards behind for trips */}
+      {/* Stacked cards behind for trips — animate fan-out */}
       {isTrip && (
         <>
           <div
             className='absolute inset-0 bg-white rounded-sm md:rounded-md border border-stone-200/60 shadow-md'
-            style={{ transform: 'rotate(2.5deg) translate(4px, 3px)', zIndex: 0 }}
+            style={{
+              zIndex: 0,
+              animation: 'fanRight 0.6s ease-out forwards',
+            }}
           />
           <div
             className='absolute inset-0 bg-white rounded-sm md:rounded-md border border-stone-200/40 shadow-sm'
-            style={{ transform: 'rotate(-1.5deg) translate(-3px, 5px)', zIndex: 0 }}
+            style={{
+              zIndex: 0,
+              animation: 'fanLeft 0.6s ease-out 0.1s forwards',
+            }}
           />
+          <style>{`
+            @keyframes fanRight {
+              from { transform: rotate(0deg) translate(0, 0); }
+              to { transform: rotate(2.5deg) translate(4px, 3px); }
+            }
+            @keyframes fanLeft {
+              from { transform: rotate(0deg) translate(0, 0); }
+              to { transform: rotate(-1.5deg) translate(-3px, 5px); }
+            }
+          `}</style>
         </>
       )}
 
@@ -186,7 +203,7 @@ export function PostcardFront({
         <div
           className={cn(
             'relative overflow-hidden rounded-lg shadow-inner image-protected bg-stone-200',
-            storytelling ? 'flex-[2]' : 'flex-1',
+            'flex-1',
           )}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -522,24 +539,29 @@ export function PostcardFront({
           </div>
         </div>
 
-        {/* Storytelling section — trip postcards only */}
+        {/* Storytelling preview — compact, with flip-to-read-more */}
         {storytelling && (
-          <div className='mt-2.5 mx-1 flex-1 min-h-0 rounded-lg border-l-[3px] border-amber-400/70 overflow-hidden'>
-            <div className='bg-amber-50/60 px-3.5 py-3 h-full overflow-y-auto'>
-              <span className='inline-block text-[10px] md:text-xs font-semibold text-amber-800/80 bg-amber-100/80 px-2 py-0.5 rounded-full mb-1.5'>
+          <button
+            className='mt-2 mx-1 rounded-lg border-l-[3px] border-amber-400/70 bg-amber-50/60 px-3.5 py-2.5 flex items-center justify-between gap-2 w-[calc(100%-0.5rem)] text-left transition-colors hover:bg-amber-50/90'
+            onClick={(e) => {
+              e.stopPropagation();
+              onFlipCard('info');
+            }}
+          >
+            <div className='flex-1 min-w-0'>
+              <span className='inline-block text-[10px] md:text-xs font-semibold text-amber-800/80 bg-amber-100/80 px-2 py-0.5 rounded-full mb-1'>
                 {factTypeEmoji(storytelling.fact_type)}{' '}
                 {factTypeLabel(storytelling.fact_type)}
               </span>
-              <p className='text-xs md:text-sm text-stone-700 leading-relaxed'>
+              <p className='text-xs md:text-sm text-stone-600 line-clamp-1 leading-snug'>
                 💡 {storytelling.did_you_know}
               </p>
-              {storytelling.narrative_link && (
-                <p className='text-[10px] md:text-xs text-amber-700/60 italic mt-1.5'>
-                  {storytelling.narrative_link}
-                </p>
-              )}
             </div>
-          </div>
+            <span className='text-amber-600 text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-0.5'>
+              Leer más
+              <ChevronRight className='w-3.5 h-3.5' />
+            </span>
+          </button>
         )}
       </div>
     </div>

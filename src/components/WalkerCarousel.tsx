@@ -4,6 +4,8 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { analytics } from '../lib/analytics';
 import { Postcard, FeedItem } from './Postcard';
+import { TripCover } from './TripCover';
+import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
@@ -55,6 +57,8 @@ export function WalkerCarousel({
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
+  // Track which trip covers have been "opened" to show the full Postcard view
+  const [openedTrips, setOpenedTrips] = useState<Set<string>>(new Set());
 
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
     displayItems.slice(0, 2),
@@ -333,43 +337,81 @@ export function WalkerCarousel({
               <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
 
               <div className='z-10 w-full h-full flex items-center justify-center'>
-                <Postcard
-                  item={item}
-                  isActive={true}
-                  isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
-                  isAdmin={isAdmin}
-                  isNearby={isNearby}
-                  favoriteIds={favoriteIds}
-                  onToggleFavorite={user ? toggleFavorite : undefined}
-                  onAuthRequired={
-                    !user
-                      ? (postcardId) => {
-                          setPendingFavoriteId(postcardId);
-                          setShowAuthGate(true);
-                          sessionStorage.setItem(AUTH_GATE_KEY, 'true');
-                          try {
-                            const heroCards = items.slice(0, 3).map((c) => ({
-                              id: c.id,
-                              illustration_url: c.illustration_url,
-                              city: c.city,
-                              country: c.country,
-                              category: c.category,
-                            }));
-                            sessionStorage.setItem(
-                              AUTH_GATE_CARDS_KEY,
-                              JSON.stringify(heroCards),
-                            );
-                          } catch {
-                            /* quota exceeded */
-                          }
-                          analytics.track('auth_gate_shown', {
-                            trigger: 'favorite',
-                            postcard_id: postcardId,
+                <AnimatePresence mode='wait'>
+                  {item.trip_id && !openedTrips.has(item.trip_id) ? (
+                    <motion.div
+                      key={`cover-${item.trip_id}`}
+                      className='w-full h-full flex items-center justify-center'
+                      initial={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                    >
+                      <TripCover
+                        item={item}
+                        isActive={true}
+                        isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
+                        onOpenTrip={() => {
+                          setOpenedTrips((prev) => {
+                            const next = new Set(prev);
+                            next.add(item.trip_id!);
+                            return next;
                           });
+                          analytics.track('trip_cover_opened', {
+                            trip_id: item.trip_id,
+                            postcard_id: item.id,
+                            country: item.country,
+                          });
+                        }}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key={`postcard-${item.id}`}
+                      className='w-full h-full flex items-center justify-center'
+                      initial={item.trip_id ? { opacity: 0, scale: 0.92, y: -20 } : false}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ duration: 0.5, ease: 'easeOut', delay: 0.05 }}
+                    >
+                      <Postcard
+                        item={item}
+                        isActive={true}
+                        isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
+                        isAdmin={isAdmin}
+                        isNearby={isNearby}
+                        favoriteIds={favoriteIds}
+                        onToggleFavorite={user ? toggleFavorite : undefined}
+                        onAuthRequired={
+                          !user
+                            ? (postcardId) => {
+                                setPendingFavoriteId(postcardId);
+                                setShowAuthGate(true);
+                                sessionStorage.setItem(AUTH_GATE_KEY, 'true');
+                                try {
+                                  const heroCards = items.slice(0, 3).map((c) => ({
+                                    id: c.id,
+                                    illustration_url: c.illustration_url,
+                                    city: c.city,
+                                    country: c.country,
+                                    category: c.category,
+                                  }));
+                                  sessionStorage.setItem(
+                                    AUTH_GATE_CARDS_KEY,
+                                    JSON.stringify(heroCards),
+                                  );
+                                } catch {
+                                  /* quota exceeded */
+                                }
+                                analytics.track('auth_gate_shown', {
+                                  trigger: 'favorite',
+                                  postcard_id: postcardId,
+                                });
+                              }
+                            : undefined
                         }
-                      : undefined
-                  }
-                />
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           );
