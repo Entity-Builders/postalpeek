@@ -59,6 +59,7 @@ export function Postcard({
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
+  const [heroReady, setHeroReady] = useState(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // React to item updates from feed navigation
@@ -130,11 +131,12 @@ export function Postcard({
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] perspective-1000 cursor-pointer transition-all duration-700 mx-auto ease-in-out',
-        isActive
-          ? 'scale-100 opacity-100'
-          : 'scale-[0.85] opacity-40 pointer-events-none',
+        'w-[90vw] max-w-[480px] h-full max-h-[80dvh] md:max-h-[85dvh] perspective-1000 cursor-pointer mx-auto ease-in-out',
+        isActive && !heroReady && 'opacity-0',
+        isActive && heroReady && 'opacity-100',
+        !isActive && 'scale-[0.85] opacity-40 pointer-events-none',
       )}
+      style={{ transition: 'opacity 300ms ease-out, transform 700ms ease-in-out' }}
       onClick={handleFlip}
     >
       <motion.div
@@ -165,6 +167,7 @@ export function Postcard({
           srcSetString={srcSetString}
           handleImageError={handleImageError}
           fallbackEnabled={fallbackEnabled}
+          onHeroLoad={() => setHeroReady(true)}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={activeSlideItem} />

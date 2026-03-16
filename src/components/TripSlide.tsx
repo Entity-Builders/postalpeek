@@ -15,6 +15,7 @@ interface TripSlideProps {
   preloadedMainUrl?: string;
   preloadedPlaceholder?: string;
   preloadedSrcSet?: string;
+  onHeroLoad?: () => void;
 }
 
 export function TripSlide({
@@ -27,6 +28,7 @@ export function TripSlide({
   preloadedMainUrl,
   preloadedPlaceholder,
   preloadedSrcSet,
+  onHeroLoad,
 }: TripSlideProps) {
   const pUrl = useSignedImage(preloadedMainUrl ? null : slideItem.illustration_url, { width: WIDTHS.blur, quality: 20 });
   const bUrl = useSignedImage(preloadedMainUrl ? null : slideItem.illustration_url, { width: WIDTHS.desktop });
@@ -44,7 +46,7 @@ export function TripSlide({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="absolute inset-0 bg-stone-300/40 animate-pulse pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-stone-200/40 via-stone-100/20 to-stone-200/30 animate-pulse pointer-events-none z-0" />
 
       {finalPlaceholder && (
         <img
@@ -69,6 +71,7 @@ export function TripSlide({
           fetchPriority={isPriority ? 'high' : 'auto'}
           draggable={false}
           onError={handleImageError}
+          onLoad={onHeroLoad}
           className={cn(
             'absolute inset-0 w-full h-full object-cover transition-transform duration-700 z-10',
             !slideItem.video_url && 'hover:scale-105',

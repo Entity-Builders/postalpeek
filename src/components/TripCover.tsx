@@ -32,75 +32,78 @@ export function TripCover({
   const [stopThumbnails, setStopThumbnails] = useState<
     { id: string; url: string; stop_name?: string }[]
   >([]);
+  const [bottomReady, setBottomReady] = useState(!item.trip_id);
+  const [heroReady, setHeroReady] = useState(false);
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
 
   const tripCtx = item.generation_metadata?.tripContext;
+  // Use embedded metadata immediately — no need to wait for Supabase
   const title = tripMeta?.title || tripCtx?.title || 'Viaje en progreso';
   const totalStops = tripCtx?.totalStops || stopThumbnails.length || '?';
   const summary = tripMeta?.itinerary_summary || '';
 
-  // Fetch trip metadata (title + summary) from postalpeek_trips
+  // Single parallel fetch for all trip data (meta + stops + thumbnails)
   useEffect(() => {
     if (!item.trip_id) return;
     let mounted = true;
 
-    supabase
-      .from('postalpeek_trips')
-      .select('title, itinerary_summary')
-      .eq('id', item.trip_id)
-      .single()
-      .then(({ data }) => {
-        if (mounted && data) {
-          setTripMeta(data as TripMeta);
-        }
-      });
+    const fetchTripData = async () => {
+      const [metaResult, postsResult] = await Promise.all([
+        supabase
+          .from('postalpeek_trips')
+          .select('title, itinerary_summary')
+          .eq('id', item.trip_id!)
+          .single(),
+        supabase
+          .from('postalpeek_postcards')
+          .select('id, illustration_url, trip_sequence')
+          .eq('trip_id', item.trip_id!)
+          .not('illustration_url', 'is', null)
+          .order('trip_sequence', { ascending: true }),
+      ]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [item.trip_id]);
+      if (!mounted) return;
 
-  // Fetch trip stop thumbnails (all postcards for this trip)
-  useEffect(() => {
-    if (!item.trip_id) return;
-    let mounted = true;
+      // Set meta immediately
+      if (metaResult.data) {
+        setTripMeta(metaResult.data as TripMeta);
+      }
 
-    supabase
-      .from('postalpeek_postcards')
-      .select('id, illustration_url, trip_sequence')
-      .eq('trip_id', item.trip_id)
-      .not('illustration_url', 'is', null)
-      .order('trip_sequence', { ascending: true })
-      .then(async ({ data }) => {
-        if (mounted && data && data.length > 0) {
-          await preSignUrls(
-            data.map((d) => d.illustration_url).filter(Boolean),
-          );
-
-          const { data: stops } = await supabase
+      if (postsResult.data && postsResult.data.length > 0) {
+        // Pre-sign + fetch stop names in parallel
+        const [, stopsResult] = await Promise.all([
+          preSignUrls(
+            postsResult.data.map((d) => d.illustration_url).filter(Boolean),
+          ),
+          supabase
             .from('postalpeek_trip_stops')
             .select('sequence, stop_name')
             .eq('trip_id', item.trip_id!)
-            .order('sequence', { ascending: true });
+            .order('sequence', { ascending: true }),
+        ]);
 
-          const stopMap: Record<number, string> = {};
-          if (stops) {
-            for (const s of stops) {
-              stopMap[s.sequence] = s.stop_name;
-            }
-          }
+        if (!mounted) return;
 
-          if (mounted) {
-            setStopThumbnails(
-              data.map((d) => ({
-                id: d.id,
-                url: d.illustration_url,
-                stop_name: stopMap[d.trip_sequence] || undefined,
-              })),
-            );
+        const stopMap: Record<number, string> = {};
+        if (stopsResult.data) {
+          for (const s of stopsResult.data) {
+            stopMap[s.sequence] = s.stop_name;
           }
         }
-      });
+
+        setStopThumbnails(
+          postsResult.data.map((d) => ({
+            id: d.id,
+            url: d.illustration_url,
+            stop_name: stopMap[d.trip_sequence] || undefined,
+          })),
+        );
+      }
+
+      if (mounted) setBottomReady(true);
+    };
+
+    fetchTripData().catch(console.error);
 
     return () => {
       mounted = false;
@@ -143,18 +146,19 @@ export function TripCover({
   return (
     <div
       className={cn(
-        'w-[90vw] max-w-[480px] h-full max-h-[88dvh] md:max-h-[85dvh] cursor-pointer transition-all duration-700 mx-auto ease-in-out',
-        isActive
-          ? 'scale-100 opacity-100'
-          : 'scale-[0.85] opacity-40 pointer-events-none',
+        'w-[90vw] max-w-[480px] h-full max-h-[88dvh] md:max-h-[85dvh] cursor-pointer mx-auto ease-in-out',
+        isActive && !heroReady && 'opacity-0',
+        isActive && heroReady && 'opacity-100',
+        !isActive && 'scale-[0.85] opacity-40 pointer-events-none',
       )}
+      style={{ transition: 'opacity 300ms ease-out, transform 700ms ease-in-out' }}
       onClick={onOpenTrip}
     >
-      {/* Clean card — no stacked cards behind */}
+      {/* Card shell — always rendered */}
       <div className='relative w-full h-full bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] rounded-sm md:rounded-md flex flex-col overflow-hidden border border-white/50'>
-        {/* Hero image — top portion, stays prominent */}
+        {/* Hero image — ALWAYS mounted so images start loading immediately */}
         <div className='relative flex-1 min-h-0 overflow-hidden bg-stone-200'>
-          {/* Placeholder blur */}
+          {/* Placeholder blur — loads in background even during skeleton */}
           {finalPlaceholder && (
             <img
               src={finalPlaceholder}
@@ -165,7 +169,7 @@ export function TripCover({
             />
           )}
 
-          {/* Main hero illustration */}
+          {/* Main hero illustration — also starts loading immediately */}
           {mainImgUrl && (
             <img
               src={mainImgUrl}
@@ -177,6 +181,7 @@ export function TripCover({
               fetchPriority={isPriority ? 'high' : 'auto'}
               draggable={false}
               onError={handleImageError}
+              onLoad={() => setHeroReady(true)}
               className='absolute inset-0 w-full h-full object-cover z-10'
             />
           )}
@@ -184,7 +189,8 @@ export function TripCover({
           {/* Gradient overlay at bottom of image for text overlay */}
           <div className='absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/60 via-black/25 to-transparent z-20' />
 
-          {/* "VIAJE COMPLETO" badge — pushed below the filter bar (z-50 at top-3) */}
+          {/* ─── Hero text overlays — always rendered using embedded feed data ─── */}
+          {/* "VIAJE COMPLETO" badge */}
           <div className='absolute top-12 left-3 z-30'>
             <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide'>
               🗺️ Viaje Completo
@@ -221,60 +227,75 @@ export function TripCover({
           </div>
         </div>
 
-        {/* Editorial content — compact bottom section */}
-        <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
-          {/* Itinerary Summary — full text */}
-          {summary && (
-            <p className='text-xs md:text-sm text-stone-600 leading-relaxed italic'>
-              {summary}
-            </p>
-          )}
-
-          {/* Stop Thumbnails Row */}
-          {stopThumbnails.length > 0 && (
+        {/* Bottom section — skeleton or real content */}
+        {!bottomReady ? (
+          <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
+            <div className='flex flex-col gap-1.5'>
+              <div className='h-3 w-full rounded-full bg-stone-200 animate-pulse' />
+              <div className='h-3 w-5/6 rounded-full bg-stone-200 animate-pulse' />
+            </div>
             <div className='flex items-start justify-around gap-1 py-1'>
-              {stopThumbnails.map((thumb, idx) => (
-                <div
-                  key={thumb.id}
-                  className='flex flex-col items-center flex-1 min-w-0'
-                >
-                  <div
-                    className={cn(
-                      'rounded-full overflow-hidden border-2 border-stone-200 shadow-sm bg-stone-100 mx-auto',
-                      thumbSize,
-                    )}
-                  >
-                    <img
-                      src={cdnImage(thumb.url, {
-                        width: 160,
-                        height: 160,
-                        fit: 'cover',
-                      })}
-                      alt={thumb.stop_name || `Stop ${idx + 1}`}
-                      className='w-full h-full object-cover'
-                      loading='lazy'
-                    />
-                  </div>
-                  <span className='text-[8px] md:text-[9px] text-stone-500 mt-1 text-center w-full truncate font-medium px-0.5'>
-                    {thumb.stop_name || `Stop ${idx + 1}`}
-                  </span>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className='flex flex-col items-center flex-1 min-w-0'>
+                  <div className='w-14 h-14 md:w-16 md:h-16 rounded-full bg-stone-200 animate-pulse mx-auto' />
+                  <div className='h-2 w-10 rounded-full bg-stone-200 animate-pulse mt-1' />
                 </div>
               ))}
             </div>
-          )}
+            <div className='w-full h-10 rounded-xl bg-stone-200 animate-pulse' />
+          </div>
+        ) : (
+          <div className='shrink-0 px-4 md:px-5 py-3 md:py-4 flex flex-col gap-2'>
+            {summary && (
+              <p className='text-xs md:text-sm text-stone-600 leading-relaxed italic'>
+                {summary}
+              </p>
+            )}
 
-          {/* CTA Button */}
-          <button
-            className='w-full py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm'
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenTrip();
-            }}
-          >
-            Ver {totalStops} Postales
-            <ChevronRight className='w-4 h-4' />
-          </button>
-        </div>
+            {stopThumbnails.length > 0 && (
+              <div className='flex items-start justify-around gap-1 py-1'>
+                {stopThumbnails.map((thumb, idx) => (
+                  <div
+                    key={thumb.id}
+                    className='flex flex-col items-center flex-1 min-w-0'
+                  >
+                    <div
+                      className={cn(
+                        'rounded-full overflow-hidden border-2 border-stone-200 shadow-sm bg-stone-100 mx-auto',
+                        thumbSize,
+                      )}
+                    >
+                      <img
+                        src={cdnImage(thumb.url, {
+                          width: 160,
+                          height: 160,
+                          fit: 'cover',
+                        })}
+                        alt={thumb.stop_name || `Stop ${idx + 1}`}
+                        className='w-full h-full object-cover'
+                        loading='lazy'
+                      />
+                    </div>
+                    <span className='text-[8px] md:text-[9px] text-stone-500 mt-1 text-center w-full truncate font-medium px-0.5'>
+                      {thumb.stop_name || `Stop ${idx + 1}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className='w-full py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm'
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTrip();
+              }}
+            >
+              Ver {totalStops} Postales
+              <ChevronRight className='w-4 h-4' />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

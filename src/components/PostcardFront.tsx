@@ -34,6 +34,7 @@ interface PostcardFrontProps {
   srcSetString?: string;
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
   fallbackEnabled?: boolean;
+  onHeroLoad?: () => void;
 }
 
 export function PostcardFront({
@@ -50,6 +51,7 @@ export function PostcardFront({
   srcSetString,
   handleImageError,
   fallbackEnabled,
+  onHeroLoad,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -237,6 +239,7 @@ export function PostcardFront({
                       preloadedSrcSet={
                         slideItem.id === item.id ? srcSetString : undefined
                       }
+                      onHeroLoad={slideItem.id === item.id ? onHeroLoad : undefined}
                     />
                   ))}
                 </div>
@@ -270,6 +273,7 @@ export function PostcardFront({
               preloadedMainUrl={mainImgUrl}
               preloadedPlaceholder={placeholderUrl}
               preloadedSrcSet={srcSetString}
+              onHeroLoad={onHeroLoad}
             />
           )}
         </div>

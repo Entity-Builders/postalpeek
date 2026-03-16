@@ -5,6 +5,7 @@ import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
   WalkerLoadingState,
+  TripCoverLoadingState,
   WalkerEmptyState,
   WalkerFavoritesEmptyState,
   WalkerTripsEmptyState,
@@ -151,7 +152,7 @@ export function WalkerFeed({
       )}
 
       {isLoading && !showWelcome ? (
-        <WalkerLoadingState />
+        showTripsOnly ? <TripCoverLoadingState /> : <WalkerLoadingState />
       ) : displayItems.length === 0 && !showWelcome ? (
         showFavoritesOnly ? (
           <WalkerFavoritesEmptyState />

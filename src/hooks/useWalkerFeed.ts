@@ -183,16 +183,29 @@ export function useWalkerFeed(tripsOnly = false) {
         setHasMore(false);
       }
 
+      const allItems = sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems;
+
+      // CRITICAL: Sign URLs BEFORE setting items, so components mount with signed URLs ready
+      const allUrls = allItems.flatMap((i) =>
+        [i.illustration_url, i.original_image_url].filter(Boolean)
+      );
+      await preSignUrls(allUrls).catch((err) => console.error('Failed to pre-sign URLs', err));
+
+      if (fetchId !== currentFetchIdRef.current) return;
+
+      // Warm browser cache for first 2 blur images (tiny 64px, instant download)
+      allItems.slice(0, 2).forEach((item) => {
+        if (item.illustration_url) {
+          const blurImg = new Image();
+          blurImg.src = cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
+        }
+      });
+
       if (sharedCard) {
         setItems([sharedCard, ...fetchedItems]);
       } else {
         setItems(fetchedItems);
       }
-
-      const allUrls = (sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems).flatMap((i) =>
-        [i.illustration_url, i.original_image_url].filter(Boolean)
-      );
-      await preSignUrls(allUrls).catch((err) => console.error('Failed to pre-sign URLs', err));
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error loading initial feed:', error);
@@ -218,8 +231,14 @@ export function useWalkerFeed(tripsOnly = false) {
           p_trips_only: tripsOnly,
         });
         if (data) {
-          prefetchCacheRef.current.set(cacheKey, data as FeedItem[]);
-          (data as FeedItem[]).slice(0, 3).forEach((item: FeedItem) => {
+          const typedData = data as FeedItem[];
+          // Pre-sign URLs so they're ready when this cache is consumed
+          await preSignUrls(
+            typedData.flatMap((i) => [i.illustration_url, i.original_image_url].filter(Boolean))
+          );
+          prefetchCacheRef.current.set(cacheKey, typedData);
+          // Warm browser image cache for first 3 cards
+          typedData.slice(0, 3).forEach((item: FeedItem) => {
             if (item.illustration_url) {
               const img = new Image();
               img.src = cdnImage(item.illustration_url, { width: WIDTHS.mobile });
