@@ -11,9 +11,10 @@ export function useWalkerFeed() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [hasSharedCard, setHasSharedCard] = useState(false);
-  const [lastRefillAt, setLastRefillAt] = useState<string | null>(null);
 
   const isFetchingRef = useRef(false);
   const currentFetchIdRef = useRef(0);
@@ -40,7 +41,6 @@ export function useWalkerFeed() {
     }
   }, []);
 
-
   useEffect(() => {
     async function fetchCountries() {
       try {
@@ -55,20 +55,11 @@ export function useWalkerFeed() {
     fetchCountries();
   }, []);
 
-  useEffect(() => {
-    async function fetchStateMeta() {
-       const { data: { session } } = await supabase.auth.getSession();
-       if (!session?.user) return;
-       const { data } = await supabase.from('postalpeek_daily_feed_state').select('last_refill_at').eq('user_id', session.user.id).maybeSingle();
-       if (data?.last_refill_at) setLastRefillAt(data.last_refill_at);
-    }
-    fetchStateMeta();
-  }, [isLoading]); // Refetch when reloading feed
-
   const fetchInitialFeed = useCallback(async (country: string | null) => {
     const fetchId = ++currentFetchIdRef.current;
     isFetchingRef.current = true;
     setIsLoading(true);
+    setHasMore(true);
 
     try {
       const segments = window.location.pathname.split('/').filter(Boolean);
@@ -115,7 +106,7 @@ export function useWalkerFeed() {
         }
       } else setHasSharedCard(false);
 
-      const { data, error } = await supabase.rpc('postalpeek_get_daily_pack', {
+      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
         p_limit: PAGE_SIZE,
         p_country: country,
       });
@@ -129,10 +120,12 @@ export function useWalkerFeed() {
         fetchedItems = fetchedItems.filter(i => i.id !== sharedCard!.id);
       }
 
+      if (fetchedItems.length < PAGE_SIZE) setHasMore(false);
+
       const allItems = sharedCard ? [sharedCard, ...fetchedItems] : fetchedItems;
 
       const allUrls = allItems.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
-      await preSignUrls(allUrls).catch(err => console.error('Failed to pre-sign URLs', err));
+      await preSignUrls(allUrls).catch(console.error);
 
       if (fetchId !== currentFetchIdRef.current) return;
 
@@ -148,8 +141,8 @@ export function useWalkerFeed() {
       setItems(allItems);
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
-      console.error('Error loading daily pack:', error);
-      analytics.captureError(error, { context: 'fetch_daily_pack', country: country });
+      console.error('Error loading initial feed:', error);
+      analytics.captureError(error, { context: 'fetch_initial_feed', country: country });
     } finally {
       if (fetchId === currentFetchIdRef.current) {
         setIsLoading(false);
@@ -158,24 +151,52 @@ export function useWalkerFeed() {
     }
   }, []);
 
-  const popFromPack = useCallback(async (postcardId: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    setItems((prev) => prev.filter(item => item.id !== postcardId));
-    
-    if (session?.user) {
-      const { error } = await supabase.rpc('postalpeek_remove_from_pack', { p_postcard_id: postcardId });
-      if (error) {
-        console.error('Failed to remove from pack', error);
-      }
-    }
-  }, []);
-
   useEffect(() => {
     fetchInitialFeed(selectedCountry);
   }, [fetchInitialFeed, selectedCountry]);
 
-  const fetchMoreFeed = useCallback(async () => {}, []);
+  const fetchMoreFeed = useCallback(async () => {
+    if (isFetchingRef.current || !hasMore || items.length === 0) return;
+
+    isFetchingRef.current = true;
+    setIsFetchingMore(true);
+
+    try {
+      const excludeIds = items.map((i) => i.id);
+
+      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
+        p_limit: PAGE_SIZE,
+        p_exclude_ids: excludeIds,
+        p_country: selectedCountry,
+      });
+
+      if (error) throw error;
+
+      const newItems = (data as FeedItem[]) || [];
+      if (newItems.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      if (newItems.length < PAGE_SIZE) setHasMore(false);
+
+      const allUrls = newItems.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
+      await preSignUrls(allUrls).catch(console.error);
+
+      setItems((prev) => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const filteredNew = newItems.filter(p => !existingIds.has(p.id));
+        return [...prev, ...filteredNew];
+      });
+
+    } catch (error) {
+      console.error('Error loading more feed:', error);
+      analytics.captureError(error, { context: 'fetch_more_feed', country: selectedCountry });
+    } finally {
+      setIsFetchingMore(false);
+      isFetchingRef.current = false;
+    }
+  }, [items, hasMore, selectedCountry]);
 
   return {
     items,
@@ -186,11 +207,8 @@ export function useWalkerFeed() {
     selectedCountry,
     setSelectedCountry,
     hasSharedCard,
-    popFromPack,
-    lastRefillAt,
-    // Stubs
-    hasMore: false,
-    isFetchingMore: false,
+    hasMore,
+    isFetchingMore,
     fetchMoreFeed,
   };
 }

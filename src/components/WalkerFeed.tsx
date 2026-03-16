@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
@@ -6,7 +6,7 @@ import { useClaimPostcard } from '../hooks/useClaimPostcard';
 import { useCollection } from '../hooks/useCollection';
 import { useAlbums } from '../hooks/useAlbums';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
-import { WalkerCardStack } from './WalkerCardStack';
+import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
   WalkerLoadingState,
@@ -49,9 +49,15 @@ export function WalkerFeed({
     selectedCountry,
     setSelectedCountry,
     hasSharedCard,
-    popFromPack,
-    lastRefillAt,
+    hasMore,
+    isFetchingMore,
+    fetchMoreFeed,
   } = useWalkerFeed();
+
+  const isFetchingRef = useRef<boolean>(false);
+  useEffect(() => {
+    isFetchingRef.current = isFetchingMore;
+  }, [isFetchingMore]);
 
   const [showAuthGate, setShowAuthGate] = useState(() => {
     return !user && sessionStorage.getItem(AUTH_GATE_KEY) === 'true';
@@ -213,15 +219,19 @@ export function WalkerFeed({
             setIsLoading(true);
             setSelectedCountry(null);
           } : undefined} 
-          lastRefillAt={lastRefillAt}
           onUnlockMore={() => {
-             alert('¡Próximamente! Podrás abrir más sobres comprando un cafecito o invitando a tus amigos.');
+             alert('¡Vuelve pronto para ver más postales!');
              analytics.track('unlock_feed_clicked');
           }}
         />
       ) : (
-        <WalkerCardStack
+        <WalkerCarousel
           items={items}
+          displayItems={items}
+          hasMore={hasMore}
+          isFetchingMore={isFetchingMore}
+          isFetchingRef={isFetchingRef}
+          fetchMoreFeed={fetchMoreFeed}
           selectedCountry={selectedCountry}
           user={user}
           isAdmin={isAdmin}
@@ -237,9 +247,6 @@ export function WalkerFeed({
           onClaimPostcard={handleClaimPostcard}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
-          onSwipe={(item) => {
-            popFromPack(item.id);
-          }}
         />
       )}
 
