@@ -184,8 +184,8 @@ export function TripCover({
           {/* Gradient overlay at bottom of image for text overlay */}
           <div className='absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/60 via-black/25 to-transparent z-20' />
 
-          {/* "VIAJE COMPLETO" badge */}
-          <div className='absolute top-3 left-3 z-30'>
+          {/* "VIAJE COMPLETO" badge — pushed below the filter bar (z-50 at top-3) */}
+          <div className='absolute top-12 left-3 z-30'>
             <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide'>
               🗺️ Viaje Completo
             </span>
