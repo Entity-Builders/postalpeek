@@ -343,8 +343,8 @@ export function WalkerCarousel({
                       key={`cover-${item.trip_id}`}
                       className='w-full h-full flex items-center justify-center'
                       initial={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.92, y: 20 }}
-                      transition={{ duration: 0.4, ease: 'easeInOut' }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      transition={{ duration: 0.2, ease: 'easeIn' }}
                     >
                       <TripCover
                         item={item}
@@ -368,9 +368,9 @@ export function WalkerCarousel({
                     <motion.div
                       key={`postcard-${item.id}`}
                       className='w-full h-full flex items-center justify-center'
-                      initial={item.trip_id ? { opacity: 0, scale: 0.92, y: -20 } : false}
+                      initial={item.trip_id ? { opacity: 0, scale: 0.95, y: -10 } : false}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ duration: 0.5, ease: 'easeOut', delay: 0.05 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
                     >
                       <Postcard
                         item={item}
