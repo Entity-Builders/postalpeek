@@ -198,6 +198,10 @@ export function useWalkerFeed() {
     }
   }, [items, hasMore, selectedCountry]);
 
+  const refetchFeed = useCallback(() => {
+    fetchInitialFeed(selectedCountry);
+  }, [fetchInitialFeed, selectedCountry]);
+
   return {
     items,
     setItems,
@@ -210,5 +214,6 @@ export function useWalkerFeed() {
     hasMore,
     isFetchingMore,
     fetchMoreFeed,
+    refetchFeed,
   };
 }

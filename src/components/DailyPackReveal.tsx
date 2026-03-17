@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 import { cdnImage } from '../utils/imageUtils';
 
 interface DailyPackRevealProps {
@@ -133,7 +134,7 @@ export function DailyPackReveal({ cards, isOpen, onClose }: DailyPackRevealProps
                             width: 800,
                             quality: 85,
                           })}
-                          alt={currentCard.description || currentCard.city}
+                          alt={t(currentCard.description) || currentCard.city}
                           className='w-full h-full object-cover'
                         />
                       )}
@@ -143,7 +144,7 @@ export function DailyPackReveal({ cards, isOpen, onClose }: DailyPackRevealProps
                     {currentCard && (
                       <div className='mt-2 px-1'>
                         <h3 className='text-sm font-semibold text-stone-800 truncate'>
-                          {currentCard.category || currentCard.description}
+                          {t(currentCard.category) || t(currentCard.description)}
                         </h3>
                         <p className='text-xs text-stone-500'>
                           📍 {currentCard.city}, {currentCard.country}

@@ -11,11 +11,14 @@ interface AlbumListProps {
   onOpenAlbum: (album: Album) => void;
 }
 
-const DIFFICULTY_CONFIG: Record<Album['difficulty'], { label: string; color: string; icon: string }> = {
-  easy:   { label: 'Fácil',   color: 'bg-emerald-500/80', icon: '🌿' },
-  medium: { label: 'Media',   color: 'bg-yellow-500/80',  icon: '⭐' },
-  hard:   { label: 'Difícil', color: 'bg-orange-500/80',  icon: '🔥' },
-  epic:   { label: 'Épica',   color: 'bg-purple-500/80',  icon: '💎' },
+const DIFFICULTY_CONFIG: Record<
+  Album['difficulty'],
+  { label: string; color: string; icon: string }
+> = {
+  easy: { label: 'Fácil', color: 'bg-emerald-500/80', icon: '🌿' },
+  medium: { label: 'Media', color: 'bg-yellow-500/80', icon: '⭐' },
+  hard: { label: 'Difícil', color: 'bg-orange-500/80', icon: '🔥' },
+  epic: { label: 'Épica', color: 'bg-purple-500/80', icon: '💎' },
 };
 
 function AlbumCard({
@@ -27,11 +30,14 @@ function AlbumCard({
   index: number;
   onClick: () => void;
 }) {
-  const coverUrl = useSignedImage(album.cover_image_url, { width: WIDTHS.mobile });
+  const coverUrl = useSignedImage(album.cover_image_url, {
+    width: WIDTHS.mobile,
+  });
   const isComplete = album.completed_at !== null;
-  const progress = album.total_slots > 0
-    ? Math.round((album.collected_slots / album.total_slots) * 100)
-    : 0;
+  const progress =
+    album.total_slots > 0
+      ? Math.round((album.collected_slots / album.total_slots) * 100)
+      : 0;
 
   return (
     <motion.button
@@ -73,7 +79,9 @@ function AlbumCard({
         {/* Difficulty + Country pills */}
         <div className='absolute top-2 left-2 flex items-center gap-1.5'>
           {album.difficulty && album.difficulty !== 'easy' && (
-            <div className={`${DIFFICULTY_CONFIG[album.difficulty].color} backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm`}>
+            <div
+              className={`${DIFFICULTY_CONFIG[album.difficulty].color} backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm`}
+            >
               <span>{DIFFICULTY_CONFIG[album.difficulty].icon}</span>
               {DIFFICULTY_CONFIG[album.difficulty].label}
             </div>
@@ -116,7 +124,10 @@ export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
       <div className='px-4 pb-3'>
         <div className='flex gap-3 overflow-hidden'>
           {[1, 2, 3].map((i) => (
-            <div key={i} className='shrink-0 w-48 md:w-56 h-40 rounded-xl bg-white/5 animate-pulse' />
+            <div
+              key={i}
+              className='shrink-0 w-48 md:w-56 h-40 rounded-xl bg-white/5 animate-pulse'
+            />
           ))}
         </div>
       </div>
@@ -129,12 +140,9 @@ export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
     <div className='pb-4'>
       {/* Section header */}
       <div className='flex items-center justify-between px-4 mb-3'>
-        <h3 className='font-display text-sm text-white/90 tracking-tight flex items-center gap-1.5'>
-          <Trophy className='w-3.5 h-3.5 text-amber-400' />
-          Álbumes
-        </h3>
         <span className='text-[10px] text-white/40'>
-          {albums.filter(a => a.completed_at).length}/{albums.length} completos
+          {albums.filter((a) => a.completed_at).length}/{albums.length}{' '}
+          completos
         </span>
       </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ticket, Scissors, MapPin } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 
 interface PostcardCouponProps {
   item: FeedItem;
@@ -17,7 +18,7 @@ export function PostcardCoupon({ item }: PostcardCouponProps) {
   const defaultMessage =
     'Aprovechá este beneficio exclusivo en tu próxima visita.';
   const offerMessage =
-    item.generation_metadata?.offer_message || defaultMessage;
+    t(item.generation_metadata?.offer_message) || defaultMessage;
 
   return (
     <div
@@ -117,7 +118,7 @@ export function PostcardCoupon({ item }: PostcardCouponProps) {
         className='absolute bottom-4 text-[10px] font-mono tracking-widest uppercase'
         style={{ color: '#a8a29e' }}
       >
-        {item.category} Partner
+        {t(item.category)} Partner
       </p>
     </div>
   );

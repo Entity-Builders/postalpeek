@@ -20,6 +20,7 @@ import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
 import { TripSlide } from './TripSlide';
@@ -338,7 +339,7 @@ export function PostcardFront({
               )}
               style={{ color: '#1a1a1a' }}
             >
-              {activeSlideItem.category
+              {t(activeSlideItem.category)
                 .replace(/[\u{1F300}-\u{1F9FF}]/u, '')
                 .trim()}
             </h3>
@@ -692,7 +693,7 @@ export function PostcardFront({
                 {factTypeLabel(storytelling.fact_type)}
               </span>
               <p className='text-xs md:text-sm text-stone-600 line-clamp-1 leading-snug'>
-                💡 {storytelling.did_you_know}
+                💡 {t(storytelling.did_you_know)}
               </p>
             </div>
             <span className='text-amber-600 text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-0.5'>

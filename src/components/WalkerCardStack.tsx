@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion';
 import { analytics } from '../lib/analytics';
+import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
 import { AlbumCoverLoadingState } from './WalkerFeedStates';
@@ -87,7 +88,7 @@ export function WalkerCardStack({
           illustration_url: c.illustration_url,
           city: c.city,
           country: c.country,
-          category: c.category,
+          category: t(c.category),
         }));
         sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
       } catch {
@@ -354,7 +355,7 @@ function SwipeableCard({
                                 illustration_url: c.illustration_url,
                                 city: c.city,
                                 country: c.country,
-                                category: c.category,
+                                category: t(c.category),
                               }));
                               sessionStorage.setItem(AUTH_GATE_CARDS_KEY, JSON.stringify(heroCards));
                             } catch {

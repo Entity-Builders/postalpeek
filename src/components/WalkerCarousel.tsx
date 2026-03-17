@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { analytics } from '../lib/analytics';
+import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
 import { AlbumCoverLoadingState } from './WalkerFeedStates';
@@ -184,7 +185,7 @@ export function WalkerCarousel({
           postcard_id: activeItem.id,
           country: activeItem.country,
           city: activeItem.city,
-          category: activeItem.category,
+          category: t(activeItem.category),
           index: itemIndex,
         });
 
@@ -215,7 +216,7 @@ export function WalkerCarousel({
             illustration_url: c.illustration_url,
             city: c.city,
             country: c.country,
-            category: c.category,
+            category: t(c.category),
           }));
           sessionStorage.setItem(
             AUTH_GATE_CARDS_KEY,
@@ -445,7 +446,7 @@ export function WalkerCarousel({
                                     illustration_url: c.illustration_url,
                                     city: c.city,
                                     country: c.country,
-                                    category: c.category,
+                                    category: t(c.category),
                                   }));
                                   sessionStorage.setItem(
                                     AUTH_GATE_CARDS_KEY,

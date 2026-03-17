@@ -27,6 +27,25 @@ function isBot(userAgent: string): boolean {
   return BOT_UA_PATTERNS.some((bot) => ua.includes(bot.toLowerCase()));
 }
 
+/** Extract text from a potentially bilingual JSONB field (returns es first, then en, then raw string). */
+function extractText(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    // Could be a JSON string from PostgREST — try parsing
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return parsed.es || parsed.en || '';
+      }
+    } catch { /* not JSON, use as-is */ }
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return (value as Record<string, string>).es || (value as Record<string, string>).en || '';
+  }
+  return String(value);
+}
+
 // ─── Supabase REST helpers (avoids bundling full SDK) ───────────
 
 /** Generic PostgREST fetch */
@@ -144,8 +163,8 @@ export default {
 
 
       if (postcard) {
-        const title = `${postcard.category} — ${postcard.city}, ${postcard.country} | PostalPeek`;
-        const description = postcard.description;
+        const title = `${extractText(postcard.category)} — ${postcard.city}, ${postcard.country} | PostalPeek`;
+        const description = extractText(postcard.description);
         const image = postcard.illustration_url
           ? postcard.illustration_url.replace(
               'pub-2fd871195f814f7083d91fe7dbbdb4b2.r2.dev',

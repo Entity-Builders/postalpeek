@@ -15,13 +15,10 @@ import {
   WalkerEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
-import { useSmartAlbums } from '../hooks/useSmartAlbums';
+import { AlbumsModal } from './AlbumsModal';
 import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
-import { AlbumsModal } from './AlbumsModal';
-import { SmartAlbumDetail } from './SmartAlbumDetail';
-import type { SmartAlbum } from '../hooks/useSmartAlbums';
 import { PostcardDetailModal } from './PostcardDetailModal';
 import { DailyPackButton } from './DailyPackButton';
 import { DailyPackReveal } from './DailyPackReveal';
@@ -31,6 +28,7 @@ import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence } from 'framer-motion';
+import { AdminToolbar } from './AdminToolbar';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -60,6 +58,7 @@ export function WalkerFeed({
     hasMore,
     isFetchingMore,
     fetchMoreFeed,
+    refetchFeed,
   } = useWalkerFeed();
 
   const isFetchingRef = useRef<boolean>(false);
@@ -98,7 +97,6 @@ export function WalkerFeed({
   // URL-driven navigation
   const navigate = useNavigate();
   const [selectedPostcard, setSelectedPostcard] = useState<FeedItem | null>(null);
-  const [selectedSmartAlbum, setSelectedSmartAlbum] = useState<SmartAlbum | null>(null);
   const location = useLocation();
   const showCollection = location.pathname === '/collection';
   const urlAlbumId = location.pathname.startsWith('/album/') ? location.pathname.split('/')[2] : null;
@@ -131,11 +129,6 @@ export function WalkerFeed({
     isLoading: isLoadingAlbums,
     refetch: refetchAlbums,
   } = useAlbums(user?.id);
-
-  const {
-    smartAlbums,
-    loading: isLoadingSmartAlbums,
-  } = useSmartAlbums(user?.id);
 
   // Derived unlocked countries from completed albums
   const unlockedCountries = React.useMemo(() => {
@@ -338,13 +331,6 @@ export function WalkerFeed({
             onSelectPostcard={setSelectedPostcard}
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
-            smartAlbums={smartAlbums}
-            isLoadingSmartAlbums={isLoadingSmartAlbums}
-            onOpenAlbum={(album) => navigate(`/album/${album.id}`)}
-            onOpenSmartAlbum={(album) => {
-              setSelectedSmartAlbum(album);
-              analytics.track('smart_album_opened', { type: album.album_type, value: album.filter_value });
-            }}
             favoriteItems={favoriteItems}
             isFavoritesLoading={isLoading}
           />
@@ -358,19 +344,6 @@ export function WalkerFeed({
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
             onClose={() => navigate(showCollection ? '/collection' : '/')}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Smart Album Detail Modal */}
-      <AnimatePresence>
-        {selectedSmartAlbum && (
-          <SmartAlbumDetail
-            album={selectedSmartAlbum}
-            collection={collection}
-            isLoading={isCollectionLoading}
-            onClose={() => setSelectedSmartAlbum(null)}
-            onSelectPostcard={(item) => setSelectedPostcard(item)}
           />
         )}
       </AnimatePresence>
@@ -430,6 +403,11 @@ export function WalkerFeed({
         cards={packCards}
         isOpen={showPackReveal}
         onClose={() => setShowPackReveal(false)}
+      />
+      {/* Admin Toolbar — only visible when isAdmin */}
+      <AdminToolbar
+        isAdmin={isAdmin}
+        onPostcardGenerated={refetchFeed}
       />
     </div>
   );

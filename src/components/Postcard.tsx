@@ -34,6 +34,15 @@ export interface FeedItem {
   claimed_at?: string | null;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
   visual_tags?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  detailed_tags?: any[];
+  aesthetic_vibes?: string[];
+  architecture_style?: string | null;
+  color_palette?: string | null;
+  scene_type?: string | null;
+  time_of_day?: string | null;
+  weather?: string | null;
+  human_activity?: string | null;
 }
 
 interface PostcardProps {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 
 interface PostcardBackProps {
   item: FeedItem;
@@ -92,7 +93,7 @@ export function PostcardBack({
 
             {/* Category */}
             <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] md:text-xs font-medium rounded-full mb-3 tracking-wide uppercase w-fit border border-indigo-100">
-              {item.category}
+              {t(item.category)}
             </span>
 
             {/* Did you know section — the main content */}
@@ -101,7 +102,7 @@ export function PostcardBack({
                 💡 ¿Sabías que...?
               </p>
               <p className="text-sm md:text-base text-stone-700 leading-relaxed">
-                {storytelling.did_you_know}
+                {t(storytelling.did_you_know)}
               </p>
             </div>
 
@@ -109,14 +110,14 @@ export function PostcardBack({
             {storytelling.narrative_link && (
               <div className="border-l-[3px] border-stone-300 pl-4 mb-4">
                 <p className="text-xs md:text-sm text-stone-500 italic leading-relaxed">
-                  "{storytelling.narrative_link}"
+                  "{t(storytelling.narrative_link)}"
                 </p>
               </div>
             )}
 
             {/* Description — the Walker's observation */}
             <p className="font-handwriting text-base md:text-lg text-slate-700 leading-relaxed mb-4">
-              "{item.description}"
+              "{t(item.description)}"
             </p>
 
             {/* Location + photo row */}
@@ -243,11 +244,11 @@ export function PostcardBack({
             {/* Left side: The Story */}
             <div className="flex-1 flex flex-col pt-2 sm:border-r border-black/10 sm:pr-6 order-first sm:order-first min-h-0">
               <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] md:text-sm font-medium rounded-full mb-3 md:mb-6 tracking-wide uppercase w-fit">
-                {item.category}
+                {t(item.category)}
               </span>
 
               <p className="font-handwriting text-lg sm:text-2xl md:text-3xl leading-relaxed text-slate-800 whitespace-pre-wrap">
-                "{item.description}"
+                "{t(item.description)}"
               </p>
 
               {/* Visual Tags — what the AI saw */}

@@ -6,6 +6,7 @@ import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import { useSignedImage } from '../utils/useSignedImage';
 import { sway, ease } from '../utils/useWelcomeAnimation';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 
 interface AuthGateModalProps {
   onSuccess: () => void;
@@ -203,7 +204,7 @@ export function AuthGateModal({
                     <img
                       key={imgUrl0}
                       src={imgUrl0}
-                      alt={mainCard.category}
+                      alt={t(mainCard.category)}
                       className='w-full h-full object-cover'
                       onError={handleImageFallback}
                     />

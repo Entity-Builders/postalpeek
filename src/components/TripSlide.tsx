@@ -3,6 +3,7 @@ import { Play } from 'lucide-react';
 import { cn } from './SearchBar';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
+import { t } from '../utils/i18n';
 import { useSignedImage, useSignedSrcSet, useRawSignedImage } from '../utils/useSignedImage';
 
 interface TripSlideProps {
@@ -65,7 +66,7 @@ export function TripSlide({
           src={mainImgUrl}
           srcSet={srcSetString}
           sizes="(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px"
-          alt={slideItem.category}
+          alt={t(slideItem.category)}
           loading={isPriority ? 'eager' : 'lazy'}
           decoding="async"
           fetchPriority={isPriority ? 'high' : 'auto'}
