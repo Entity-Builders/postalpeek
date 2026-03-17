@@ -50,7 +50,6 @@ VALUES
     ('tag', 'fish', 'Bajo el Agua 🐟'),
     ('tag', 'horse', 'Espíritu Equino 🐎'),
     ('tag', 'flower', 'Jardín Botánico 🌸'),
-    ('tag', 'tree', 'Bosques Antiguos 🌳'),
     ('tag', 'mountain', 'Cumbres Majestuosas ⛰️'),
     ('tag', 'beach', 'Días de Playa 🏖️'),
     ('tag', 'river', 'Ríos Serenos 🏞️'),
@@ -58,7 +57,6 @@ VALUES
     ('tag', 'snow', 'Maravillas de Invierno ❄️'),
     ('tag', 'sunset', 'Atardeceres Mágicos 🌅'),
     ('tag', 'sunrise', 'Primeros Rayos 🌄'),
-    ('tag', 'cloud', 'Cazador de Nubes ☁️'),
     ('tag', 'stars', 'Noches Estrelladas ✨'),
 
     -- ====================
@@ -69,9 +67,7 @@ VALUES
     ('tag', 'plane', 'Aventuras por los Aires ✈️'),
     ('tag', 'boat', 'Travesías Marítimas ⛵'),
     ('tag', 'bicycle', 'Paseos en Bici 🚲'),
-    ('tag', 'building', 'Rascacielos 🏢'),
     ('tag', 'bridge', 'Puentes del Mundo 🌉'),
-    ('tag', 'street', 'Calles con Encanto 🛣️'),
     ('tag', 'church', 'Santuarios⛪'),
     ('tag', 'temple', 'Templos Sagrados ⛩️'),
     ('tag', 'castle', 'Castillos de Leyenda 🏰'),

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion';
 import { analytics } from '../lib/analytics';
 import { Postcard, FeedItem } from './Postcard';
@@ -218,8 +219,31 @@ function SwipeableCard({
 
     if (info.offset.x > threshold || velocity > 500) {
       // Swipe Right (Like/Claim)
-      controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
-      analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
+      if (user && !item.owner_id && item.type !== 'welcome') {
+        Alert.alert(
+          'Reclamar Postal',
+          'Cuesta 1 Estampilla reclamar esta postal del feed global. ¿Aceptar?',
+          [
+            {
+              text: 'Cancelar',
+              style: 'cancel',
+              onPress: () => {
+                controls.start({ x: 0, transition: { type: 'spring', stiffness: 300, damping: 20 } });
+              }
+            },
+            {
+              text: 'Aceptar',
+              onPress: () => {
+                controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
+                analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
+              }
+            }
+          ]
+        );
+      } else {
+        controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
+        analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
+      }
     } else if (info.offset.x < -threshold || velocity < -500) {
       // Swipe Left (Discard)
       controls.start({ x: -500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('left'));

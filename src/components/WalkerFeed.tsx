@@ -7,6 +7,7 @@ import { useCollection } from '../hooks/useCollection';
 import { useAlbums } from '../hooks/useAlbums';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
 import { useDailyPack } from '../hooks/useDailyPack';
+import type { FeedItem } from './Postcard';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
@@ -19,6 +20,9 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { AlbumsModal } from './AlbumsModal';
+import { SmartAlbumDetail } from './SmartAlbumDetail';
+import type { SmartAlbum } from '../hooks/useSmartAlbums';
+import { PostcardDetailModal } from './PostcardDetailModal';
 import { DailyPackButton } from './DailyPackButton';
 import { DailyPackReveal } from './DailyPackReveal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
@@ -93,6 +97,8 @@ export function WalkerFeed({
   } = useCollection(user?.id);
   // URL-driven navigation
   const navigate = useNavigate();
+  const [selectedPostcard, setSelectedPostcard] = useState<FeedItem | null>(null);
+  const [selectedSmartAlbum, setSelectedSmartAlbum] = useState<SmartAlbum | null>(null);
   const location = useLocation();
   const showCollection = location.pathname === '/collection';
   const urlAlbumId = location.pathname.startsWith('/album/') ? location.pathname.split('/')[2] : null;
@@ -329,14 +335,15 @@ export function WalkerFeed({
             isLoading={isCollectionLoading}
             claimStatus={claimStatus}
             onClose={() => navigate('/')}
+            onSelectPostcard={setSelectedPostcard}
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
             smartAlbums={smartAlbums}
             isLoadingSmartAlbums={isLoadingSmartAlbums}
             onOpenAlbum={(album) => navigate(`/album/${album.id}`)}
             onOpenSmartAlbum={(album) => {
-              // TODO: Wire up Smart Album Detail view
-              console.log('Open smart album', album);
+              setSelectedSmartAlbum(album);
+              analytics.track('smart_album_opened', { type: album.album_type, value: album.filter_value });
             }}
             favoriteItems={favoriteItems}
             isFavoritesLoading={isLoading}
@@ -351,6 +358,29 @@ export function WalkerFeed({
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
             onClose={() => navigate(showCollection ? '/collection' : '/')}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Smart Album Detail Modal */}
+      <AnimatePresence>
+        {selectedSmartAlbum && (
+          <SmartAlbumDetail
+            album={selectedSmartAlbum}
+            collection={collection}
+            isLoading={isCollectionLoading}
+            onClose={() => setSelectedSmartAlbum(null)}
+            onSelectPostcard={(item) => setSelectedPostcard(item)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Postcard Detail / Validation Modal */}
+      <AnimatePresence>
+        {selectedPostcard && (
+          <PostcardDetailModal
+            item={selectedPostcard}
+            onClose={() => setSelectedPostcard(null)}
           />
         )}
       </AnimatePresence>

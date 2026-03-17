@@ -71,7 +71,7 @@ BEGIN
       array_agg(illustration_url) AS cover_urls
     FROM unnested_tags
     GROUP BY tag
-    HAVING COUNT(*) >= 2
+    HAVING COUNT(*) >= 3
   ),
   -- COMBINE ALL
   all_groups AS (
@@ -96,6 +96,8 @@ BEGIN
   FROM all_groups g
   LEFT JOIN public.postalpeek_smart_album_rules r 
     ON g.album_type = r.filter_type AND lower(g.filter_value) = lower(r.filter_value)
+  -- Option A: Tags MUST exist in the dictionary, others (country, category) fall back to generic
+  WHERE g.album_type != 'tag' OR r.id IS NOT NULL
   ORDER BY g.postcard_count DESC;
 
 END;
