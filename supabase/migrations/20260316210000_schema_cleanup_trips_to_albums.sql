@@ -64,6 +64,7 @@ DROP FUNCTION IF EXISTS postalpeek_pop_from_pack(UUID);
 
 -- 7a. postalpeek_get_random_feed (updated references)
 DROP FUNCTION IF EXISTS public.postalpeek_get_random_feed(integer, text, uuid[], boolean);
+DROP FUNCTION IF EXISTS public.postalpeek_get_random_feed(p_limit integer, p_country text, p_exclude_ids uuid[], p_trips_only boolean);
 
 CREATE OR REPLACE FUNCTION public.postalpeek_get_random_feed(
   p_limit INT DEFAULT 10,
@@ -228,5 +229,4 @@ BEGIN
 END;
 $$;
 
--- 7c. Drop the old 4-param version that used p_trips_only
-DROP FUNCTION IF EXISTS public.postalpeek_get_random_feed(integer, text, uuid[], boolean);
+
