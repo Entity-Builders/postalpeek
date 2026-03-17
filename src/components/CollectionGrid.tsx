@@ -4,8 +4,10 @@ import { ArrowLeft, Package, Heart, Trophy } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 import { AlbumList } from './AlbumList';
+import { SmartAlbumCarousel } from './SmartAlbumCarousel';
 import type { FeedItem } from './Postcard';
 import type { Album } from '../hooks/useAlbums';
+import type { SmartAlbum } from '../hooks/useSmartAlbums';
 
 type SectionId = 'albums' | 'postcards' | 'favorites';
 
@@ -23,10 +25,13 @@ interface CollectionGridProps {
   /** Favorites */
   favoriteItems?: FeedItem[];
   isFavoritesLoading?: boolean;
-  /** Albums */
   albums?: Album[];
   isLoadingAlbums?: boolean;
   onOpenAlbum?: (album: Album) => void;
+  /** Smart Albums */
+  smartAlbums?: SmartAlbum[];
+  isLoadingSmartAlbums?: boolean;
+  onOpenSmartAlbum?: (album: SmartAlbum) => void;
 }
 
 const SECTIONS: { key: SectionId; label: string; icon: React.ReactNode }[] = [
@@ -182,6 +187,9 @@ export function CollectionGrid({
   albums = [],
   isLoadingAlbums = false,
   onOpenAlbum,
+  smartAlbums = [],
+  isLoadingSmartAlbums = false,
+  onOpenSmartAlbum,
 }: CollectionGridProps) {
   const [activeSection, setActiveSection] = useState<SectionId>('albums');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -337,22 +345,45 @@ export function CollectionGrid({
         {/* ── Albums section ── */}
         <div
           ref={(el) => { sectionRefs.current.albums = el; }}
-          className="px-4 pt-2 pb-6"
+          className="pb-6"
         >
-          {(albums.length > 0 || isLoadingAlbums) ? (
-            <AlbumList
-              albums={albums}
-              isLoading={isLoadingAlbums}
-              onOpenAlbum={(a) => onOpenAlbum?.(a)}
-            />
-          ) : (
-            <div className="flex flex-col items-center py-8 text-center">
-              <span className="text-4xl mb-3">📚</span>
-              <p className="text-sm text-stone-400 max-w-xs">
-                Los álbumes se irán desbloqueando a medida que colecciones postales.
-              </p>
+          {/* Smart Albums Section (Top) */}
+          {(smartAlbums.length > 0 || isLoadingSmartAlbums) && (
+            <div className="mb-6 bg-stone-100/50 py-4 border-b border-stone-200/50">
+              <div className="px-4 mb-2">
+                <h3 className="font-serif text-lg text-stone-800 flex items-center gap-2">
+                  <span className="text-xl">✨</span> Smart Albums
+                </h3>
+              </div>
+              <SmartAlbumCarousel
+                albums={smartAlbums}
+                isLoading={isLoadingSmartAlbums}
+                onOpenAlbum={(a) => onOpenSmartAlbum?.(a)}
+              />
             </div>
           )}
+
+          {/* Curated Albums Section */}
+          <div className="px-4 pt-2">
+            <h3 className="font-serif text-lg text-stone-800 flex items-center gap-2 mb-4">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              Álbumes Curados
+            </h3>
+            {(albums.length > 0 || isLoadingAlbums) ? (
+              <AlbumList
+                albums={albums}
+                isLoading={isLoadingAlbums}
+                onOpenAlbum={(a) => onOpenAlbum?.(a)}
+              />
+            ) : (
+              <div className="flex flex-col items-center py-8 text-center bg-stone-50 rounded-2xl border border-stone-200">
+                <span className="text-4xl mb-3">📚</span>
+                <p className="text-sm text-stone-400 max-w-xs">
+                  Los álbumes curados irán apareciendo aquí.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mx-4 border-t border-stone-300/40" />

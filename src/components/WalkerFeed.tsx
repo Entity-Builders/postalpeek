@@ -14,6 +14,7 @@ import {
   WalkerEmptyState,
 } from './WalkerFeedStates';
 import { AuthGateModal } from './AuthGateModal';
+import { useSmartAlbums } from '../hooks/useSmartAlbums';
 import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
@@ -125,6 +126,11 @@ export function WalkerFeed({
     refetch: refetchAlbums,
   } = useAlbums(user?.id);
 
+  const {
+    smartAlbums,
+    loading: isLoadingSmartAlbums,
+  } = useSmartAlbums(user?.id);
+
   // Derived unlocked countries from completed albums
   const unlockedCountries = React.useMemo(() => {
     const set = new Set<string>();
@@ -149,10 +155,10 @@ export function WalkerFeed({
   useEffect(() => {
     supabase
       .rpc('postalpeek_get_album_postcard_ids')
-      .then(({ data }) => {
+      .then(({ data }: { data: string[] | null }) => {
         if (data && Array.isArray(data))
           setAlbumPostcardIds(
-            new Set(data as string[]),
+            new Set(data),
           );
       });
   }, [albums]);
@@ -325,7 +331,13 @@ export function WalkerFeed({
             onClose={() => navigate('/')}
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
+            smartAlbums={smartAlbums}
+            isLoadingSmartAlbums={isLoadingSmartAlbums}
             onOpenAlbum={(album) => navigate(`/album/${album.id}`)}
+            onOpenSmartAlbum={(album) => {
+              // TODO: Wire up Smart Album Detail view
+              console.log('Open smart album', album);
+            }}
             favoriteItems={favoriteItems}
             isFavoritesLoading={isLoading}
           />
