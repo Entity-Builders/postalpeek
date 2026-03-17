@@ -38,7 +38,7 @@ export function WalkerLoadingState() {
   );
 }
 
-export function TripCoverLoadingState() {
+export function AlbumCoverLoadingState() {
   return (
     <div className='absolute inset-0 z-20 w-full h-full flex flex-col items-center justify-center pointer-events-none'>
       {/* Warm gradient background that matches the eventual blur backdrop */}

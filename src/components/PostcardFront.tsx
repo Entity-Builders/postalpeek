@@ -96,37 +96,35 @@ export function PostcardFront({
   //         : 'idle';
 
   const isBusiness =
-    item.generation_metadata?.strategy === 'Zigzag Shared Place';
-
-  // State and logic for Trip Galleries
-  const [tripItems, setTripItems] = useState<FeedItem[]>([item]);
-  const [tripStops, setTripStops] = useState<Record<number, { stop_name: string; stop_description?: string }>>({});
+    item.generation_metadata?.strategy === 'Zigzag Shared Place';  // State and logic for Album Galleries
+  const [albumItems, setAlbumItems] = useState<FeedItem[]>([item]);
+  const [albumStops, setAlbumStops] = useState<Record<number, { stop_name: string; stop_description?: string }>>({});
 
   React.useEffect(() => {
-    if (!item.trip_id) return;
+    if (!item.album_id) return;
     let mounted = true;
 
-    // Fetch postcards for this trip
+    // Fetch postcards for this album
     supabase
       .from('postalpeek_postcards')
       .select('*')
-      .eq('trip_id', item.trip_id)
+      .eq('album_id', item.album_id)
       .not('illustration_url', 'is', null)
-      .order('trip_sequence', { ascending: true })
+      .order('album_sequence', { ascending: true })
       .then(({ data }) => {
         if (mounted && data) {
           const items = data as FeedItem[];
           
-          // Pre-sign the fetched trip URLs to ensure they display correctly
+          // Pre-sign the fetched album URLs to ensure they display correctly
           preSignUrls(items.flatMap((i) => [i.illustration_url, i.original_image_url].filter(Boolean))).catch((err) => 
-            console.error('Failed to pre-sign trip item images', err)
+            console.error('Failed to pre-sign album item images', err)
           );
 
-          if (items.some((i) => i.id === item.id)) setTripItems(items);
+          if (items.some((i) => i.id === item.id)) setAlbumItems(items);
           else
-            setTripItems(
+            setAlbumItems(
               [item, ...items].sort(
-                (a, b) => (a.trip_sequence || 0) - (b.trip_sequence || 0),
+                (a, b) => (a.album_sequence || 0) - (b.album_sequence || 0),
               ),
             );
         }
@@ -134,17 +132,17 @@ export function PostcardFront({
 
     // Fetch stop metadata (names, descriptions)
     supabase
-      .from('postalpeek_trip_stops')
-      .select('sequence, stop_name, stop_description')
-      .eq('trip_id', item.trip_id)
-      .order('sequence', { ascending: true })
+      .from('postalpeek_album_slots')
+      .select('slot_order, slot_label, stop_description')
+      .eq('album_id', item.album_id)
+      .order('slot_order', { ascending: true })
       .then(({ data }) => {
         if (mounted && data) {
           const map: Record<number, { stop_name: string; stop_description?: string }> = {};
           for (const stop of data) {
-            map[stop.sequence] = { stop_name: stop.stop_name, stop_description: stop.stop_description };
+            map[stop.slot_order] = { stop_name: stop.slot_label, stop_description: stop.stop_description };
           }
-          setTripStops(map);
+          setAlbumStops(map);
         }
       });
 
@@ -160,7 +158,7 @@ export function PostcardFront({
 
   React.useEffect(() => {
     if (!emblaApi) return;
-    const initialIndex = tripItems.findIndex((i) => i.id === item.id);
+    const initialIndex = albumItems.findIndex((i) => i.id === item.id);
     if (initialIndex > 0) emblaApi.scrollTo(initialIndex, true);
 
     const onSelect = () => setCurrentIndex(emblaApi.selectedScrollSnap());
@@ -168,11 +166,11 @@ export function PostcardFront({
     return () => {
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, tripItems, item.id]);
+  }, [emblaApi, albumItems, item.id]);
 
-  const activeSlideItem = tripItems[currentIndex] || item;
+  const activeSlideItem = albumItems[currentIndex] || item;
 
-  const isTrip = !!item.trip_id;
+  const isAlbumGroup = !!item.album_id;
   const storytelling = activeSlideItem.generation_metadata?.storytelling;
 
   React.useEffect(() => {
@@ -191,8 +189,8 @@ export function PostcardFront({
         WebkitTransform: 'rotateY(0deg) translateZ(1px)',
       }}
     >
-      {/* Stacked cards behind for trips — animate fan-out */}
-      {isTrip && (
+      {/* Stacked cards behind for album groups — animate fan-out */}
+      {isAlbumGroup && (
         <>
           <div
             className='absolute inset-0 bg-white rounded-sm md:rounded-md border border-stone-200/60 shadow-md'
@@ -240,19 +238,19 @@ export function PostcardFront({
             </span>
           )}
 
-          {isTrip ? (
+          {isAlbumGroup ? (
             <>
               <div className='absolute top-2 left-2 right-2 z-30 pointer-events-none drop-shadow-md'>
                 <span className='bg-black/60 text-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-medium border border-white/20 shadow-lg'>
                   🛫{' '}
                   {item.generation_metadata?.tripContext?.title ||
-                    'Viaje en progreso'}
+                    'Álbum de viaje'}
                 </span>
               </div>
 
               <div className='overflow-hidden w-full h-full relative z-10' ref={emblaRef}>
                 <div className='flex w-full h-full'>
-                  {tripItems.map((slideItem) => (
+                  {albumItems.map((slideItem) => (
                     <TripSlide
                       key={slideItem.id}
                       slideItem={slideItem}
@@ -277,9 +275,9 @@ export function PostcardFront({
               </div>
 
               {/* Pagination Dots */}
-              {tripItems.length > 1 && (
+              {albumItems.length > 1 && (
                 <div className='absolute bottom-4 left-0 right-0 z-30 flex justify-center gap-1.5 pointer-events-none'>
-                  {tripItems.map((_, idx) => (
+                  {albumItems.map((_, idx) => (
                     <div
                       key={idx}
                       className={cn(
@@ -313,15 +311,15 @@ export function PostcardFront({
         {/* Title + Buttons row */}
         <div className='mt-3 md:mt-4 px-1 pb-1 flex justify-between items-end shrink-0'>
           <div className='flex-1 min-w-0 mr-3'>
-            {/* Trip stop indicator */}
-            {activeSlideItem.trip_id && activeSlideItem.trip_sequence != null && (() => {
-              const stopMeta = tripStops[activeSlideItem.trip_sequence!];
-              const tripCtx = activeSlideItem.generation_metadata?.tripContext;
-              const totalStops = tripCtx?.totalStops || Object.keys(tripStops).length || tripItems.length;
+            {/* Album stop indicator */}
+            {activeSlideItem.album_id && activeSlideItem.album_sequence != null && (() => {
+              const stopMeta = albumStops[activeSlideItem.album_sequence!];
+              const albumCtx = activeSlideItem.generation_metadata?.tripContext;
+              const totalStops = albumCtx?.totalStops || Object.keys(albumStops).length || albumItems.length;
               return (
                 <div className='mb-1'>
                   <p className='text-[10px] md:text-xs text-stone-400 font-medium tracking-wider uppercase'>
-                    📍 Stop {activeSlideItem.trip_sequence}
+                    📍 Stop {activeSlideItem.album_sequence}
                     {totalStops ? ` of ${totalStops}` : ''}
                     {stopMeta?.stop_name ? ` — ${stopMeta.stop_name}` : ''}
                   </p>

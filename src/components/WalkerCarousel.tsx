@@ -4,7 +4,8 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { analytics } from '../lib/analytics';
 import { Postcard, FeedItem } from './Postcard';
-import { TripCover } from './TripCover';
+import { AlbumCover } from './AlbumCover';
+import { AlbumCoverLoadingState } from './WalkerFeedStates';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
@@ -64,8 +65,8 @@ export function WalkerCarousel({
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
-  // Track which trip covers have been "opened" to show the full Postcard view
-  const [openedTrips, setOpenedTrips] = useState<Set<string>>(new Set());
+  // Track which album covers have been "opened" to show the full Postcard view
+  const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   // Track which cards have loaded their hero image so we can hide the skeleton
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
 
@@ -111,7 +112,7 @@ export function WalkerCarousel({
     if (emblaApi) {
       emblaApi.scrollTo(0, true);
     }
-    setOpenedTrips(new Set());
+    setOpenedAlbums(new Set());
   }, [emblaApi]);
 
   useEffect(() => {
@@ -377,26 +378,26 @@ export function WalkerCarousel({
                   }}
                 >
                 <AnimatePresence mode='wait'>
-                  {item.trip_id && !openedTrips.has(item.trip_id) ? (
+                  {item.album_id && !openedAlbums.has(item.album_id) ? (
                     <motion.div
-                      key={`cover-${item.trip_id}`}
+                      key={`cover-${item.album_id}`}
                       className='w-full h-full flex items-center justify-center'
                       initial={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95, y: 10 }}
                       transition={{ duration: 0.2, ease: 'easeIn' }}
                     >
-                      <TripCover
+                      <AlbumCover
                         item={item}
                         isActive={true}
                         isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
                         onOpenTrip={() => {
-                          setOpenedTrips((prev) => {
+                          setOpenedAlbums((prev) => {
                             const next = new Set(prev);
-                            next.add(item.trip_id!);
+                            next.add(item.album_id!);
                             return next;
                           });
-                          analytics.track('trip_cover_opened', {
-                            trip_id: item.trip_id,
+                          analytics.track('album_cover_opened', {
+                            album_id: item.album_id,
                             postcard_id: item.id,
                             country: item.country,
                           });
@@ -407,7 +408,7 @@ export function WalkerCarousel({
                     <motion.div
                       key={`postcard-${item.id}`}
                       className='w-full h-full flex items-center justify-center'
-                      initial={item.trip_id ? { opacity: 0, scale: 0.95, y: -10 } : false}
+                      initial={item.album_id ? { opacity: 0, scale: 0.95, y: -10 } : false}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       transition={{ duration: 0.25, ease: 'easeOut' }}
                     >

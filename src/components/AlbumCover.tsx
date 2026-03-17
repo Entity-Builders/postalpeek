@@ -10,63 +10,63 @@ import {
 } from '../utils/useSignedImage';
 import type { FeedItem } from './Postcard';
 
-interface TripCoverProps {
+interface AlbumCoverProps {
   item: FeedItem;
   isActive: boolean;
   isPriority: boolean;
   onOpenTrip: () => void;
 }
 
-interface TripMeta {
+interface AlbumMeta {
   title: string;
   itinerary_summary: string;
 }
 
-export function TripCover({
+export function AlbumCover({
   item,
   isActive,
   isPriority,
   onOpenTrip,
-}: TripCoverProps) {
-  const [tripMeta, setTripMeta] = useState<TripMeta | null>(null);
+}: AlbumCoverProps) {
+  const [albumMeta, setAlbumMeta] = useState<AlbumMeta | null>(null);
   const [stopThumbnails, setStopThumbnails] = useState<
     { id: string; url: string; stop_name?: string }[]
   >([]);
-  const [bottomReady, setBottomReady] = useState(!item.trip_id);
+  const [bottomReady, setBottomReady] = useState(!item.album_id);
   const [heroReady, setHeroReady] = useState(false);
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
 
   const tripCtx = item.generation_metadata?.tripContext;
   // Use embedded metadata immediately — no need to wait for Supabase
-  const title = tripMeta?.title || tripCtx?.title || 'Álbum descubierto';
+  const title = albumMeta?.title || tripCtx?.title || 'Álbum descubierto';
   const totalStops = tripCtx?.totalStops || stopThumbnails.length || '?';
-  const summary = tripMeta?.itinerary_summary || '';
+  const summary = albumMeta?.itinerary_summary || '';
 
-  // Single parallel fetch for all trip data (meta + stops + thumbnails)
+  // Single parallel fetch for all album data (meta + stops + thumbnails)
   useEffect(() => {
-    if (!item.trip_id) return;
+    if (!item.album_id) return;
     let mounted = true;
 
-    const fetchTripData = async () => {
+    const fetchAlbumData = async () => {
       const [metaResult, postsResult] = await Promise.all([
         supabase
-          .from('postalpeek_trips')
+          .from('postalpeek_albums')
           .select('title, itinerary_summary')
-          .eq('id', item.trip_id!)
+          .eq('id', item.album_id!)
           .single(),
         supabase
           .from('postalpeek_postcards')
-          .select('id, illustration_url, trip_sequence')
-          .eq('trip_id', item.trip_id!)
+          .select('id, illustration_url, album_sequence')
+          .eq('album_id', item.album_id!)
           .not('illustration_url', 'is', null)
-          .order('trip_sequence', { ascending: true }),
+          .order('album_sequence', { ascending: true }),
       ]);
 
       if (!mounted) return;
 
       // Set meta immediately
       if (metaResult.data) {
-        setTripMeta(metaResult.data as TripMeta);
+        setAlbumMeta(metaResult.data as AlbumMeta);
       }
 
       if (postsResult.data && postsResult.data.length > 0) {
@@ -76,10 +76,10 @@ export function TripCover({
             postsResult.data.map((d) => d.illustration_url).filter(Boolean),
           ),
           supabase
-            .from('postalpeek_trip_stops')
-            .select('sequence, stop_name')
-            .eq('trip_id', item.trip_id!)
-            .order('sequence', { ascending: true }),
+            .from('postalpeek_album_slots')
+            .select('slot_order, slot_label')
+            .eq('album_id', item.album_id!)
+            .order('slot_order', { ascending: true }),
         ]);
 
         if (!mounted) return;
@@ -87,7 +87,7 @@ export function TripCover({
         const stopMap: Record<number, string> = {};
         if (stopsResult.data) {
           for (const s of stopsResult.data) {
-            stopMap[s.sequence] = s.stop_name;
+            stopMap[s.slot_order] = s.slot_label;
           }
         }
 
@@ -95,7 +95,7 @@ export function TripCover({
           postsResult.data.map((d) => ({
             id: d.id,
             url: d.illustration_url,
-            stop_name: stopMap[d.trip_sequence] || undefined,
+            stop_name: stopMap[d.album_sequence] || undefined,
           })),
         );
       }
@@ -103,12 +103,12 @@ export function TripCover({
       if (mounted) setBottomReady(true);
     };
 
-    fetchTripData().catch(console.error);
+    fetchAlbumData().catch(console.error);
 
     return () => {
       mounted = false;
     };
-  }, [item.trip_id]);
+  }, [item.album_id]);
 
   // Signed image URLs for the hero image
   const placeholderUrl = useSignedImage(item.illustration_url, {
@@ -146,7 +146,7 @@ export function TripCover({
   return (
     <div
       className={cn(
-        'w-full max-w-[480px] cursor-pointer mx-auto ease-in-out',
+        'w-full h-full max-w-[480px] cursor-pointer mx-auto ease-in-out',
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
         !isActive && 'scale-[0.85] opacity-40 pointer-events-none',

@@ -24,8 +24,8 @@ export interface FeedItem {
   streetview_pov?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generation_metadata?: any;
-  trip_id?: string;
-  trip_sequence?: number;
+  album_id?: string;
+  album_sequence?: number;
   video_url?: string;
   video_generation_status?: 'idle' | 'processing' | 'completed' | 'failed';
   imagine_task_id?: string;

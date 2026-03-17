@@ -6,6 +6,7 @@ import { useClaimPostcard } from '../hooks/useClaimPostcard';
 import { useCollection } from '../hooks/useCollection';
 import { useAlbums } from '../hooks/useAlbums';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
+import { useDailyPack } from '../hooks/useDailyPack';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import {
@@ -17,6 +18,8 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { AlbumsModal } from './AlbumsModal';
+import { DailyPackButton } from './DailyPackButton';
+import { DailyPackReveal } from './DailyPackReveal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -98,6 +101,22 @@ export function WalkerFeed({
     limit: number;
   } | null>(null);
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
+
+  // ── Daily Pack ──
+  const {
+    packCards,
+    isPackAvailable,
+    isLoading: isPackLoading,
+    openPack,
+  } = useDailyPack(user?.id);
+  const [showPackReveal, setShowPackReveal] = useState(false);
+
+  const handleOpenPack = useCallback(async () => {
+    const result = await openPack();
+    if (result.success && result.postcards && result.postcards.length > 0) {
+      setShowPackReveal(true);
+    }
+  }, [openPack]);
 
   // ── Albums ──
   const {
@@ -358,6 +377,18 @@ export function WalkerFeed({
           />
         )}
       </AnimatePresence>
+
+      {/* Daily Pack — floating button + reveal modal */}
+      <DailyPackButton
+        isAvailable={isPackAvailable}
+        isLoading={isPackLoading}
+        onOpen={handleOpenPack}
+      />
+      <DailyPackReveal
+        cards={packCards}
+        isOpen={showPackReveal}
+        onClose={() => setShowPackReveal(false)}
+      />
     </div>
   );
 }

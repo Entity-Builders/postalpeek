@@ -38,7 +38,7 @@ export function PostcardBack({
   handleImageError,
 }: PostcardBackProps) {
   const storytelling = item.generation_metadata?.storytelling;
-  const isTrip = !!item.trip_id;
+  const isAlbumGroup = !!item.album_id;
   const tripCtx = item.generation_metadata?.tripContext;
   const visualTags: string[] = item.visual_tags || [];
   const vibeInjected: string = item.generation_metadata?.vibe_injected || '';
@@ -75,7 +75,7 @@ export function PostcardBack({
       <div className="relative flex flex-col w-full h-full text-black/80 overflow-y-auto pb-2">
         
         {/* Trip-specific back: storytelling + letter */}
-        {isTrip && storytelling ? (
+        {isAlbumGroup && storytelling ? (
           <>
             {/* Trip header with stop info */}
             <div className="flex items-center justify-between mb-4">

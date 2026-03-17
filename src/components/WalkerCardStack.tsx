@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion';
 import { analytics } from '../lib/analytics';
 import { Postcard, FeedItem } from './Postcard';
-import { TripCover } from './TripCover';
+import { AlbumCover } from './AlbumCover';
+import { AlbumCoverLoadingState } from './WalkerFeedStates';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import type { User } from '@supabase/supabase-js';
@@ -48,7 +49,7 @@ export function WalkerCardStack({
   albumPostcardIds = new Set(),
   onSwipe,
 }: WalkerCardStackProps) {
-  const [openedTrips, setOpenedTrips] = useState<Set<string>>(new Set());
+  const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
   const [swipedCount, setSwipedCount] = useState(0);
 
@@ -121,7 +122,7 @@ export function WalkerCardStack({
                    }
                 }
               }}
-              // Pass down specific props for the Postcard/TripCover
+              // Pass down specific props for the Postcard/AlbumCover
               user={user}
               isAdmin={isAdmin}
               favoriteIds={favoriteIds}
@@ -130,8 +131,8 @@ export function WalkerCardStack({
               onClaimPostcard={onClaimPostcard}
               isClaimLoading={isClaimLoading}
               albumPostcardIds={albumPostcardIds}
-              openedTrips={openedTrips}
-              setOpenedTrips={setOpenedTrips}
+              openedAlbums={openedAlbums}
+              setOpenedAlbums={setOpenedAlbums}
               heroReadyIds={heroReadyIds}
               setHeroReadyIds={setHeroReadyIds}
               showWelcome={showWelcome}
@@ -160,8 +161,8 @@ interface SwipeableCardProps {
   onClaimPostcard?: (id: string) => void;
   isClaimLoading: boolean;
   albumPostcardIds: Set<string>;
-  openedTrips: Set<string>;
-  setOpenedTrips: React.Dispatch<React.SetStateAction<Set<string>>>;
+  openedAlbums: Set<string>;
+  setOpenedAlbums: React.Dispatch<React.SetStateAction<Set<string>>>;
   heroReadyIds: Set<string>;
   setHeroReadyIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   showWelcome: boolean;
@@ -184,8 +185,8 @@ function SwipeableCard({
   onClaimPostcard,
   isClaimLoading,
   albumPostcardIds,
-  openedTrips,
-  setOpenedTrips,
+  openedAlbums,
+  setOpenedAlbums,
   setHeroReadyIds,
   showWelcome,
   swipedCount,
@@ -275,20 +276,20 @@ function SwipeableCard({
               <div className='w-full h-full flex items-center justify-center bg-transparent rounded-lg overflow-hidden relative'>
                  <WalkerWelcome previewCards={items.slice(0, 3)} />
               </div>
-            ) : item.trip_id && !openedTrips.has(item.trip_id) ? (
+            ) : item.album_id && !openedAlbums.has(item.album_id) ? (
               <div 
                 className='w-full h-full bg-transparent flex-1'
                 onPointerDown={() => {
                 }}
               >
-                <TripCover
+                <AlbumCover
                   item={item}
                   isActive={true}
                   isPriority={true}
                   onOpenTrip={() => {
-                    setOpenedTrips((prev: Set<string>) => {
+                    setOpenedAlbums((prev: Set<string>) => {
                       const next = new Set(prev);
-                      next.add(item.trip_id!);
+                      next.add(item.album_id!);
                       return next;
                     });
                   }}
