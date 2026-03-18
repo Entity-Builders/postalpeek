@@ -143,21 +143,21 @@ export async function preSignUrls(urls: string[]): Promise<void> {
 /**
  * Get the (potentially signed) path for an object.
  * If signing is enabled and the URL has been pre-signed, returns the signed path.
- * If signing is enabled but not yet complete, returns a sentinel.
- * Otherwise returns the original path (for development with ALLOW_UNSIGNED=true).
+ * Otherwise returns the original path as fallback (unsigned but still works).
  */
-export const SIGNING_SENTINEL = '__PENDING_SIGNATURE__';
+export const SIGNING_SENTINEL = '__PENDING_SIGNATURE__'; // kept for compat
 
 function resolveObjectPath(objectPath: string): string {
   if (!SIGN_KEY) return objectPath;
-  return preSignedStore.get(objectPath) || SIGNING_SENTINEL;
+  // Return signed path if available, otherwise fall back to unsigned
+  return preSignedStore.get(objectPath) || objectPath;
 }
 
 // ─── Public API ─────────────────────────────────────────────────
 
 /**
  * Rewrite a legacy `pub-xxx.r2.dev` URL to the custom CDN domain,
- * with signed path if signing is enabled.
+ * with signed path if signing is enabled and available.
  */
 export function cdnUrl(url: string): string {
   if (!url) return url;
@@ -169,12 +169,9 @@ export function cdnUrl(url: string): string {
   if (!normalized.includes(CDN_HOST)) return normalized;
 
   const objectPath = normalized.replace(CDN_ORIGIN, '').replace(/^\//, '');
-  const signedPath = resolveObjectPath(objectPath);
+  const resolvedPath = resolveObjectPath(objectPath);
 
-  // If a signature is required but not ready, return empty string to prevent 403 leaks
-  if (signedPath === SIGNING_SENTINEL) return '';
-
-  return `${CDN_ORIGIN}/${signedPath}`;
+  return `${CDN_ORIGIN}/${resolvedPath}`;
 }
 
 // ─── Cloudflare Image Transformations ────────────────────────
@@ -217,11 +214,8 @@ export function cdnImage(url: string, opts: TransformOptions = {}): string {
   // Don't double-transform
   if (rawPath.startsWith('cdn-cgi/')) return normalized;
 
-  // Resolve to signed path (or original if signing is off)
-  const signedPath = resolveObjectPath(rawPath);
-
-  // If a signature is required but not ready, return empty string to prevent 403 leaks
-  if (signedPath === SIGNING_SENTINEL) return '';
+  // Resolve to signed path (or unsigned fallback)
+  const resolvedPath = resolveObjectPath(rawPath);
 
   // Build transform options string
   const params: string[] = [];
@@ -231,7 +225,7 @@ export function cdnImage(url: string, opts: TransformOptions = {}): string {
   params.push(`quality=${opts.quality ?? 80}`);
   params.push(`fit=${opts.fit ?? 'cover'}`);
 
-  return `${CDN_ORIGIN}/cdn-cgi/image/${params.join(',')}/${signedPath}`;
+  return `${CDN_ORIGIN}/cdn-cgi/image/${params.join(',')}/${resolvedPath}`;
 }
 
 /**

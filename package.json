@@ -13,6 +13,7 @@
     "test:walker:new": "curl -i -X POST 'http://127.0.0.1:54321/functions/v1/postalpeek-cron-walker?force=true&forceNewTrip=true'",
     "reset:collection": "bash scripts/reset-collection.sh",
     "enrich:collection": "npx tsx scripts/enrich-collection.ts",
+    "sync:prod": "npx tsx scripts/sync-to-prod.ts",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

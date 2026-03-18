@@ -90,8 +90,11 @@ export function PostcardFront({
   const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showClaimedTooltip, setShowClaimedTooltip] = useState(false);
+  const [showClaimTooltip, setShowClaimTooltip] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isClean, setIsClean] = useState(false);
+  const [isClean, setIsClean] = useState(
+    () => localStorage.getItem('pp_clean_mode') === 'true'
+  );
   useLang(); // subscribe to language changes
 
   // Reset clean mode when the card loses focus (swipe away)
@@ -354,6 +357,7 @@ export function PostcardFront({
               e.stopPropagation();
               const nextClean = !isClean;
               setIsClean(nextClean);
+              localStorage.setItem('pp_clean_mode', String(nextClean));
               analytics.track(nextClean ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off', {
                 postcard_id: activeSlideItem.id,
                 country: activeSlideItem.country,
@@ -472,8 +476,11 @@ export function PostcardFront({
                   <button
                     className='p-2 md:p-2.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-500 hover:text-amber-600 hover:scale-105 transition-all'
                     disabled={isClaimLoading}
+                    onMouseEnter={() => { if (!isClaimed) setShowClaimTooltip(true); }}
+                    onMouseLeave={() => setShowClaimTooltip(false)}
                     onClick={(e) => {
                       e.stopPropagation();
+                      setShowClaimTooltip(false);
                       if (isClaimed) {
                         setShowClaimedTooltip((prev) => !prev);
                         setTimeout(() => setShowClaimedTooltip(false), 2500);
@@ -500,7 +507,6 @@ export function PostcardFront({
                         }, 200);
                       }
                     }}
-                    title={isClaimed ? undefined : 'Reclamar esta postal'}
                   >
                     {isClaimLoading ? (
                       <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
@@ -508,6 +514,12 @@ export function PostcardFront({
                       <Gem className='w-4 h-4 md:w-5 md:h-5' />
                     )}
                   </button>
+                  {showClaimTooltip && (
+                    <div className='absolute bottom-full right-0 mb-2 px-3 py-2 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50 pointer-events-none'>
+                      Reclamar esta postal
+                      <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
+                    </div>
+                  )}
                   {showClaimedTooltip && (
                     <div
                       className='absolute bottom-full right-0 mb-2 px-3 py-2 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50'

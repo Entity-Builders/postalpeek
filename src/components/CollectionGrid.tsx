@@ -7,8 +7,9 @@ import { AlbumList } from './AlbumList';
 import { CollectionFilterBar } from './CollectionFilterBar';
 import type { FeedItem } from './Postcard';
 import type { Album } from '../hooks/useAlbums';
-import { t } from '../utils/i18n';
+import { t, useLang, getLang } from '../utils/i18n';
 import { analytics } from '../lib/analytics';
+import { useSearchStrategy } from '../hooks/useSearchStrategy';
 
 type SectionId = 'albums' | 'postcards';
 
@@ -54,6 +55,34 @@ function CollectionCard({
   const imgUrl = useSignedImage(item.illustration_url, {
     width: WIDTHS.mobile,
   });
+
+  // Track postcards with missing images in PostHog Error Tracking
+  React.useEffect(() => {
+    if (!imgUrl && item.illustration_url) {
+      console.warn(`[CollectionCard] Image failed to sign: ${item.id}`);
+      analytics.captureError(
+        new Error(`Postcard image sign failed: ${item.id}`),
+        {
+          postcard_id: item.id,
+          error_type: 'sign_failed',
+          illustration_url: item.illustration_url,
+          city: item.city,
+          country: item.country,
+        },
+      );
+    } else if (!item.illustration_url) {
+      console.warn(`[CollectionCard] No illustration_url: ${item.id}`);
+      analytics.captureError(
+        new Error(`Postcard missing illustration_url: ${item.id}`),
+        {
+          postcard_id: item.id,
+          error_type: 'missing_url',
+          city: item.city,
+          country: item.country,
+        },
+      );
+    }
+  }, [imgUrl, item.id, item.illustration_url, item.city, item.country]);
 
   const rarityColors: Record<string, string> = {
     common: 'bg-stone-100 text-stone-500',
@@ -199,21 +228,16 @@ export function CollectionGrid({
     return [...collection, ...extras];
   }, [collection, favoriteItems]);
 
-  // Debounced search tracking
-  useEffect(() => {
-    if (!searchQuery.trim()) return;
-    const timer = setTimeout(() => {
-      analytics.track('collection_searched', { query: searchQuery.trim() });
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+
 
   // Dynamically calculate the top tags present in the unified collection
-  const suggestedTags = React.useMemo(() => {
-    if (!allItems || allItems.length === 0) return [];
+  const lang = useLang();
+  const { suggestedTags, allTagNames, tagDisplayNames } = React.useMemo(() => {
+    if (!allItems || allItems.length === 0) return { suggestedTags: [], allTagNames: [], tagDisplayNames: {} };
 
     const tagCounts: Record<string, number> = {};
     const tagDisplayNames: Record<string, string> = {};
+    const currentLang = getLang();
 
     allItems.forEach((item) => {
       // Prefer detailed_tags labels (high weight only) for cleaner chips
@@ -221,8 +245,14 @@ export function CollectionGrid({
 
       if (item.detailed_tags && item.detailed_tags.length > 0) {
         itemTags = item.detailed_tags
-          .filter((t: any) => (t.weight ?? 0) >= 6)
-          .map((t: any) => t.label?.es || t.label?.en || t.spanish_label || t.label);
+          .filter((dt: any) => (dt.weight ?? 0) >= 6)
+          .map((dt: any) => {
+            const lbl = dt.label;
+            if (typeof lbl === 'object' && lbl !== null) {
+              return lbl[currentLang] || lbl.es || lbl.en || '';
+            }
+            return String(lbl || '');
+          });
       } else {
         // Fallback to flat tags for old postcards
         itemTags = [
@@ -231,7 +261,7 @@ export function CollectionGrid({
           item.architecture_style,
           item.color_palette,
           t(item.category),
-        ].filter((t): t is string => typeof t === 'string' && t.length > 0);
+        ].filter((v): v is string => typeof v === 'string' && v.length > 0);
       }
 
       // Add scene-level fields as chips too
@@ -258,10 +288,14 @@ export function CollectionGrid({
     const sortedTags = Object.keys(tagCounts).sort(
       (a, b) => tagCounts[b] - tagCounts[a],
     );
-    return sortedTags
-      .slice(0, 15)
-      .map((normalized) => tagDisplayNames[normalized]);
-  }, [allItems]);
+    return {
+      suggestedTags: sortedTags
+        .slice(0, 15)
+        .map((normalized) => tagDisplayNames[normalized]),
+      allTagNames: sortedTags.map((normalized) => tagDisplayNames[normalized]),
+      tagDisplayNames,
+    };
+  }, [allItems, lang]);
 
   const [activeSection, setActiveSection] = useState<SectionId>('albums');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -333,104 +367,21 @@ export function CollectionGrid({
     }, 600);
   }, []);
 
-  // Filter logic
-  const filterItems = useCallback(
-    (items: FeedItem[]) => {
-      return items.filter((item) => {
-        const q = searchQuery.trim();
-        let matchesSearch = true;
-        if (q) {
-          const normalize = (str: string) =>
-            str
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toLowerCase();
-          const qNorm = normalize(q);
+  // ── Search strategy (PostHog flag decides classic vs AI) ──────
+  const { mode: searchMode, filterItems, checkAutoFallback, isSmartSearching, smartSearchActive } =
+    useSearchStrategy({ allTagNames, searchQuery, activeFilters });
 
-          // Basic plural stemming for English/Spanish
-          const searchTerms = [qNorm];
-          if (qNorm.endsWith('es') && qNorm.length > 4) {
-            searchTerms.push(qNorm.slice(0, -2));
-          } else if (qNorm.endsWith('s') && qNorm.length > 3) {
-            searchTerms.push(qNorm.slice(0, -1));
-          }
-
-          const escapedTerms = searchTerms.map((term) =>
-            term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-          );
-
-          // Word prefix match: allows "car" to match "car", or "cars" to match "car".
-          // Handles spaces, underscores (tags), and dashes as boundaries.
-          const searchRegex = new RegExp(
-            `(?:^|\\s|_|-)(?:${escapedTerms.join('|')})`,
-            'i',
-          );
-
-          const searchableFields = [
-            item.city,
-            item.country,
-            t(item.category),
-            ...(item.visual_tags || []),
-            ...(item.aesthetic_vibes || []),
-            item.architecture_style,
-            item.color_palette,
-            // Scene-level metadata
-            item.scene_type,
-            item.time_of_day,
-            item.weather,
-            item.human_activity,
-            // Spanish labels from detailed_tags for bilingual search
-            ...(item.detailed_tags || [])
-              .flatMap((t: any) => [t.label?.es, t.label?.en, t.spanish_label])
-              .filter(Boolean),
-          ]
-            .filter((t): t is string => typeof t === 'string' && t.length > 0)
-            .map(normalize);
-
-          matchesSearch = searchableFields.some((text) =>
-            searchRegex.test(text),
-          );
-        }
-
-        let matchesFilters = true;
-        if (activeFilters.length > 0) {
-          const normalize = (str: string) =>
-            str
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toLowerCase();
-          // Must match AT LEAST ONE of the active filters (OR logic for chips)
-          const itemTags = [
-            ...(item.visual_tags || []),
-            ...(item.aesthetic_vibes || []),
-            item.architecture_style,
-            item.color_palette,
-            item.country,
-            t(item.category),
-            // Scene-level metadata
-            item.scene_type,
-            item.time_of_day,
-            item.weather,
-            item.human_activity,
-            // Full detailed_tags (both languages) for precise chip matching
-            ...(item.detailed_tags || [])
-              .flatMap((t: any) => [t.label?.es, t.label?.en, t.spanish_label])
-              .filter(Boolean),
-          ]
-            .filter((t): t is string => typeof t === 'string' && t.length > 0)
-            .map(normalize);
-
-          matchesFilters = activeFilters.some((f) => {
-            const fNorm = normalize(f);
-            return itemTags.some((t) => t.includes(fNorm));
-          });
-        }
-
-        return matchesSearch && matchesFilters;
+  // Debounced search tracking
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const timer = setTimeout(() => {
+      analytics.track('collection_searched', {
+        query: searchQuery.trim(),
+        search_mode: searchMode,
       });
-    },
-    [searchQuery, activeFilters],
-  );
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchMode]);
 
   // Apply filters to the unified list, then optionally narrow to favorites-only
   const filteredItems = React.useMemo(() => {
@@ -440,6 +391,71 @@ export function CollectionGrid({
     }
     return base;
   }, [filterItems, allItems, showOnlyFavorites, favoriteIds]);
+
+  // Dynamic pills: show top tags from filtered results when searching
+  const activeSuggestedTags = React.useMemo(() => {
+    const isFiltering = searchQuery.trim() || activeFilters.length > 0;
+    if (!isFiltering || filteredItems.length === 0 || filteredItems.length === allItems.length) {
+      return suggestedTags;
+    }
+
+    // Count tags in filtered items
+    const counts: Record<string, number> = {};
+    const currentLang = getLang();
+    filteredItems.forEach((item) => {
+      const tags: string[] = [];
+      if (item.detailed_tags?.length) {
+        item.detailed_tags
+          .filter((dt: any) => (dt.weight ?? 0) >= 6)
+          .forEach((dt: any) => {
+            const lbl = dt.label;
+            const display = typeof lbl === 'object' && lbl !== null
+              ? lbl[currentLang] || lbl.es || lbl.en || ''
+              : String(lbl || '');
+            if (display) tags.push(display);
+          });
+      }
+      if (item.scene_type) tags.push(item.scene_type);
+      if (item.time_of_day) tags.push(item.time_of_day);
+      if (item.weather) tags.push(item.weather);
+
+      tags.forEach((tag) => {
+        const norm = tag.toLowerCase().trim();
+        if (norm.length >= 2 && norm.length <= 25) {
+          const display = tagDisplayNames[norm] || (tag.charAt(0).toUpperCase() + tag.slice(1));
+          counts[display] = (counts[display] || 0) + 1;
+        }
+      });
+    });
+
+    // Exclude already-active filters from suggestions
+    const activeSet = new Set(activeFilters.map((f) => f.toLowerCase()));
+    return Object.entries(counts)
+      .filter(([tag]) => !activeSet.has(tag.toLowerCase()))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([tag]) => tag);
+  }, [filteredItems, allItems, searchQuery, activeFilters, suggestedTags, tagDisplayNames]);
+
+  // Scroll to top when search results settle (debounced to avoid jump while typing)
+  const prevQueryRef = useRef('');
+  useEffect(() => {
+    const q = searchQuery.trim();
+    // Only scroll when the query meaningfully changes (start or clear)
+    if (q !== prevQueryRef.current) {
+      prevQueryRef.current = q;
+      if (!q) {
+        // Cleared the search — scroll to top immediately
+        scrollContainerRef.current?.scrollTo({ top: 0 });
+      }
+      // Don't scroll during typing — let the user browse while debouncing
+    }
+  }, [searchQuery]);
+
+  // Auto-fallback: 0 classic results in smart mode → force AI
+  useEffect(() => {
+    checkAutoFallback(filteredItems.length);
+  }, [filteredItems.length, checkAutoFallback]);
 
   return (
     <motion.div
@@ -492,7 +508,7 @@ export function CollectionGrid({
       {/* Scrollable content — all sections stacked */}
       <div
         ref={scrollContainerRef}
-        className='flex-1 overflow-y-auto pb-8 scroll-smooth'
+        className='flex-1 overflow-y-auto pb-8'
       >
         {/* ── Albums section ── */}
         <div
@@ -533,18 +549,25 @@ export function CollectionGrid({
             onSearchChange={setSearchQuery}
             activeFilters={activeFilters}
             onToggleFilter={(f) => {
-              analytics.track('collection_filtered', { filter_tag: f });
+              analytics.track('collection_filtered', {
+                filter_tag: f,
+                search_mode: searchMode,
+              });
               setActiveFilters((prev) =>
                 prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
               );
             }}
-            suggestedTags={suggestedTags}
+            suggestedTags={activeSuggestedTags}
+            allTagNames={allTagNames}
             showOnlyFavorites={showOnlyFavorites}
             onToggleFavorites={() => {
               setShowOnlyFavorites((prev) => !prev);
               analytics.track('collection_filtered', { filter_tag: '♥ Favoritos' });
             }}
             favoritesCount={favoriteItems.length}
+            isSmartSearching={isSmartSearching}
+            smartSearchActive={smartSearchActive}
+            searchMode={searchMode}
           />
         </div>
 
@@ -573,7 +596,31 @@ export function CollectionGrid({
             isLoading={isLoading}
             onSelectPostcard={onSelectPostcard}
             emptyState={
-              showOnlyFavorites ? (
+              searchQuery.trim() && !isSmartSearching ? (
+                <div className='flex flex-col items-center py-10 text-center'>
+                  <span className='text-5xl mb-4'>🔍</span>
+                  <h3 className='font-serif text-lg text-stone-700 mb-2'>
+                    No encontramos &ldquo;{searchQuery.trim()}&rdquo;
+                  </h3>
+                  <p className='text-sm text-stone-400 max-w-xs mb-6'>
+                    Probá con otras palabras o explorá el feed para descubrir nuevas postales.
+                  </p>
+                  <div className='flex gap-3'>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className='px-5 py-2 rounded-full border border-stone-300 text-stone-600 text-sm font-medium hover:bg-stone-100 transition-colors'
+                    >
+                      Limpiar búsqueda
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className='px-5 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition-colors'
+                    >
+                      Ir al feed
+                    </button>
+                  </div>
+                </div>
+              ) : showOnlyFavorites ? (
                 <div className='flex flex-col items-center py-10 text-center'>
                   <span className='text-5xl mb-4'>♥</span>
                   <h3 className='font-serif text-lg text-stone-700 mb-2'>

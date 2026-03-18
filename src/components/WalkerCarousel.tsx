@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { analytics } from '../lib/analytics';
+import { FeatureFlags } from '../lib/featureFlags';
 import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
@@ -12,6 +13,7 @@ import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import { DailyPackCard, type RevealMode } from './DailyPackCard';
 import { DailyPackComplete } from './DailyPackComplete';
+import { SpotlightResultsSlide } from './SpotlightResultsSlide';
 import type { User } from '@supabase/supabase-js';
 
 const FREE_CARD_LIMIT = 4;
@@ -46,6 +48,10 @@ interface WalkerCarouselProps {
   onPackComplete?: () => void;
   /** Expand image to fullscreen lightbox */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
+  /** Spotlight search results */
+  spotlightResults?: FeedItem[];
+  spotlightQuery?: string;
+  onSelectPostcard?: (item: FeedItem) => void;
 }
 
 export function WalkerCarousel({
@@ -71,6 +77,9 @@ export function WalkerCarousel({
   albumPostcardIds = new Set(),
   packCards = [],
   onPackComplete,
+  spotlightResults = [],
+  spotlightQuery = '',
+  onSelectPostcard,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -94,14 +103,14 @@ export function WalkerCarousel({
   const [revealMode, setRevealMode] = useState<RevealMode>('tap');
   useEffect(() => {
     if (!isPackMode) return;
-    const flag = analytics.getFeatureFlag('daily-pack-reveal-mode');
+    const flag = analytics.getFeatureFlag(FeatureFlags.DAILY_PACK_REVEAL_MODE);
     if (flag === 'auto-scroll' || flag === 'cascade') {
       setRevealMode(flag);
       analytics.track('daily_pack_variant_assigned', { variant: flag });
     } else {
       // Flag not loaded yet — listen for it
       analytics.onFeatureFlagsLoaded(() => {
-        const resolved = analytics.getFeatureFlag('daily-pack-reveal-mode');
+        const resolved = analytics.getFeatureFlag(FeatureFlags.DAILY_PACK_REVEAL_MODE);
         const mode: RevealMode =
           resolved === 'auto-scroll' || resolved === 'cascade' ? resolved : 'tap';
         setRevealMode(mode);
@@ -155,6 +164,12 @@ export function WalkerCarousel({
     setOpenedAlbums(new Set());
   }, [emblaApi]);
 
+  // Scroll to top when spotlight results arrive or are dismissed
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.scrollTo(0, false); // animated scroll to reveal the spotlight slide
+  }, [emblaApi, spotlightResults.length]);
+
   useEffect(() => {
     if (displayItems.length === 0) return;
 
@@ -167,12 +182,23 @@ export function WalkerCarousel({
   }, [displayItems, staggeredItems.length]);
 
   type SlideEntry =
+    | { type: 'spotlight' }
     | { type: 'welcome' }
     | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }
     | { type: 'pack_card'; item: FeedItem; packIndex: number };
 
   const slides = React.useMemo((): SlideEntry[] => {
     const arr: SlideEntry[] = [];
+
+    // ── Spotlight results take over as the first slide ──
+    if (spotlightResults.length > 0) {
+      arr.push({ type: 'spotlight' });
+      // Still append normal feed slides so user can swipe past spotlight
+      for (let i = 0; i < staggeredItems.length; i++) {
+        arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+      }
+      return arr;
+    }
 
     // ── Pack cards are prepended to the feed (no modal override) ──
     if (isPackMode) {
@@ -201,7 +227,7 @@ export function WalkerCarousel({
       }
     }
     return arr;
-  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, packCards]);
+  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, packCards, spotlightResults]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -363,8 +389,8 @@ export function WalkerCarousel({
   const ambientUrl = useMemo(() => {
     const slide = slides[currentSlideIndex];
     if (!slide) return null;
-    if (slide.type === 'welcome') return null;
-    const item = slide.type === 'pack_card' ? slide.item : slide.item;
+    if (slide.type === 'welcome' || slide.type === 'spotlight') return null;
+    const item = slide.item;
     return cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 }) || null;
   }, [slides, currentSlideIndex]);
 
@@ -419,6 +445,24 @@ export function WalkerCarousel({
       >
       <div className='embla__container h-full flex flex-col'>
         {slides.map((slide, slideIndex) => {
+          if (slide.type === 'spotlight') {
+            return (
+              <div
+                key='spotlight-slide'
+                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
+              >
+                <SpotlightResultsSlide
+                  results={spotlightResults}
+                  claimedIds={claimedIds}
+                  onClaim={onClaimPostcard || (() => {})}
+                  isClaimLoading={isClaimLoading}
+                  onSelectPostcard={onSelectPostcard || (() => {})}
+                  query={spotlightQuery}
+                />
+              </div>
+            );
+          }
+
           if (slide.type === 'welcome') {
             return (
               <div key="welcome-slide" className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>

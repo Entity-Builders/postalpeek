@@ -22,6 +22,7 @@ import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
 import { ImageLightbox } from './ImageLightbox';
 import { DailyPackButton } from './DailyPackButton';
+import { SpotlightPill } from './SpotlightPill';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -30,6 +31,7 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence } from 'framer-motion';
 import { AdminToolbar } from './AdminToolbar';
 import { useLang, toggleLang } from '../utils/i18n';
+import type { SmartSearchResult } from '../hooks/useSmartSearch';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -61,6 +63,84 @@ export function WalkerFeed({
     fetchMoreFeed,
     refetchFeed,
   } = useWalkerFeed();
+
+  // ── Spotlight search state (needs items from useWalkerFeed) ──
+  const [spotlightResults, setSpotlightResults] = useState<FeedItem[]>([]);
+  const [spotlightQuery, setSpotlightQuery] = useState('');
+  const [isSpotlightSearching, setIsSpotlightSearching] = useState(false);
+  const spotlightAbortRef = useRef<AbortController | null>(null);
+
+  const handleSpotlightSearch = useCallback(async (query: string) => {
+    if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
+    const controller = new AbortController();
+    spotlightAbortRef.current = controller;
+
+    setSpotlightQuery(query);
+    setIsSpotlightSearching(true);
+    setSpotlightResults([]);
+
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o';
+
+      const tagSet = new Set<string>();
+      items.forEach((item) => {
+        if (item.detailed_tags?.length) {
+          item.detailed_tags.forEach((dt: { label?: string | Record<string, string> }) => {
+            const lbl = dt.label;
+            const name = typeof lbl === 'object' && lbl !== null ? lbl.en || lbl.es || '' : String(lbl || '');
+            if (name) tagSet.add(name);
+          });
+        }
+        (item.visual_tags || []).forEach((t: string) => tagSet.add(t));
+      });
+
+      const response = await fetch(`${baseUrl}/functions/v1/postalpeek-search-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
+        },
+        body: JSON.stringify({ query, availableTags: Array.from(tagSet).slice(0, 100) }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+      const smartResult: SmartSearchResult = await response.json();
+
+      const { data, error } = await supabase.rpc('postalpeek_spotlight_search', {
+        p_tags: smartResult.tags,
+        p_time_of_day: smartResult.time_of_day,
+        p_weather: smartResult.weather,
+        p_scene_type: smartResult.scene_type,
+        p_country: smartResult.country,
+        p_city: smartResult.city,
+        p_rarity: smartResult.rarity,
+        p_free_text: smartResult.freeTextSearch,
+        p_limit: 4,
+      });
+
+      if (error) throw error;
+      setSpotlightResults(data || []);
+      analytics.track('spotlight_pill_searched', { query, results_count: (data || []).length });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      console.warn('[Spotlight] search failed:', err);
+      setSpotlightResults([]);
+    } finally {
+      setIsSpotlightSearching(false);
+    }
+  }, [items]);
+
+  const handleSpotlightDismiss = useCallback(() => {
+    if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
+    setSpotlightResults([]);
+    setSpotlightQuery('');
+    setIsSpotlightSearching(false);
+  }, []);
+
 
   const isFetchingRef = useRef<boolean>(false);
   useEffect(() => {
@@ -126,6 +206,8 @@ export function WalkerFeed({
   } = useDailyPack(user?.id);
 
   const isPackMode = packCards.length > 0;
+
+
 
   const handleOpenPack = useCallback(async () => {
     const result = await openPack();
@@ -246,6 +328,8 @@ export function WalkerFeed({
         />
       )}
 
+
+
       {isLoading && !showWelcome ? (
         <WalkerLoadingState />
       ) : items.length === 0 && !showWelcome ? (
@@ -263,6 +347,8 @@ export function WalkerFeed({
         <WalkerCarousel
           items={items}
           displayItems={items}
+          spotlightResults={spotlightResults}
+          spotlightQuery={spotlightQuery}
           hasMore={hasMore}
           isFetchingMore={isFetchingMore}
           isFetchingRef={isFetchingRef}
@@ -288,6 +374,7 @@ export function WalkerFeed({
             refetchCollection();
             refetchAlbums();
           }}
+          onSelectPostcard={setSelectedPostcard}
         />
       )}
 
@@ -425,6 +512,20 @@ export function WalkerFeed({
           />
         )}
       </AnimatePresence>
+
+      {/* AI Spotlight Pill — floating between filter bar and card */}
+      {!isPackMode && !showCollection && !isOnWelcome && (
+        <div className='absolute z-[49] left-1/2 -translate-x-1/2'
+          style={{ top: '64px', width: 'min(95vw, 480px)' }}>
+          <SpotlightPill
+            isVisible={!isIdle}
+            isActive={spotlightResults.length > 0 || isSpotlightSearching}
+            onSearch={handleSpotlightSearch}
+            onDismiss={handleSpotlightDismiss}
+            isSearching={isSpotlightSearching}
+          />
+        </div>
+      )}
 
       {/* Daily Pack — floating button (hidden during pack mode) */}
       {!isPackMode && (
