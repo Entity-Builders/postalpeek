@@ -230,3 +230,28 @@ h6 {
       scale(0.6);
   }
 }
+
+/* ── Mobile: prevent iOS zoom on input focus ──────────────── */
+/* iOS Safari zooms in when an input font-size < 16px.        */
+/* We force all inputs to render at ≥ 16px; the visual size   */
+/* (via Tailwind classes like text-sm) is unaffected because  */
+/* we scale it back down with font-size on the wrapper.       */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Mobile: landscape orientation guard ─────────────────── */
+/* Hide the app and show a friendly rotate message when the   */
+/* device is in landscape mode (phone held sideways).         */
+@media (orientation: landscape) and (max-height: 500px) {
+  #landscape-block {
+    display: flex !important;
+  }
+  #root {
+    display: none !important;
+  }
+}
