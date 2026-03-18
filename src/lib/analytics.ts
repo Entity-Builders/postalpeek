@@ -23,6 +23,15 @@ export function initAnalytics() {
     disableSessionRecording: false,
   });
 
+  // Tag every event with app context so we can filter by app in PostHog dashboard
+  analytics.setGlobalProperties({
+    app: 'postalpeek',
+    platform: 'web',
+    environment: import.meta.env.VITE_PUBLIC_POSTHOG_KEY
+      ? 'production'
+      : 'development',
+  });
+
   // Global error handlers for non-React errors
   window.onerror = (message, source, lineno, colno, error) => {
     analytics.captureError(error || new Error(String(message)), {

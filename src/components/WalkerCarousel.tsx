@@ -6,11 +6,12 @@ import { analytics } from '../lib/analytics';
 import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
-import { AlbumCoverLoadingState } from './WalkerFeedStates';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
+import { DailyPackCard } from './DailyPackCard';
+import { DailyPackComplete } from './DailyPackComplete';
 import type { User } from '@supabase/supabase-js';
 
 const FREE_CARD_LIMIT = 4;
@@ -40,6 +41,9 @@ interface WalkerCarouselProps {
   onClaimPostcard?: (postcardId: string) => void;
   isClaimLoading?: boolean;
   albumPostcardIds?: Set<string>;
+  /** Daily Pack inline mode */
+  packCards?: FeedItem[];
+  onPackComplete?: () => void;
 }
 
 export function WalkerCarousel({
@@ -63,6 +67,8 @@ export function WalkerCarousel({
   onClaimPostcard,
   isClaimLoading = false,
   albumPostcardIds = new Set(),
+  packCards = [],
+  onPackComplete,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -70,6 +76,9 @@ export function WalkerCarousel({
   const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   // Track which cards have loaded their hero image so we can hide the skeleton
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
+  // Daily pack: track revealed card indices
+  const [revealedPackCards, setRevealedPackCards] = useState<Set<number>>(new Set());
+  const isPackMode = packCards.length > 0;
 
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
     displayItems.slice(0, 2),
@@ -127,8 +136,25 @@ export function WalkerCarousel({
     }
   }, [displayItems, staggeredItems.length]);
 
-  const slides = React.useMemo(() => {
-    const arr: Array<{ type: 'welcome' } | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }> = [];
+  type SlideEntry =
+    | { type: 'welcome' }
+    | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }
+    | { type: 'pack_card'; item: FeedItem; packIndex: number }
+    | { type: 'pack_complete' };
+
+  const slides = React.useMemo((): SlideEntry[] => {
+    // ── Pack mode: override normal feed ──
+    if (isPackMode) {
+      const arr: SlideEntry[] = packCards.map((card, i) => ({
+        type: 'pack_card' as const,
+        item: card,
+        packIndex: i,
+      }));
+      arr.push({ type: 'pack_complete' as const });
+      return arr;
+    }
+
+    const arr: SlideEntry[] = [];
     
     if (showWelcome) {
       if (hasSharedCard && staggeredItems.length > 0) {
@@ -149,7 +175,7 @@ export function WalkerCarousel({
       }
     }
     return arr;
-  }, [staggeredItems, showWelcome, hasSharedCard]);
+  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, packCards]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -325,6 +351,78 @@ export function WalkerCarousel({
             );
           }
 
+          /* ── Pack card slide ── */
+          if (slide.type === 'pack_card') {
+            const { item: packItem, packIndex } = slide;
+            const difference = slideIndex - currentSlideIndex;
+            const isNearby = difference >= -1 && difference <= lookaheadOffset;
+            return (
+              <div
+                key={`pack-${packItem.id}`}
+                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50'
+              >
+                {isNearby && (
+                  <img
+                    src={cdnImage(packItem.illustration_url, { width: WIDTHS.blur, quality: 50 })}
+                    alt=''
+                    loading='eager'
+                    decoding='async'
+                    className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
+                  />
+                )}
+                <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
+                <div className='z-10 w-full h-full flex items-center justify-center'>
+                  <DailyPackCard
+                    item={packItem}
+                    cardIndex={packIndex}
+                    totalCards={packCards.length}
+                    isActive={slideIndex === currentSlideIndex}
+                    isRevealed={revealedPackCards.has(packIndex)}
+                    onReveal={() => {
+                      setRevealedPackCards((prev) => {
+                        const next = new Set(prev);
+                        next.add(packIndex);
+                        return next;
+                      });
+                    }}
+                    isInAlbum={albumPostcardIds.has(packItem.id)}
+                    user={user}
+                    isAdmin={isAdmin}
+                    favoriteIds={favoriteIds}
+                    toggleFavorite={toggleFavorite}
+                    claimedIds={claimedIds}
+                    onClaimPostcard={onClaimPostcard}
+                    isClaimLoading={isClaimLoading}
+                    albumPostcardIds={albumPostcardIds}
+                    setShowAuthGate={setShowAuthGate}
+                    setPendingFavoriteId={setPendingFavoriteId}
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          /* ── Pack complete slide ── */
+          if (slide.type === 'pack_complete') {
+            const albumCount = packCards.filter((c) => albumPostcardIds.has(c.id)).length;
+            return (
+              <div
+                key='pack-complete'
+                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-200 via-stone-100 to-stone-200'
+              >
+                <DailyPackComplete
+                  cards={packCards}
+                  albumCardCount={albumCount}
+                  onGoToFeed={() => {
+                    setRevealedPackCards(new Set());
+                    onPackComplete?.();
+                  }}
+                />
+              </div>
+            );
+          }
+
+          /* ── Normal postcard slide (unchanged) ── */
           const { item, index: itemIndex, isFirstShared } = slide;
           const difference = slideIndex - currentSlideIndex;
           const isNearby = difference >= -1 && difference <= lookaheadOffset;

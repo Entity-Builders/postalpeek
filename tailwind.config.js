@@ -11,6 +11,8 @@ export default {
         sans: ['Inter', 'sans-serif'],
         display: ['Outfit', 'sans-serif'],
         handwriting: ['Dancing Script', 'cursive'],
+        poetic: ['EB Garamond', 'serif'],
+        elegant: ['Cormorant Garamond', 'serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out forwards',

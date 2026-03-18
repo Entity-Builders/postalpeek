@@ -5,7 +5,7 @@ import { useMouseIdle } from './hooks/useMouseIdle';
 import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { initAnalytics } from './lib/analytics';
+import { initAnalytics, analytics } from './lib/analytics';
 
 function App() {
   const isIdle = useMouseIdle(5000);
@@ -17,6 +17,18 @@ function App() {
   useEffect(() => {
     initAnalytics();
   }, []);
+
+  // Identify user in PostHog when auth state changes
+  useEffect(() => {
+    if (user) {
+      analytics.identify(user.id, {
+        email: user.email,
+        created_at: user.created_at,
+      });
+    } else {
+      analytics.reset();
+    }
+  }, [user]);
 
   // --- Secret triple-click login trigger ---
   const clickCount = useRef(0);

@@ -209,7 +209,7 @@ export function CollectionGrid({
       if (item.detailed_tags && item.detailed_tags.length > 0) {
         itemTags = item.detailed_tags
           .filter((t: any) => (t.weight ?? 0) >= 6)
-          .map((t: any) => t.spanish_label || t.label);
+          .map((t: any) => t.label?.es || t.label?.en || t.spanish_label || t.label);
       } else {
         // Fallback to flat tags for old postcards
         itemTags = [
@@ -396,7 +396,7 @@ export function CollectionGrid({
             item.human_activity,
             // Spanish labels from detailed_tags for bilingual search
             ...(item.detailed_tags || [])
-              .map((t: any) => t.spanish_label)
+              .flatMap((t: any) => [t.label?.es, t.label?.en, t.spanish_label])
               .filter(Boolean),
           ]
             .filter((t): t is string => typeof t === 'string' && t.length > 0)
@@ -429,7 +429,7 @@ export function CollectionGrid({
             item.human_activity,
             // Full detailed_tags (both languages) for precise chip matching
             ...(item.detailed_tags || [])
-              .flatMap((t: any) => [t.spanish_label, t.label])
+              .flatMap((t: any) => [t.label?.es, t.label?.en, t.spanish_label])
               .filter(Boolean),
           ]
             .filter((t): t is string => typeof t === 'string' && t.length > 0)

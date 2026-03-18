@@ -26,8 +26,7 @@ const MIN_VISUAL_TAG_CONFIDENCE = 7;
 
 const TAXONOMY_INSTRUCTIONS = `
 "detailed_tags": An array of JSON objects describing EVERY visible element. Each object MUST have:
-  - "label": English lowercase tag with underscores (e.g. "apartment_building", "stray_cat", "neon_sign"). Use the MOST SPECIFIC term. If you tag "apartment_building", do NOT also tag "building". If you tag "colectivo", do NOT also tag "bus" or "vehicle".
-  - "spanish_label": Spanish translation of the label (e.g. "edificio de departamentos", "gato callejero", "cartel de neón").
+  - "label": { "en": "English lowercase tag with underscores (e.g. 'apartment_building', 'stray_cat', 'neon_sign'). Use the MOST SPECIFIC term. If you tag 'apartment_building', do NOT also tag 'building'.", "es": "Spanish translation (e.g. 'edificio de departamentos', 'gato callejero', 'cartel de neón')." }
   - "type": A semantic category. Common ones: "architecture", "vehicle", "nature", "object", "person", "animal", "food", "signage". You MAY invent new types if nothing fits well (e.g. "urban_art", "infrastructure", "weather_element", "street_furniture", "public_transport", "religious", "sports", "water_feature"). Use lowercase with underscores.
   - "weight": 1-10 integer. How PROMINENT is this element in the frame? 10 = the main subject/fills most of the image. 1 = tiny background detail barely visible.
   - "confidence": 1-10 integer. How CERTAIN are you this element is present? 10 = absolutely sure. 1 = guessing.
@@ -64,6 +63,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
     ? LOCAL_SERVICE_ROLE_KEY
     : loadEnvValue(infraEnvPath, 'SUPABASE_SERVICE_ROLE_KEY');
 const GEMINI_API_KEY = loadEnvValue(infraEnvPath, 'GEMINI_API_KEY');
+const GOOGLE_MAPS_API_KEY = loadEnvValue(infraEnvPath, 'GOOGLE_MAPS_API_KEY');
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
   console.error('❌ SUPABASE_SERVICE_ROLE_KEY not found in eb-infra/.env');
@@ -177,7 +177,7 @@ async function main() {
 
   const { data: postcards, error } = await supabase
     .from('postalpeek_postcards')
-    .select('id, original_image_url, location_name, city, country')
+    .select('id, original_image_url, location_name, city, country, category, description, lat, lng')
     .is('detailed_tags', null)
     .limit(limit)
     .order('created_at', { ascending: false });
@@ -278,7 +278,13 @@ async function main() {
             (t.weight ?? 0) >= MIN_VISUAL_TAG_WEIGHT &&
             (t.confidence ?? 0) >= MIN_VISUAL_TAG_CONFIDENCE,
         )
-        .map((t: any) => String(t.label).toLowerCase().trim());
+        .map((t: any) => {
+          const lbl = t.label;
+          // Handle bilingual {es,en} objects and plain strings
+          const en = typeof lbl === 'object' && lbl !== null ? lbl.en : lbl;
+          return String(en || '').toLowerCase().trim();
+        })
+        .filter(Boolean);
 
       // Parse bilingual category/description (handles both {es,en} objects and plain strings)
       const parsedCategory = typeof analysis.category === 'object' && analysis.category !== null
@@ -288,9 +294,11 @@ async function main() {
         ? analysis.description
         : { es: analysis.description || null };
 
-      const update = {
-        category: parsedCategory,
-        description: parsedDescription,
+      const update: Record<string, unknown> = {
+        // Only overwrite category/description if the postcard doesn't already have them
+        // (preserves the richer original values from the generation pipeline)
+        ...(!pc.category ? { category: parsedCategory } : {}),
+        ...(!pc.description ? { description: parsedDescription } : {}),
         detailed_tags: detailedTags,
         visual_tags: visualTags,
         scene_type: analysis.scene_type || null,
@@ -304,11 +312,54 @@ async function main() {
         color_palette: analysis.color_palette || null,
       };
 
+      // ─── Diff Preview ─────────────────────────────────────────
+      const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+      const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
+      const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
+      const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
+
+      console.log(`\n${progress} ${cyan(pc.location_name || pc.city || 'Unknown')}`);
+      console.log(dim('─'.repeat(60)));
+
+      // Before state
+      console.log(dim('  BEFORE:'));
+      console.log(dim(`    category:     ${JSON.stringify(pc.category) || '(none)'}`));
+      console.log(dim(`    description:  ${JSON.stringify(pc.description)?.slice(0, 80) || '(none)'}`));
+      console.log(dim(`    detailed_tags: (none)`));
+      console.log(dim(`    visual_tags:  (none)`));
+
+      // After state
+      console.log(green('  AFTER:'));
+      if (!pc.category) {
+        console.log(green(`  + category:     ${JSON.stringify(parsedCategory)}`));
+      } else {
+        console.log(dim(`    category:     ${yellow('(kept original)')}`));
+      }
+      if (!pc.description) {
+        console.log(green(`  + description:  ${JSON.stringify(parsedDescription)?.slice(0, 80)}`));
+      } else {
+        console.log(dim(`    description:  ${yellow('(kept original)')}`));
+      }
+      console.log(green(`  + detailed_tags: ${detailedTags.length} tags`));
+      // Show top 3 tags as preview
+      const topTags = detailedTags
+        .sort((a: any, b: any) => (b.weight ?? 0) - (a.weight ?? 0))
+        .slice(0, 3)
+        .map((t: any) => `${t.label?.es || t.label?.en || '?'} (w:${t.weight})`)
+        .join(', ');
+      if (topTags) console.log(dim(`                   → ${topTags}`));
+      console.log(green(`  + visual_tags:   [${visualTags.join(', ')}]`));
+      console.log(green(`  + scene:         ${analysis.scene_type || '?'}`));
+      console.log(green(`  + time/weather:  ${analysis.time_of_day || '?'} / ${analysis.weather || '?'}`));
+      if (analysis.did_you_know) {
+        const fact = typeof analysis.did_you_know === 'object'
+          ? analysis.did_you_know.es?.slice(0, 60)
+          : String(analysis.did_you_know).slice(0, 60);
+        console.log(green(`  + did_you_know:  "${fact}..."`));
+      }
+
       if (dryRun) {
-        console.log(
-          `${progress} ✅ Would update:`,
-          JSON.stringify(update, null, 2).slice(0, 200) + '...',
-        );
+        console.log(yellow(`  ⏸️  DRY RUN — not saved`));
       } else {
         const { error: updateError } = await supabase
           .from('postalpeek_postcards')
@@ -316,17 +367,101 @@ async function main() {
           .eq('id', pc.id);
 
         if (updateError) {
-          console.error(
-            `${progress} ❌ DB update failed:`,
-            updateError.message,
-          );
+          console.error(`  ❌ DB update failed: ${updateError.message}`);
           failed++;
           continue;
         }
 
-        console.log(
-          `${progress} ✅ Enriched! ${detailedTags.length} tags, scene: ${analysis.scene_type}, time: ${analysis.time_of_day}`,
-        );
+        console.log(green(`  ✅ Saved!`));
+
+        // ─── Inline Business Discovery (multi-business) ────
+        if (GOOGLE_MAPS_API_KEY && pc.lat && pc.lng) {
+          try {
+            const nearbyUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${pc.lat},${pc.lng}&radius=50&type=establishment&key=${GOOGLE_MAPS_API_KEY}`;
+            const nearbyRes = await fetch(nearbyUrl);
+            const nearbyData = await nearbyRes.json();
+
+            if (nearbyData.status === 'OK' && nearbyData.results?.length) {
+              const places = nearbyData.results.slice(0, 5);
+              console.log(green(`  🏪 Businesses found: ${places.length}`));
+
+              for (const place of places) {
+                const bizType = classifyBusinessType(place.types || []);
+                const dist = haversineDistance(pc.lat, pc.lng, place.geometry.location.lat, place.geometry.location.lng);
+                const prominence = detectProminence(place.name, bizType, dist, detailedTags);
+
+                // Get contact details
+                const contact: Record<string, string> = {};
+                try {
+                  const detUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number,website&key=${GOOGLE_MAPS_API_KEY}`;
+                  const detRes = await fetch(detUrl);
+                  const detData = await detRes.json();
+                  if (detData.status === 'OK' && detData.result) {
+                    if (detData.result.formatted_phone_number) contact.phone = detData.result.formatted_phone_number;
+                    if (detData.result.website) contact.website = detData.result.website;
+                  }
+                } catch { /* non-blocking */ }
+
+                // Check if business already exists
+                const { data: existing } = await supabase
+                  .from('eb_businesses')
+                  .select('id')
+                  .eq('google_place_id', place.place_id)
+                  .single();
+
+                const isNew = !existing;
+                let businessId: string;
+
+                if (existing) {
+                  businessId = existing.id;
+                } else {
+                  const { data: newBiz } = await supabase
+                    .from('eb_businesses')
+                    .insert({
+                      google_place_id: place.place_id,
+                      name: place.name,
+                      business_type: bizType,
+                      google_types: place.types,
+                      contact,
+                      rating: place.rating || null,
+                      price_level: place.price_level ?? null,
+                      lat: place.geometry.location.lat,
+                      lng: place.geometry.location.lng,
+                      city: pc.city || null,
+                      country: pc.country || null,
+                    })
+                    .select('id')
+                    .single();
+
+                  if (!newBiz) continue;
+                  businessId = newBiz.id;
+                }
+
+                // Create link
+                await supabase
+                  .from('postalpeek_business_links')
+                  .upsert(
+                    { business_id: businessId, postcard_id: pc.id, prominence, distance_m: dist },
+                    { onConflict: 'business_id,postcard_id' },
+                  );
+
+                // Format output
+                const icon = prominence === 'protagonist' ? '⭐' : prominence === 'featured' ? '•' : '·';
+                const promColor = prominence === 'protagonist' ? green : prominence === 'featured' ? cyan : dim;
+                const newTag = isNew ? yellow(' NEW') : dim(' EXISTS');
+                console.log(promColor(`     ${icon} ${place.name} (${bizType}) — ${prominence.toUpperCase()} — ${dist}m${newTag}`));
+                if (contact.phone) console.log(dim(`       📞 ${contact.phone}`));
+                if (contact.website) console.log(dim(`       🌐 ${contact.website?.slice(0, 50)}`));
+              }
+            } else {
+              console.log(dim(`  🏪 No businesses nearby`));
+            }
+          } catch (bizErr: any) {
+            console.log(dim(`  🏪 Discovery failed: ${bizErr.message}`));
+          }
+        } else if (!GOOGLE_MAPS_API_KEY) {
+          console.log(dim(`  🏪 Skipped (no GOOGLE_MAPS_API_KEY)`));
+        }
       }
 
       success++;
@@ -347,6 +482,77 @@ async function main() {
   console.log(
     `\n🎉 Done! ✅ ${success} enriched, ❌ ${failed} failed out of ${postcards.length} total.`,
   );
+}
+
+// ─── Business Type Classifier ───────────────────────────────────
+
+const BUSINESS_TYPES = new Set([
+  'restaurant', 'cafe', 'bar', 'bakery', 'meal_delivery', 'meal_takeaway',
+  'store', 'clothing_store', 'convenience_store', 'department_store',
+  'electronics_store', 'grocery_or_supermarket', 'shopping_mall', 'book_store',
+  'lodging', 'hotel', 'gym', 'spa', 'beauty_salon', 'hair_care',
+  'gas_station', 'car_repair', 'pharmacy', 'dentist', 'doctor',
+  'bank', 'florist', 'tourist_attraction', 'museum', 'art_gallery',
+  'night_club', 'movie_theater',
+]);
+
+function classifyBusinessType(googleTypes: string[]): string | null {
+  for (const t of googleTypes) {
+    if (BUSINESS_TYPES.has(t)) return t;
+  }
+  return googleTypes[0] || null;
+}
+
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function detectProminence(
+  businessName: string,
+  businessType: string | null,
+  distance: number,
+  detailedTags: any[],
+): 'protagonist' | 'featured' | 'nearby' {
+  if (!detailedTags?.length) return 'nearby';
+  const nameLower = businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  for (const tag of detailedTags) {
+    const tagLabel = (
+      typeof tag.label === 'object' ? (tag.label?.en || tag.label?.es || '') : String(tag.label || '')
+    ).toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (nameLower.length > 3 && tagLabel.includes(nameLower)) return 'protagonist';
+    if (tag.type === 'signage' && nameLower.length > 3 && tagLabel.includes(nameLower.slice(0, 6))) return 'protagonist';
+  }
+
+  if (businessType) {
+    const typeWords = businessType.replace(/_/g, ' ').split(' ');
+    for (const tag of detailedTags) {
+      const tagLabel = (typeof tag.label === 'object' ? (tag.label?.en || '') : String(tag.label || '')).toLowerCase();
+      for (const word of typeWords) {
+        if (tagLabel.includes(word) && word.length > 3) {
+          if ((tag.weight ?? 0) >= 7 && distance <= 15) return 'protagonist';
+          return 'featured';
+        }
+      }
+    }
+  }
+
+  if (distance <= 20) {
+    const hasFacade = detailedTags.some((t: any) => {
+      const l = typeof t.label === 'object' ? (t.label?.en || '') : String(t.label || '');
+      return ['storefront', 'facade', 'shop_front', 'entrance', 'signage'].some(kw => l.toLowerCase().includes(kw));
+    });
+    if (hasFacade) return 'featured';
+  }
+
+  return 'nearby';
 }
 
 main().catch((err) => {

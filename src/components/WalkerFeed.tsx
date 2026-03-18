@@ -21,7 +21,6 @@ import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
 import { DailyPackButton } from './DailyPackButton';
-import { DailyPackReveal } from './DailyPackReveal';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
@@ -113,13 +112,15 @@ export function WalkerFeed({
     isPackAvailable,
     isLoading: isPackLoading,
     openPack,
+    clearPack,
   } = useDailyPack(user?.id);
-  const [showPackReveal, setShowPackReveal] = useState(false);
+
+  const isPackMode = packCards.length > 0;
 
   const handleOpenPack = useCallback(async () => {
     const result = await openPack();
     if (result.success && result.postcards && result.postcards.length > 0) {
-      setShowPackReveal(true);
+      // Pack cards are now handled inline by WalkerCarousel
     }
   }, [openPack]);
 
@@ -271,6 +272,12 @@ export function WalkerFeed({
           onClaimPostcard={handleClaimPostcard}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
+          packCards={packCards}
+          onPackComplete={() => {
+            clearPack();
+            refetchCollection();
+            refetchAlbums();
+          }}
         />
       )}
 
@@ -393,20 +400,18 @@ export function WalkerFeed({
         )}
       </AnimatePresence>
 
-      {/* Daily Pack — floating button + reveal modal */}
-      <DailyPackButton
-        isAvailable={isPackAvailable}
-        isLoading={isPackLoading}
-        onOpen={handleOpenPack}
-      />
-      <DailyPackReveal
-        cards={packCards}
-        isOpen={showPackReveal}
-        onClose={() => setShowPackReveal(false)}
-      />
+      {/* Daily Pack — floating button (hidden during pack mode) */}
+      {!isPackMode && (
+        <DailyPackButton
+          isAvailable={isPackAvailable}
+          isLoading={isPackLoading}
+          onOpen={handleOpenPack}
+        />
+      )}
       {/* Admin Toolbar — only visible when isAdmin */}
       <AdminToolbar
         isAdmin={isAdmin}
+        user={user}
         onPostcardGenerated={refetchFeed}
       />
     </div>

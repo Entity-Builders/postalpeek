@@ -106,17 +106,8 @@ export function PostcardBack({
               </p>
             </div>
 
-            {/* Narrative link — Walker's voice */}
-            {storytelling.narrative_link && (
-              <div className="border-l-[3px] border-stone-300 pl-4 mb-4">
-                <p className="text-xs md:text-sm text-stone-500 italic leading-relaxed">
-                  "{t(storytelling.narrative_link)}"
-                </p>
-              </div>
-            )}
-
             {/* Description — the Walker's observation */}
-            <p className="font-handwriting text-base md:text-lg text-slate-700 leading-relaxed mb-4">
+            <p className="font-poetic italic text-base md:text-lg text-stone-900 leading-relaxed mb-4">
               "{t(item.description)}"
             </p>
 
@@ -247,7 +238,7 @@ export function PostcardBack({
                 {t(item.category)}
               </span>
 
-              <p className="font-handwriting text-lg sm:text-2xl md:text-3xl leading-relaxed text-slate-800 whitespace-pre-wrap">
+              <p className="font-poetic italic text-lg sm:text-2xl md:text-3xl leading-relaxed text-stone-900 whitespace-pre-wrap">
                 "{t(item.description)}"
               </p>
 

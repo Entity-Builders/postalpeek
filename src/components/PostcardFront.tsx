@@ -159,11 +159,20 @@ export function PostcardFront({
 
   React.useEffect(() => {
     if (!emblaApi) return;
-    const initialIndex = albumItems.findIndex((i) => i.id === item.id);
-    if (initialIndex > 0) emblaApi.scrollTo(initialIndex, true);
 
+    // Register the onSelect handler FIRST, so that any synchronous events
+    // fired by scrollTo are captured and currentIndex stays in sync.
     const onSelect = () => setCurrentIndex(emblaApi.selectedScrollSnap());
     emblaApi.on('select', onSelect);
+
+    const initialIndex = albumItems.findIndex((i) => i.id === item.id);
+    if (initialIndex > 0) {
+      // Set currentIndex synchronously as a safety net in case select fires
+      // before the next React render cycle.
+      setCurrentIndex(initialIndex);
+      emblaApi.scrollTo(initialIndex, true);
+    }
+
     return () => {
       emblaApi.off('select', onSelect);
     };

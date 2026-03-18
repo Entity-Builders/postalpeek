@@ -96,6 +96,10 @@ export function useDailyPack(userId: string | null | undefined) {
     }
   }, [userId]);
 
+  const clearPack = useCallback(() => {
+    setPackCards([]);
+  }, []);
+
   return {
     packCards,
     isPackAvailable,
@@ -103,5 +107,6 @@ export function useDailyPack(userId: string | null | undefined) {
     isLoading,
     hasChecked,
     openPack,
+    clearPack,
   };
 }
