@@ -52,8 +52,15 @@ export function SpotlightResultsSlide({
   const active = results[activeIndex];
 
   return (
-    <div className='flex flex-col items-center justify-center w-full h-full gap-4 pt-16'>
-
+    <div
+      className='flex flex-col items-center w-full h-full gap-2'
+      style={{
+        /* top: leave room for the SpotlightPill (≈70px) + status bar */
+        paddingTop: 'max(72px, calc(env(safe-area-inset-top) + 60px))',
+        /* bottom: leave room for thumbnails & safe area */
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      }}
+    >
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -6 }}
@@ -61,14 +68,14 @@ export function SpotlightResultsSlide({
         transition={{ delay: 0.1, duration: 0.25 }}
         className='flex items-center gap-2 shrink-0'
       >
-        <Sparkles className='w-3.5 h-3.5 text-purple-500' />
-        <p className='text-xs text-stone-500 font-mono'>
+        <Sparkles className='w-3 h-3 text-purple-500' />
+        <p className='text-[11px] text-stone-500 font-mono'>
           {results.length} {results.length === 1 ? 'resultado' : 'resultados'} ·{' '}
           &ldquo;{query}&rdquo;
         </p>
       </motion.div>
 
-      {/* The real Postcard — same as the main feed */}
+      {/* The real Postcard — flex-1 + min-h-0 so it shrinks to fit */}
       <AnimatePresence mode='wait'>
         <motion.div
           key={active.id}
@@ -76,18 +83,27 @@ export function SpotlightResultsSlide({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -8 }}
           transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-          className='w-[95vw] max-w-[480px] shrink-0'
-          style={{ aspectRatio: '4/5' }}
+          className='w-full flex-1 min-h-0 flex items-center justify-center px-3'
         >
-          <Postcard
-            item={active}
-            isActive={true}
-            isClaimedByMe={claimedIds.has(active.id)}
-            isClaimed={!!active.owner_id}
-            onClaimPostcard={handleClaim}
-            isClaimLoading={isClaimLoading}
-            hideActions={false}
-          />
+          {/* Inner wrapper respects 4:5 ratio but never overflows */}
+          <div
+            className='w-full h-full max-w-[400px]'
+            style={{
+              /* Cap height to the available flex space */
+              maxHeight: '100%',
+              aspectRatio: '4/5',
+            }}
+          >
+            <Postcard
+              item={active}
+              isActive={true}
+              isClaimedByMe={claimedIds.has(active.id)}
+              isClaimed={!!active.owner_id}
+              onClaimPostcard={handleClaim}
+              isClaimLoading={isClaimLoading}
+              hideActions={false}
+            />
+          </div>
         </motion.div>
       </AnimatePresence>
 
@@ -97,7 +113,7 @@ export function SpotlightResultsSlide({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.25 }}
-          className='flex gap-2.5 items-center shrink-0'
+          className='flex gap-2.5 items-center shrink-0 pb-1'
         >
           {results.map((item, i) => (
             <motion.button
@@ -106,8 +122,8 @@ export function SpotlightResultsSlide({
               whileTap={{ scale: 0.93 }}
               className={`relative overflow-hidden rounded-xl transition-all duration-200
                 ${i === activeIndex
-                  ? 'w-14 h-14 ring-2 ring-stone-800 ring-offset-2 ring-offset-[#e6e2da] opacity-100'
-                  : 'w-10 h-10 opacity-45 hover:opacity-75'
+                  ? 'w-12 h-12 ring-2 ring-stone-800 ring-offset-2 ring-offset-[#e6e2da] opacity-100'
+                  : 'w-9 h-9 opacity-45 hover:opacity-75'
                 }`}
             >
               <img
@@ -134,3 +150,4 @@ export function SpotlightResultsSlide({
     </div>
   );
 }
+

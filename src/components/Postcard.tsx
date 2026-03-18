@@ -1,6 +1,9 @@
+import { type BilingualText } from '../utils/i18n';
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useAnimate } from 'framer-motion';
+
 import { WIDTHS } from '../utils/imageUtils';
+
 import { useSignedImage, useSignedSrcSet, useRawSignedImage } from '../utils/useSignedImage';
 import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
@@ -17,8 +20,8 @@ export interface FeedItem {
   lng: number;
   original_image_url: string;
   illustration_url: string;
-  category: string;
-  description: string;
+  category: string | BilingualText;
+  description: string | BilingualText;
   created_at: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   streetview_pov?: any;

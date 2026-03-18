@@ -62,5 +62,8 @@ export function useLang(): Lang {
 export function t(value: MaybeBilingual, lang: Lang = currentLang): string {
   if (!value) return '';
   if (typeof value === 'string') return value;
-  return value[lang] || value.es || '';
+  const result = value[lang] || value.es || '';
+  // Defensive: guard against malformed JSONB (e.g., nested objects)
+  if (typeof result !== 'string') return '';
+  return result;
 }

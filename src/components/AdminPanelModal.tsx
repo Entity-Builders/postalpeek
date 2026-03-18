@@ -13,15 +13,10 @@ interface AdminPanelModalProps {
 }
 
 interface UserStats {
-  claimLimits: {
-    daily_claims_used: number;
-    monthly_claims_used: number;
-    last_daily_reset: string;
-    last_monthly_reset: string;
-  } | null;
   collectionCount: number;
   totalPostcards: number;
   unenrichedCount: number;
+  noIllustrationTagsCount: number;
   dailyPackToday: boolean;
   albumsCount: number;
   albumsCompleted: number;
@@ -141,6 +136,12 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
   // Enrichment
   const [copied, setCopied] = useState(false);
 
+  // Backfill
+  const [backfillStatus, setBackfillStatus] = useState<{ status: ActionStatus; message: string }>({
+    status: 'idle',
+    message: '',
+  });
+
   // ── Fetch user stats ──
 
   const fetchStats = useCallback(async () => {
@@ -149,11 +150,8 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
       const userId = user?.id;
 
       // Parallel queries
-      const [claimRes, collectionRes, totalRes, unenrichedRes, dailyPackRes, albumsRes] =
+      const [collectionRes, totalRes, unenrichedRes, noIllTagsRes, dailyPackRes, albumsRes] =
         await Promise.all([
-          userId
-            ? supabase.from('postalpeek_claim_limits').select('*').eq('user_id', userId).maybeSingle()
-            : Promise.resolve({ data: null }),
           userId
             ? supabase
                 .from('postalpeek_postcards')
@@ -165,6 +163,11 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
             .from('postalpeek_postcards')
             .select('id', { count: 'exact', head: true })
             .is('detailed_tags', null),
+          supabase
+            .from('postalpeek_postcards')
+            .select('id', { count: 'exact', head: true })
+            .not('illustration_url', 'is', null)
+            .or('illustration_tags.is.null,illustration_tags.eq.[]'),
           userId
             ? supabase
                 .from('postalpeek_daily_packs')
@@ -182,10 +185,10 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
         ).length ?? 0;
 
       setStats({
-        claimLimits: claimRes.data as UserStats['claimLimits'],
         collectionCount: (collectionRes as { count: number | null }).count ?? 0,
         totalPostcards: (totalRes as { count: number | null }).count ?? 0,
         unenrichedCount: (unenrichedRes as { count: number | null }).count ?? 0,
+        noIllustrationTagsCount: (noIllTagsRes as { count: number | null }).count ?? 0,
         dailyPackToday: !!dailyPackRes.data,
         albumsCount: (albumsRes as { count: number | null }).count ?? 0,
         albumsCompleted,
@@ -430,6 +433,32 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
     setTimeout(() => setCopied(false), 2000);
   }, [stats?.unenrichedCount]);
 
+  const runIllustrationTagsBackfill = useCallback(async () => {
+    setBackfillStatus({ status: 'loading', message: 'Analyzing illustrations… (batch of 10)' });
+    try {
+      const { data, error } = await supabase.functions.invoke('backfill-illustration-tags', {
+        body: { batch_size: 10, dry_run: false },
+      });
+      if (error) throw error;
+      const processed = data?.processed ?? 0;
+      const failed = data?.failed ?? 0;
+      if (processed === 0) {
+        setBackfillStatus({ status: 'success', message: '✅ All postcards already have illustration tags!' });
+      } else {
+        setBackfillStatus({
+          status: 'success',
+          message: `✅ Processed ${processed} postcards${failed > 0 ? ` (${failed} failed)` : ''}. Run again if more remain.`,
+        });
+      }
+      fetchStats();
+    } catch (err: unknown) {
+      setBackfillStatus({
+        status: 'error',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [fetchStats]);
+
   // ── Keyboard shortcut ──
 
   useEffect(() => {
@@ -555,32 +584,13 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
                         </div>
                       </div>
 
-                      {/* Claim Limits */}
+                      {/* Claim Limits — deprecated, table removed */}
                       <div>
                         <h3 className="text-white/70 text-[10px] uppercase tracking-widest font-semibold mb-2">
                           Claim Limits
                         </h3>
                         <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                          <StatRow
-                            label="Daily"
-                            value={
-                              stats.claimLimits
-                                ? `${stats.claimLimits.daily_claims_used} / 10`
-                                : 'No record'
-                            }
-                          />
-                          <StatRow
-                            label="Monthly"
-                            value={
-                              stats.claimLimits
-                                ? `${stats.claimLimits.monthly_claims_used} / 200`
-                                : 'No record'
-                            }
-                          />
-                          <StatRow
-                            label="Last daily reset"
-                            value={stats.claimLimits?.last_daily_reset || '—'}
-                          />
+                          <StatRow label="Status" value={<span style={{ color: 'rgb(148,163,184)' }}>Deprecated — Daily Packs are now the bottleneck</span>} />
                         </div>
                       </div>
 
@@ -811,6 +821,53 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
                         </span>
                       </button>
                     )}
+                  </div>
+
+                  {/* Illustration Tags Backfill */}
+                  <div
+                    className="pt-4 border-t"
+                    style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white/60 text-xs font-medium tracking-wide uppercase">
+                        Illustration Tags Backfill
+                      </span>
+                      {stats && (
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-full font-mono"
+                          style={{
+                            background:
+                              stats.noIllustrationTagsCount === 0
+                                ? 'rgba(16,185,129,0.2)'
+                                : 'rgba(251,191,36,0.2)',
+                            color:
+                              stats.noIllustrationTagsCount === 0
+                                ? 'rgb(110,231,183)'
+                                : 'rgb(253,224,71)',
+                          }}
+                        >
+                          {stats.noIllustrationTagsCount === 0
+                            ? '✅ All tagged'
+                            : `${stats.noIllustrationTagsCount} pending`}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-white/30 text-[10px] mb-2">
+                      Analyzes each illustration with Gemini and saves tags. Runs in batches of 10.
+                    </p>
+                    <ActionButton
+                      onClick={runIllustrationTagsBackfill}
+                      disabled={backfillStatus.status === 'loading' || stats?.noIllustrationTagsCount === 0}
+                      gradient="linear-gradient(135deg, rgba(139,92,246,0.6), rgba(99,102,241,0.6))"
+                    >
+                      <span>🏷️</span>
+                      <span>
+                        {backfillStatus.status === 'loading'
+                          ? 'Analyzing…'
+                          : 'Backfill Illustration Tags (×10)'}
+                      </span>
+                    </ActionButton>
+                    <StatusBadge status={backfillStatus.status} message={backfillStatus.message} />
                   </div>
                 </div>
               )}

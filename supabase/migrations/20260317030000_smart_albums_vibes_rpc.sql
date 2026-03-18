@@ -2,6 +2,17 @@
 -- Phase 4.3: Smart Filters with Vibe Metadata
 -- ============================================================
 
+-- 0. Ensure the custom return type exists (self-contained: safe to re-run)
+--    The previous migration used DROP TYPE ... CASCADE which may have dropped this.
+DROP TYPE IF EXISTS public.postalpeek_smart_album_list CASCADE;
+CREATE TYPE public.postalpeek_smart_album_list AS (
+  album_type TEXT,
+  filter_value TEXT,
+  title TEXT,
+  postcard_count INT,
+  cover_urls TEXT[]
+);
+
 -- 1. Update the Dictionary Constraint to allow new Vibe types
 ALTER TABLE public.postalpeek_smart_album_rules 
   DROP CONSTRAINT IF EXISTS postalpeek_smart_album_rules_filter_type_check;
