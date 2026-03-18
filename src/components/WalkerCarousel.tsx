@@ -45,7 +45,7 @@ interface WalkerCarouselProps {
   packCards?: FeedItem[];
   onPackComplete?: () => void;
   /** Expand image to fullscreen lightbox */
-  onExpandImage?: (item: FeedItem) => void;
+  onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
 }
 
 export function WalkerCarousel({
@@ -71,7 +71,6 @@ export function WalkerCarousel({
   albumPostcardIds = new Set(),
   packCards = [],
   onPackComplete,
-  onExpandImage,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -81,7 +80,15 @@ export function WalkerCarousel({
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
   // Daily pack: track revealed card indices
   const [revealedPackCards, setRevealedPackCards] = useState<Set<number>>(new Set());
+  const [showPackSummary, setShowPackSummary] = useState(false);
   const isPackMode = packCards.length > 0;
+
+  // Show summary immediately when pack cards arrive
+  useEffect(() => {
+    if (isPackMode && packCards.length > 0) {
+      setShowPackSummary(true);
+    }
+  }, [isPackMode, packCards.length]);
 
   // Read PostHog feature flag for reveal mode (defaults to 'tap')
   const [revealMode, setRevealMode] = useState<RevealMode>('tap');
@@ -162,24 +169,20 @@ export function WalkerCarousel({
   type SlideEntry =
     | { type: 'welcome' }
     | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }
-    | { type: 'pack_card'; item: FeedItem; packIndex: number }
-    | { type: 'pack_complete' };
+    | { type: 'pack_card'; item: FeedItem; packIndex: number };
 
   const slides = React.useMemo((): SlideEntry[] => {
-    // ── Pack mode: override normal feed ──
+    const arr: SlideEntry[] = [];
+
+    // ── Pack cards are prepended to the feed (no modal override) ──
     if (isPackMode) {
-      const arr: SlideEntry[] = packCards.map((card, i) => ({
-        type: 'pack_card' as const,
-        item: card,
-        packIndex: i,
-      }));
-      arr.push({ type: 'pack_complete' as const });
-      return arr;
+      packCards.forEach((card, i) => {
+        arr.push({ type: 'pack_card' as const, item: card, packIndex: i });
+      });
     }
 
-    const arr: SlideEntry[] = [];
-    
-    if (showWelcome) {
+    // ── Normal feed follows ──
+    if (showWelcome && !isPackMode) {
       if (hasSharedCard && staggeredItems.length > 0) {
         arr.push({ type: 'postcard', item: staggeredItems[0], index: 0, isFirstShared: true });
         arr.push({ type: 'welcome' });
@@ -328,8 +331,6 @@ export function WalkerCarousel({
     (e: React.WheelEvent<HTMLDivElement>) => {
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         if (!emblaApi) return;
-        // React synthetic wheel events are passive, so preventDefault() throws a warning.
-        // Since the container is overflow-hidden, native scrolling doesn't happen anyway.
         if (Math.abs(e.deltaY) < 5) return;
         scrollWithDebounce(e.deltaY > 0 ? 'next' : 'prev');
       }
@@ -430,25 +431,6 @@ export function WalkerCarousel({
             );
           }
 
-          /* ── Pack complete slide ── */
-          if (slide.type === 'pack_complete') {
-            const albumCount = packCards.filter((c) => albumPostcardIds.has(c.id)).length;
-            return (
-              <div
-                key='pack-complete'
-                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-200 via-stone-100 to-stone-200'
-              >
-                <DailyPackComplete
-                  cards={packCards}
-                  albumCardCount={albumCount}
-                  onGoToFeed={() => {
-                    setRevealedPackCards(new Set());
-                    onPackComplete?.();
-                  }}
-                />
-              </div>
-            );
-          }
 
           /* ── Normal postcard slide (unchanged) ── */
           const { item, index: itemIndex, isFirstShared } = slide;
@@ -588,7 +570,6 @@ export function WalkerCarousel({
                               }
                             : undefined
                         }
-                        onExpandImage={onExpandImage}
                       />
                     </motion.div>
                   )}
@@ -605,6 +586,37 @@ export function WalkerCarousel({
           </div>
         )}
       </div>
+
+      {/* Pack summary overlay — appears when all cards are revealed */}
+      <AnimatePresence>
+        {showPackSummary && (
+          <motion.div
+            key='pack-summary'
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className='absolute inset-0 z-40 bg-gradient-to-br from-stone-200 via-stone-100 to-stone-200 flex items-center justify-center'
+            onWheel={(e) => {
+              if (e.deltaY > 30) {
+                setShowPackSummary(false);
+                // Pre-reveal all cards so they appear without blur
+                setRevealedPackCards(new Set(packCards.map((_, i) => i)));
+              }
+            }}
+          >
+            <DailyPackComplete
+              cards={packCards}
+              albumCardCount={packCards.filter(c => albumPostcardIds.has(c.id)).length}
+              onGoToFeed={() => {
+                setShowPackSummary(false);
+                // Pre-reveal all cards so they appear without blur
+                setRevealedPackCards(new Set(packCards.map((_, i) => i)));
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

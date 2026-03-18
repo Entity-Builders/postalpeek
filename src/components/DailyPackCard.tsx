@@ -62,13 +62,13 @@ export function DailyPackCard({
     }
   }, [revealMode, isActive, isRevealed, onReveal]);
 
-  // Cascade mode: reveal after a stagger delay
+  // Cascade mode: first card (index 0) requires tap; rest auto-reveal with stagger
   useEffect(() => {
-    if (revealMode === 'cascade' && !isRevealed) {
+    if (revealMode === 'cascade' && !isRevealed && cardIndex > 0) {
       const timer = setTimeout(() => onReveal(), cascadeDelay);
       return () => clearTimeout(timer);
     }
-  }, [revealMode, isRevealed, onReveal, cascadeDelay]);
+  }, [revealMode, isRevealed, onReveal, cascadeDelay, cardIndex]);
 
   const handleReveal = useCallback(() => {
     if (isRevealed) return;
@@ -84,46 +84,61 @@ export function DailyPackCard({
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center'>
-      {/* Pack counter badge */}
+      {/* Pack counter badge with neon glow */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
         className='mb-3 text-center z-20'
       >
-        <div className='inline-flex items-center gap-2 bg-black/40 backdrop-blur-md text-white/90 px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 shadow-lg'>
-          <Sparkles className='w-3.5 h-3.5 text-amber-300' />
-          <span>Sobre Diario · Postal {cardIndex + 1} de {totalCards}</span>
-          <Sparkles className='w-3.5 h-3.5 text-amber-300' />
+        <div className='relative inline-flex'>
+          {/* Neon glow layer */}
+          <motion.div
+            className='absolute inset-0 rounded-full'
+            style={{
+              background: 'linear-gradient(90deg, #f59e0b, #8b5cf6, #f59e0b)',
+              backgroundSize: '200% 100%',
+              filter: 'blur(12px)',
+            }}
+            animate={{
+              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              opacity: [0.5, 0.8, 0.5],
+            }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          {/* Badge */}
+          <div className='relative inline-flex items-center gap-2 bg-black/50 backdrop-blur-md text-white/90 px-3 py-1.5 rounded-full text-xs font-medium border border-white/15 shadow-lg'>
+            <Sparkles className='w-3.5 h-3.5 text-amber-300' />
+            <span>Sobre Diario · Postal {cardIndex + 1} de {totalCards}</span>
+            <Sparkles className='w-3.5 h-3.5 text-amber-300' />
+          </div>
         </div>
       </motion.div>
 
-      {/* Card container with optional album glow */}
+      {/* Card container with pack border */}
       <div
         className='relative w-[95vw] max-w-[480px] md:max-w-[520px] mx-auto'
         style={{ aspectRatio: '4/5' }}
       >
-        {/* Album euphoria: animated golden glow ring */}
-        {isInAlbum && (
-          <div className='absolute -inset-1.5 z-0 rounded-[14px] overflow-hidden pointer-events-none'>
-            <div
-              className='absolute inset-0 rounded-[14px]'
-              style={{
-                background: 'linear-gradient(135deg, #f59e0b, #ef4444, #f59e0b, #eab308, #f59e0b)',
-                backgroundSize: '400% 400%',
-                animation: 'albumGlow 3s ease-in-out infinite',
-              }}
-            />
-            <style>{`
-              @keyframes albumGlow {
-                0%, 100% { background-position: 0% 50%; }
-                50% { background-position: 100% 50%; }
-              }
-            `}</style>
-          </div>
-        )}
+        {/* Pack card border — subtle animated dark frame for all pack cards */}
+        <div className='absolute -inset-1.5 z-0 rounded-[14px] overflow-hidden pointer-events-none'>
+          <div
+            className='absolute inset-0 rounded-[14px]'
+            style={{
+              background: 'linear-gradient(135deg, #1c1917, #44403c, #1c1917, #57534e, #1c1917)',
+              backgroundSize: '400% 400%',
+              animation: 'packBorder 4s ease-in-out infinite',
+            }}
+          />
+          <style>{`
+            @keyframes packBorder {
+              0%, 100% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+            }
+          `}</style>
+        </div>
 
-        {/* Album badge */}
+        {/* Album badge with neon amber glow */}
         {isInAlbum && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
@@ -131,9 +146,26 @@ export function DailyPackCard({
             transition={{ delay: 0.4, type: 'spring', stiffness: 300, damping: 20 }}
             className='absolute -top-3 left-1/2 -translate-x-1/2 z-30'
           >
-            <div className='flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg border border-amber-300/30'>
-              <Trophy className='w-3.5 h-3.5' />
-              <span>¡Carta de Álbum!</span>
+            <div className='relative'>
+              {/* Amber neon glow */}
+              <motion.div
+                className='absolute inset-0 rounded-full'
+                style={{
+                  background: 'linear-gradient(90deg, #f59e0b, #ef4444, #f59e0b)',
+                  backgroundSize: '200% 100%',
+                  filter: 'blur(10px)',
+                }}
+                animate={{
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                  opacity: [0.6, 1, 0.6],
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <div className='relative flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg border border-amber-300/30'>
+                <Trophy className='w-3.5 h-3.5' />
+                <span>¡Carta de Álbum!</span>
+              </div>
             </div>
           </motion.div>
         )}
@@ -182,9 +214,9 @@ export function DailyPackCard({
             />
           </motion.div>
 
-          {/* Tap-to-reveal overlay — only visible in tap mode when unrevealed */}
+          {/* Tap-to-reveal overlay — visible for tap mode + first card in cascade */}
           <AnimatePresence>
-            {!isRevealed && revealMode === 'tap' && (
+            {!isRevealed && (revealMode === 'tap' || (revealMode === 'cascade' && cardIndex === 0)) && (
               <motion.button
                 key='reveal-overlay'
                 className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 cursor-pointer rounded-md'

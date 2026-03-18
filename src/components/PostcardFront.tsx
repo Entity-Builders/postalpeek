@@ -14,6 +14,7 @@ import {
   Gem,
   ShieldCheck,
   Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
@@ -21,7 +22,7 @@ import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
-import { t } from '../utils/i18n';
+import { t, useLang } from '../utils/i18n';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
 import { TripSlide } from './TripSlide';
@@ -55,8 +56,10 @@ interface PostcardFrontProps {
   showClaimGuide?: boolean;
   /** Hide claim + share buttons (e.g. in daily pack reveal) */
   hideActions?: boolean;
+  /** Whether this card is the currently visible slide */
+  isActive?: boolean;
   /** Called when user taps expand to see fullscreen image */
-  onExpandImage?: (item: FeedItem) => void;
+  onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
 }
 
 export function PostcardFront({
@@ -81,13 +84,25 @@ export function PostcardFront({
   isInAlbum = false,
   showClaimGuide = false,
   hideActions = false,
-  onExpandImage,
+  isActive = true,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showClaimedTooltip, setShowClaimedTooltip] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isClean, setIsClean] = useState(false);
+  useLang(); // subscribe to language changes
+
+  // Reset clean mode when the card loses focus (swipe away)
+  React.useEffect(() => {
+    if (!isActive && isClean) {
+      setIsClean(false);
+    }
+  }, [isActive, isClean]);
+  const [showIdCopied, setShowIdCopied] = useState(false);
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = React.useRef(false);
   // Video generation state — commented out while button is hidden
   // const [localAnimState, setLocalAnimState] = useState<
   //   'idle' | 'queued' | null
@@ -238,13 +253,17 @@ export function PostcardFront({
 
       {/* Main card */}
       <div
-        className='relative w-full h-full bg-white flex flex-col'
+        className='relative w-full h-full flex flex-col transition-all duration-300 bg-white'
         style={{ zIndex: 1 }}
       >
-        <div className="flex-1 w-full min-h-0 relative p-1 pb-0 overflow-hidden flex flex-col bg-white">
+        <div className={cn(
+          "flex-1 w-full min-h-0 relative overflow-hidden flex flex-col transition-all duration-300",
+          isClean ? 'p-0' : 'p-1 pb-0 bg-white',
+        )}>
           <div
             className={cn(
-              'relative overflow-hidden rounded shadow-inner image-protected bg-stone-200 flex-1 min-h-0',
+              'relative overflow-hidden shadow-inner image-protected bg-stone-200 flex-1 min-h-0 transition-all duration-300',
+              isClean ? 'rounded-none' : 'rounded',
             )}
             onContextMenu={(e) => e.preventDefault()}
           >
@@ -323,27 +342,37 @@ export function PostcardFront({
             />
           )}
 
-          {/* Expand icon — fullscreen image */}
-          {onExpandImage && (
-            <button
-              className='absolute bottom-2.5 right-2.5 z-40 p-1.5 rounded-md bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all backdrop-blur-sm'
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpandImage(activeSlideItem);
-                analytics.track('expand_image_clicked', {
-                  postcard_id: activeSlideItem.id,
-                  country: activeSlideItem.country,
-                });
-              }}
-              title='Ver imagen completa'
-            >
-              <Maximize2 className='w-3.5 h-3.5' />
-            </button>
-          )}        </div>
+          {/* Expand / Clean toggle */}
+          <button
+            className={cn(
+              'absolute z-40 p-1.5 rounded-md transition-all shadow-md ring-1 ring-white/20',
+              isClean
+                ? 'bottom-2.5 right-2.5 bg-black/50 hover:bg-black/70 text-white/90 hover:text-white'
+                : 'bottom-2.5 right-2.5 bg-black/60 hover:bg-black/80 text-white/90 hover:text-white',
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              const nextClean = !isClean;
+              setIsClean(nextClean);
+              analytics.track(nextClean ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off', {
+                postcard_id: activeSlideItem.id,
+                country: activeSlideItem.country,
+              });
+            }}
+            title={isClean ? 'Volver' : 'Ver imagen'}
+          >
+            {isClean
+              ? <Minimize2 className='w-3.5 h-3.5' />
+              : <Maximize2 className='w-3.5 h-3.5' />
+            }
+          </button>        </div>
         </div>
         
-        {/* Title + Buttons row */}
-        <div className='mt-3 md:mt-4 px-1 pb-1 flex justify-between items-end shrink-0'>
+        {/* Title + Buttons row — hidden in clean mode */}
+        <div className={cn(
+          'mt-3 md:mt-4 px-1 pb-1 flex justify-between items-end shrink-0 transition-all duration-300 overflow-hidden',
+          isClean ? 'max-h-0 opacity-0 mt-0 pb-0' : 'max-h-40 opacity-100',
+        )}>
           <div className='flex-1 min-w-0 mr-3'>
             {/* Album stop indicator */}
             {activeSlideItem.album_id && activeSlideItem.album_sequence != null && (() => {
@@ -698,22 +727,61 @@ export function PostcardFront({
               </button>
             )}
 
-            <button
-              className='p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors'
-              onClick={(e) => {
-                e.stopPropagation();
-                onFlipCard('info');
-              }}
-            >
-              <Info className='w-4 h-4 md:w-5 md:h-5' />
-            </button>
+            <div className='relative'>
+              <button
+                className='p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors'
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  didLongPress.current = false;
+                  longPressTimer.current = setTimeout(async () => {
+                    didLongPress.current = true;
+                    try {
+                      await navigator.clipboard.writeText(activeSlideItem.id);
+                      setShowIdCopied(true);
+                      setTimeout(() => setShowIdCopied(false), 1500);
+                    } catch {
+                      /* clipboard not available */
+                    }
+                  }, 600);
+                }}
+                onPointerUp={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                }}
+                onPointerLeave={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (didLongPress.current) return;
+                  onFlipCard('info');
+                }}
+              >
+                <Info className='w-4 h-4 md:w-5 md:h-5' />
+              </button>
+              {showIdCopied && (
+                <div className='absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50 animate-fade-in'>
+                  ID Copied! 📋
+                  <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Storytelling preview — compact, with flip-to-read-more */}
         {storytelling && (
           <button
-            className='mt-2 mx-1 rounded-lg border-l-[3px] border-amber-400/70 bg-amber-50/60 px-3.5 py-2.5 flex items-center justify-between gap-2 w-[calc(100%-0.5rem)] text-left transition-colors hover:bg-amber-50/90'
+            className={cn(
+              'mt-2 mx-1 rounded-lg border-l-[3px] border-amber-400/70 bg-amber-50/60 px-3.5 py-2.5 flex items-center justify-between gap-2 w-[calc(100%-0.5rem)] text-left transition-all hover:bg-amber-50/90',
+              isClean ? 'max-h-0 opacity-0 overflow-hidden mt-0 py-0 px-0 border-l-0' : 'max-h-24 opacity-100',
+              'duration-300',
+            )}
             onClick={(e) => {
               e.stopPropagation();
               onFlipCard('info');

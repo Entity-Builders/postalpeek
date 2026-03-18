@@ -289,7 +289,19 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
       const { data, error } = await supabase.functions.invoke('postalpeek-regenerate-illustration', {
         body: { postcard_id: postcardId.trim() },
       });
-      if (error) throw error;
+      if (error) {
+        // supabase.functions.invoke wraps non-2xx with a generic message;
+        // the real body lives in error.context (a Response object)
+        let realMessage = error.message;
+        try {
+          const ctx = (error as unknown as { context: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            realMessage = body?.error || body?.message || realMessage;
+          }
+        } catch { /* ignore parse failures */ }
+        throw new Error(realMessage);
+      }
       setActionStatus({
         status: 'success',
         message: data?.message || `Illustration regenerated ✅`,
@@ -310,7 +322,17 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
       const { data, error } = await supabase.functions.invoke('postalpeek-regenerate-descriptions', {
         body: { postcard_id: postcardId.trim() },
       });
-      if (error) throw error;
+      if (error) {
+        let realMessage = error.message;
+        try {
+          const ctx = (error as unknown as { context: Response }).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.json();
+            realMessage = body?.error || body?.message || realMessage;
+          }
+        } catch { /* ignore parse failures */ }
+        throw new Error(realMessage);
+      }
       setActionStatus({
         status: 'success',
         message: data?.message || `Descriptions regenerated ✅`,

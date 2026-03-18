@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeedItem } from './Postcard';
-import { t } from '../utils/i18n';
+import { t, useLang } from '../utils/i18n';
 
 interface PostcardBackProps {
   item: FeedItem;
@@ -39,6 +39,7 @@ export function PostcardBack({
   handleImageError,
 }: PostcardBackProps) {
   const storytelling = item.generation_metadata?.storytelling;
+  useLang(); // subscribe — triggers re-render on language change
   const isAlbumGroup = !!item.album_id;
   const tripCtx = item.generation_metadata?.tripContext;
   const visualTags: string[] = item.visual_tags || [];

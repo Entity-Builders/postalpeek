@@ -29,6 +29,7 @@ import { analytics } from '../lib/analytics';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence } from 'framer-motion';
 import { AdminToolbar } from './AdminToolbar';
+import { useLang, toggleLang } from '../utils/i18n';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -103,6 +104,7 @@ export function WalkerFeed({
   const [lightboxState, setLightboxState] = useState<{
     items: FeedItem[];
     initialIndex: number;
+    sourceRect?: DOMRect;
   } | null>(null);
   const location = useLocation();
   const showCollection = location.pathname === '/collection';
@@ -286,9 +288,6 @@ export function WalkerFeed({
             refetchCollection();
             refetchAlbums();
           }}
-          onExpandImage={(item) => {
-            setLightboxState({ items: [item], initialIndex: 0 });
-          }}
         />
       )}
 
@@ -372,6 +371,7 @@ export function WalkerFeed({
           <ImageLightbox
             items={lightboxState.items}
             initialIndex={lightboxState.initialIndex}
+            sourceRect={lightboxState.sourceRect}
             onClose={() => setLightboxState(null)}
             onOpenDetail={(item) => {
               setLightboxState(null);
@@ -387,10 +387,6 @@ export function WalkerFeed({
           <PostcardDetailModal
             item={selectedPostcard}
             onClose={() => setSelectedPostcard(null)}
-            onExpandImage={(item) => {
-              setSelectedPostcard(null);
-              setLightboxState({ items: [item], initialIndex: 0 });
-            }}
           />
         )}
       </AnimatePresence>
@@ -444,6 +440,28 @@ export function WalkerFeed({
         user={user}
         onPostcardGenerated={refetchFeed}
       />
+
+      {/* Language Toggle — floating bottom-left */}
+      <LanguageToggle isIdle={isIdle} isOnWelcome={isOnWelcome} />
     </div>
   );
 }
+
+/* ── Floating Language Toggle ─────────────────────── */
+function LanguageToggle({ isIdle, isOnWelcome }: { isIdle?: boolean; isOnWelcome: boolean }) {
+  const lang = useLang();
+  return (
+    <button
+      className={`absolute bottom-6 left-4 z-50 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border transition-all duration-700 cursor-pointer
+        bg-black/30 text-white/80 border-white/15 hover:bg-black/50 hover:text-white shadow-lg
+        ${isIdle || isOnWelcome ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      onClick={() => toggleLang()}
+      title={lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+    >
+      <span className={lang === 'es' ? 'text-white' : 'text-white/40'}>ES</span>
+      <span className='text-white/30'>|</span>
+      <span className={lang === 'en' ? 'text-white' : 'text-white/40'}>EN</span>
+    </button>
+  );
+}
+

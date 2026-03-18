@@ -10,7 +10,7 @@ import { analytics } from '../lib/analytics';
 interface PostcardDetailModalProps {
   item: FeedItem;
   onClose: () => void;
-  onExpandImage?: (item: FeedItem) => void;
+  onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
 }
 
 type ValidationState = 'idle' | 'analyzing' | 'success' | 'error';

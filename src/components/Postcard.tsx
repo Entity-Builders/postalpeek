@@ -71,7 +71,7 @@ interface PostcardProps {
   /** Called when the hero image finishes loading */
   onHeroReady?: () => void;
   /** Called when user taps the expand icon to see fullscreen image */
-  onExpandImage?: (item: FeedItem) => void;
+  onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
 }
 
 export function Postcard({
@@ -90,7 +90,6 @@ export function Postcard({
   showClaimGuide = false,
   hideActions = false,
   onHeroReady,
-  onExpandImage,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -189,6 +188,7 @@ export function Postcard({
           item={item}
           isAdmin={isAdmin}
           isPriority={isPriority}
+          isActive={isActive}
           isLiked={isLiked}
           onToggleFavorite={onToggleFavorite}
           onAuthRequired={onAuthRequired}
@@ -213,7 +213,6 @@ export function Postcard({
           isInAlbum={isInAlbum}
           showClaimGuide={showClaimGuide}
           hideActions={hideActions}
-          onExpandImage={onExpandImage}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={activeSlideItem} />
