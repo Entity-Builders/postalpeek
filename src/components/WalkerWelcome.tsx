@@ -6,6 +6,7 @@ import { t } from '../utils/i18n';
 import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { useSignedImage } from '../utils/useSignedImage';
 import { useWelcomeAnimation } from '../utils/useWelcomeAnimation';
+import { analytics } from '../lib/analytics';
 
 interface WalkerWelcomeProps {
   previewCards: FeedItem[];
@@ -23,6 +24,10 @@ interface WalkerWelcomeProps {
  */
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const cards = previewCards.slice(0, 3);
+
+  React.useEffect(() => {
+    analytics.track('welcome_screen_viewed', { postcards_count: cards.length });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
 

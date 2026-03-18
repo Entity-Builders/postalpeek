@@ -207,10 +207,9 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
     if (!user?.id) return;
     setActionStatus({ status: 'loading', message: 'Resetting claim limits...' });
     try {
-      const { error } = await supabase
-        .from('postalpeek_claim_limits')
-        .update({ daily_claims_used: 0, monthly_claims_used: 0 })
-        .eq('user_id', user.id);
+      const { error } = await supabase.rpc('postalpeek_admin_reset_claims', {
+        p_user_id: user.id,
+      });
       if (error) throw error;
       setActionStatus({ status: 'success', message: 'Claim limits reset ✅' });
       fetchStats();
@@ -227,12 +226,11 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
     if (!confirm('This will remove ownership of ALL postcards for this user. Are you sure?')) return;
     setActionStatus({ status: 'loading', message: 'Unclaiming all postcards...' });
     try {
-      const { error } = await supabase
-        .from('postalpeek_postcards')
-        .update({ owner_id: null, claimed_at: null })
-        .eq('owner_id', user.id);
+      const { data, error } = await supabase.rpc('postalpeek_admin_unclaim_all', {
+        p_user_id: user.id,
+      });
       if (error) throw error;
-      setActionStatus({ status: 'success', message: 'All postcards unclaimed ✅' });
+      setActionStatus({ status: 'success', message: `${data ?? 0} postcards unclaimed ✅` });
       fetchStats();
     } catch (err: unknown) {
       setActionStatus({
@@ -268,10 +266,9 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
     if (!confirm(`Delete postcard ${postcardId}? This is permanent.`)) return;
     setActionStatus({ status: 'loading', message: 'Deleting postcard...' });
     try {
-      const { error } = await supabase
-        .from('postalpeek_postcards')
-        .delete()
-        .eq('id', postcardId.trim());
+      const { error } = await supabase.rpc('postalpeek_admin_delete_postcard', {
+        p_postcard_id: postcardId.trim(),
+      });
       if (error) throw error;
       setActionStatus({ status: 'success', message: `Postcard ${postcardId.slice(0, 8)}… deleted ✅` });
       setPostcardId('');

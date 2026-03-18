@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Gem,
   ShieldCheck,
+  Maximize2,
 } from 'lucide-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
@@ -52,6 +53,10 @@ interface PostcardFrontProps {
   isInAlbum?: boolean;
   /** Tutorial: show a pulsing guide tooltip on the claim button */
   showClaimGuide?: boolean;
+  /** Hide claim + share buttons (e.g. in daily pack reveal) */
+  hideActions?: boolean;
+  /** Called when user taps expand to see fullscreen image */
+  onExpandImage?: (item: FeedItem) => void;
 }
 
 export function PostcardFront({
@@ -75,6 +80,8 @@ export function PostcardFront({
   isClaimLoading = false,
   isInAlbum = false,
   showClaimGuide = false,
+  hideActions = false,
+  onExpandImage,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -315,7 +322,24 @@ export function PostcardFront({
               onHeroLoad={onHeroLoad}
             />
           )}
-        </div>
+
+          {/* Expand icon — fullscreen image */}
+          {onExpandImage && (
+            <button
+              className='absolute bottom-2.5 right-2.5 z-40 p-1.5 rounded-md bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all backdrop-blur-sm'
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpandImage(activeSlideItem);
+                analytics.track('expand_image_clicked', {
+                  postcard_id: activeSlideItem.id,
+                  country: activeSlideItem.country,
+                });
+              }}
+              title='Ver imagen completa'
+            >
+              <Maximize2 className='w-3.5 h-3.5' />
+            </button>
+          )}        </div>
         </div>
         
         {/* Title + Buttons row */}
@@ -376,12 +400,11 @@ export function PostcardFront({
                 if (onToggleFavorite) {
                   onToggleFavorite(item.id);
                 }
-                if (!isLiked) {
-                  analytics.track('postcard_liked', {
-                    postcard_id: item.id,
-                    country: item.country,
-                  });
-                }
+                analytics.track(isLiked ? 'postcard_unfavorited' : 'postcard_favorited', {
+                  postcard_id: item.id,
+                  country: item.country,
+                  city: item.city,
+                });
               }}
             >
               <Heart
@@ -393,7 +416,7 @@ export function PostcardFront({
             </button>
 
             {/* 🃏 Claim area */}
-            <div className='relative'>
+            {!hideActions && <div className='relative'>
               {/* Tutorial guide tooltip */}
               {showClaimGuide && !isClaimedByMe && (
                 <motion.div
@@ -492,9 +515,9 @@ export function PostcardFront({
                   />
                 </div>
               )}
-            </div>
+            </div>}
 
-            <button
+            {!hideActions && <button
               className={cn(
                 'p-2 md:p-2.5 rounded-full transition-colors',
                 isCopied
@@ -552,7 +575,7 @@ export function PostcardFront({
               ) : (
                 <Share2 className='w-4 h-4 md:w-5 md:h-5 transition-transform' />
               )}
-            </button>
+            </button>}
 
             {/* --- Video generation button (varita mágica) — commented out for now ---
             {isAdmin && animationState !== 'completed' && (

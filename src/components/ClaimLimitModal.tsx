@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { analytics } from '../lib/analytics';
 
 interface ClaimLimitModalProps {
   type: 'daily' | 'monthly';
@@ -10,6 +11,10 @@ interface ClaimLimitModalProps {
 }
 
 export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalProps) {
+  React.useEffect(() => {
+    analytics.track('claim_limit_shown', { type, used, limit });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <AnimatePresence>
       <motion.div

@@ -10,11 +10,12 @@ import { analytics } from '../lib/analytics';
 interface PostcardDetailModalProps {
   item: FeedItem;
   onClose: () => void;
+  onExpandImage?: (item: FeedItem) => void;
 }
 
 type ValidationState = 'idle' | 'analyzing' | 'success' | 'error';
 
-export function PostcardDetailModal({ item, onClose }: PostcardDetailModalProps) {
+export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDetailModalProps) {
   const [validationState, setValidationState] = useState<ValidationState>('idle');
   const [validationReason, setValidationReason] = useState<string | null>(null);
 
@@ -105,7 +106,7 @@ export function PostcardDetailModal({ item, onClose }: PostcardDetailModalProps)
       <div className="flex-1 overflow-y-auto px-4 pb-12 flex flex-col items-center pt-2">
         {/* Postcard Container */}
         <div className="w-full max-w-sm aspect-[3/4] relative mb-6">
-          <Postcard item={item} isActive={true} />
+          <Postcard item={item} isActive={true} onExpandImage={onExpandImage} />
         </div>
 
         {/* IRL Validation Section */}

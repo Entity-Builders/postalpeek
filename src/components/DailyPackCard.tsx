@@ -1,12 +1,12 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Trophy } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { Postcard } from './Postcard';
-import { useSignedImage } from '../utils/useSignedImage';
-import { WIDTHS } from '../utils/imageUtils';
 import type { User } from '@supabase/supabase-js';
 import { analytics } from '../lib/analytics';
+
+export type RevealMode = 'tap' | 'auto-scroll' | 'cascade';
 
 interface DailyPackCardProps {
   item: FeedItem;
@@ -15,6 +15,10 @@ interface DailyPackCardProps {
   isActive: boolean;
   isRevealed: boolean;
   onReveal: () => void;
+  /** Reveal UX variant */
+  revealMode: RevealMode;
+  /** Delay in ms before auto-revealing (cascade mode only) */
+  cascadeDelay?: number;
   /** Album euphoria */
   isInAlbum: boolean;
   /** Full Postcard props */
@@ -37,24 +41,34 @@ export function DailyPackCard({
   isActive,
   isRevealed,
   onReveal,
+  revealMode,
+  cascadeDelay = 0,
   isInAlbum,
   user,
   isAdmin,
   favoriteIds,
   toggleFavorite,
   claimedIds,
-  onClaimPostcard,
   isClaimLoading,
   albumPostcardIds,
   setShowAuthGate,
   setPendingFavoriteId,
 }: DailyPackCardProps) {
 
-  // Pre-load a blurred version for the cover
-  const blurUrl = useSignedImage(item.illustration_url, {
-    width: WIDTHS.mobile, // Need enough resolution for blurring to look good
-    quality: 60,
-  });
+  // Auto-scroll mode: reveal when slide becomes active
+  useEffect(() => {
+    if (revealMode === 'auto-scroll' && isActive && !isRevealed) {
+      onReveal();
+    }
+  }, [revealMode, isActive, isRevealed, onReveal]);
+
+  // Cascade mode: reveal after a stagger delay
+  useEffect(() => {
+    if (revealMode === 'cascade' && !isRevealed) {
+      const timer = setTimeout(() => onReveal(), cascadeDelay);
+      return () => clearTimeout(timer);
+    }
+  }, [revealMode, isRevealed, onReveal, cascadeDelay]);
 
   const handleReveal = useCallback(() => {
     if (isRevealed) return;
@@ -133,57 +147,75 @@ export function DailyPackCard({
             borderRadius: '12px',
           }}
         >
-          <AnimatePresence mode='wait'>
-            {!isRevealed ? (
-              /* ─── UNREVEALED: Blurred cover ─── */
+          {/* Always render the real Postcard — when unrevealed it's blurred via CSS */}
+          <motion.div
+            className='w-full h-full [&>div]:!opacity-100'
+            animate={{
+              filter: isRevealed ? 'blur(0px)' : 'blur(16px)',
+              scale: isRevealed ? 1 : 1.08,
+            }}
+            initial={{ filter: 'blur(16px)', scale: 1.08 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 18, mass: 0.8 }}
+            style={{ pointerEvents: isRevealed ? 'auto' : 'none', overflow: 'hidden' }}
+          >
+            <Postcard
+              item={item}
+              isActive={isActive}
+              isAdmin={isAdmin}
+              isPriority={true}
+              favoriteIds={favoriteIds}
+              onToggleFavorite={user ? toggleFavorite : undefined}
+              isClaimedByMe={claimedIds.has(item.id)}
+              isClaimed={!!item.owner_id}
+              onClaimPostcard={undefined}
+              isClaimLoading={isClaimLoading}
+              isInAlbum={albumPostcardIds.has(item.id)}
+              hideActions={true}
+              onAuthRequired={
+                !user
+                  ? (postcardId) => {
+                      setPendingFavoriteId(postcardId);
+                      setShowAuthGate(true);
+                    }
+                  : undefined
+              }
+            />
+          </motion.div>
+
+          {/* Tap-to-reveal overlay — only visible in tap mode when unrevealed */}
+          <AnimatePresence>
+            {!isRevealed && revealMode === 'tap' && (
               <motion.button
-                key='cover'
-                className='w-full h-full rounded-md overflow-hidden relative cursor-pointer'
+                key='reveal-overlay'
+                className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 cursor-pointer rounded-md'
                 onClick={handleReveal}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
               >
-                {/* The actual image, heavily blurred */}
-                {blurUrl && (
-                  <img
-                    src={blurUrl}
-                    alt=''
-                    className='absolute inset-0 w-full h-full object-cover'
-                    style={{
-                      filter: 'blur(28px) saturate(1.3) brightness(0.85)',
-                      transform: 'scale(1.15)', // prevent blur edges showing
-                    }}
-                    loading='eager'
-                    draggable={false}
-                  />
-                )}
+                {/* Subtle dark overlay for text contrast */}
+                <div className='absolute inset-0 bg-black/10 rounded-md' />
 
-                {/* Overlay gradient */}
-                <div className='absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30 z-10' />
+                {/* Sparkle icon */}
+                <motion.div
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.8, 1, 0.8] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  className='relative w-16 h-16 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center border border-white/40 shadow-lg'
+                >
+                  <Sparkles className='w-8 h-8 text-white drop-shadow-md' />
+                </motion.div>
+                <span className='relative text-white font-semibold text-base drop-shadow-lg tracking-wide'>
+                  Toca para revelar
+                </span>
+                <span className='relative text-white/70 text-sm drop-shadow'>
+                  Postal #{cardIndex + 1}
+                </span>
 
-                {/* Tap to reveal CTA */}
-                <div className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3'>
-                  <motion.div
-                    animate={{ scale: [1, 1.15, 1], opacity: [0.8, 1, 0.8] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                    className='w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 shadow-lg'
-                  >
-                    <Sparkles className='w-8 h-8 text-white drop-shadow-md' />
-                  </motion.div>
-                  <span className='text-white font-semibold text-base drop-shadow-md tracking-wide'>
-                    Toca para revelar
-                  </span>
-                  <span className='text-white/60 text-sm'>
-                    Postal #{cardIndex + 1}
-                  </span>
-                </div>
-
-                {/* Shimmer sweep animation */}
-                <div className='absolute inset-0 z-10 pointer-events-none overflow-hidden'>
+                {/* Shimmer sweep */}
+                <div className='absolute inset-0 pointer-events-none overflow-hidden rounded-md'>
                   <div
                     className='absolute w-[200%] h-full -left-full'
                     style={{
-                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%)',
                       animation: 'shimmerSweep 3s ease-in-out infinite',
                     }}
                   />
@@ -195,37 +227,6 @@ export function DailyPackCard({
                   `}</style>
                 </div>
               </motion.button>
-            ) : (
-              /* ─── REVEALED: Full Postcard component ─── */
-              <motion.div
-                key='revealed'
-                className='w-full h-full'
-                initial={{ opacity: 0, scale: 1.02 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-              >
-                <Postcard
-                  item={item}
-                  isActive={isActive}
-                  isAdmin={isAdmin}
-                  isPriority={true}
-                  favoriteIds={favoriteIds}
-                  onToggleFavorite={user ? toggleFavorite : undefined}
-                  isClaimedByMe={claimedIds.has(item.id)}
-                  isClaimed={!!item.owner_id}
-                  onClaimPostcard={user ? onClaimPostcard : undefined}
-                  isClaimLoading={isClaimLoading}
-                  isInAlbum={albumPostcardIds.has(item.id)}
-                  onAuthRequired={
-                    !user
-                      ? (postcardId) => {
-                          setPendingFavoriteId(postcardId);
-                          setShowAuthGate(true);
-                        }
-                      : undefined
-                  }
-                />
-              </motion.div>
             )}
           </AnimatePresence>
         </div>

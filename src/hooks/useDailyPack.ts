@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import type { FeedItem } from '../components/Postcard';
 import { analytics } from '../lib/analytics';
+import { preSignUrls } from '../utils/imageUtils';
 
 interface DailyPackResult {
   success: boolean;
@@ -76,6 +77,12 @@ export function useDailyPack(userId: string | null | undefined) {
       const result = data as DailyPackResult;
 
       if (result.success && result.postcards) {
+        // Pre-sign illustration URLs so Postcard components can render images
+        const urls = result.postcards.flatMap((p: FeedItem) =>
+          [p.illustration_url, p.original_image_url].filter(Boolean)
+        );
+        await preSignUrls(urls);
+
         setPackCards(result.postcards);
         setIsPackAvailable(false);
         setIsPackOpened(true);

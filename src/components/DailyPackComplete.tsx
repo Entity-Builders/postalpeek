@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, Trophy, ArrowDown } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { cdnImage } from '../utils/imageUtils';
+import { analytics } from '../lib/analytics';
 
 interface DailyPackCompleteProps {
   cards: FeedItem[];
@@ -15,6 +16,13 @@ export function DailyPackComplete({
   albumCardCount,
   onGoToFeed,
 }: DailyPackCompleteProps) {
+  React.useEffect(() => {
+    analytics.track('daily_pack_completed', {
+      cards_count: cards.length,
+      album_cards_count: albumCardCount,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className='w-full h-full flex flex-col items-center justify-center px-6'>
       {/* Celebration header */}

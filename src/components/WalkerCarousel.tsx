@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
-import { DailyPackCard } from './DailyPackCard';
+import { DailyPackCard, type RevealMode } from './DailyPackCard';
 import { DailyPackComplete } from './DailyPackComplete';
 import type { User } from '@supabase/supabase-js';
 
@@ -44,6 +44,8 @@ interface WalkerCarouselProps {
   /** Daily Pack inline mode */
   packCards?: FeedItem[];
   onPackComplete?: () => void;
+  /** Expand image to fullscreen lightbox */
+  onExpandImage?: (item: FeedItem) => void;
 }
 
 export function WalkerCarousel({
@@ -69,6 +71,7 @@ export function WalkerCarousel({
   albumPostcardIds = new Set(),
   packCards = [],
   onPackComplete,
+  onExpandImage,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [lookaheadOffset, setLookaheadOffset] = useState(1);
@@ -79,6 +82,26 @@ export function WalkerCarousel({
   // Daily pack: track revealed card indices
   const [revealedPackCards, setRevealedPackCards] = useState<Set<number>>(new Set());
   const isPackMode = packCards.length > 0;
+
+  // Read PostHog feature flag for reveal mode (defaults to 'tap')
+  const [revealMode, setRevealMode] = useState<RevealMode>('tap');
+  useEffect(() => {
+    if (!isPackMode) return;
+    const flag = analytics.getFeatureFlag('daily-pack-reveal-mode');
+    if (flag === 'auto-scroll' || flag === 'cascade') {
+      setRevealMode(flag);
+      analytics.track('daily_pack_variant_assigned', { variant: flag });
+    } else {
+      // Flag not loaded yet — listen for it
+      analytics.onFeatureFlagsLoaded(() => {
+        const resolved = analytics.getFeatureFlag('daily-pack-reveal-mode');
+        const mode: RevealMode =
+          resolved === 'auto-scroll' || resolved === 'cascade' ? resolved : 'tap';
+        setRevealMode(mode);
+        analytics.track('daily_pack_variant_assigned', { variant: mode });
+      });
+    }
+  }, [isPackMode]);
 
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
     displayItems.slice(0, 2),
@@ -361,15 +384,18 @@ export function WalkerCarousel({
                 key={`pack-${packItem.id}`}
                 className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50'
               >
-                {isNearby && (
-                  <img
-                    src={cdnImage(packItem.illustration_url, { width: WIDTHS.blur, quality: 50 })}
-                    alt=''
-                    loading='eager'
-                    decoding='async'
-                    className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
-                  />
-                )}
+                {isNearby && (() => {
+                  const blurSrc = cdnImage(packItem.illustration_url, { width: WIDTHS.blur, quality: 50 });
+                  return blurSrc ? (
+                    <img
+                      src={blurSrc}
+                      alt=''
+                      loading='eager'
+                      decoding='async'
+                      className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
+                    />
+                  ) : null;
+                })()}
                 <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
                 <div className='z-10 w-full h-full flex items-center justify-center'>
                   <DailyPackCard
@@ -385,6 +411,8 @@ export function WalkerCarousel({
                         return next;
                       });
                     }}
+                    revealMode={revealMode}
+                    cascadeDelay={packIndex * 300}
                     isInAlbum={albumPostcardIds.has(packItem.id)}
                     user={user}
                     isAdmin={isAdmin}
@@ -560,6 +588,7 @@ export function WalkerCarousel({
                               }
                             : undefined
                         }
+                        onExpandImage={onExpandImage}
                       />
                     </motion.div>
                   )}

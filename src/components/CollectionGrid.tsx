@@ -8,6 +8,7 @@ import { CollectionFilterBar } from './CollectionFilterBar';
 import type { FeedItem } from './Postcard';
 import type { Album } from '../hooks/useAlbums';
 import { t } from '../utils/i18n';
+import { analytics } from '../lib/analytics';
 
 type SectionId = 'albums' | 'postcards' | 'favorites';
 
@@ -194,6 +195,15 @@ export function CollectionGrid({
 }: CollectionGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+
+  // Debounced search tracking
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const timer = setTimeout(() => {
+      analytics.track('collection_searched', { query: searchQuery.trim() });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Dynamically calculate the top tags present in the user's collection
   const suggestedTags = React.useMemo(() => {
@@ -548,6 +558,7 @@ export function CollectionGrid({
             onSearchChange={setSearchQuery}
             activeFilters={activeFilters}
             onToggleFilter={(f) => {
+              analytics.track('collection_filtered', { filter_tag: f });
               setActiveFilters((prev) =>
                 prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
               );

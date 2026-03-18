@@ -7,6 +7,7 @@ import { useSignedImage } from '../utils/useSignedImage';
 import { sway, ease } from '../utils/useWelcomeAnimation';
 import type { FeedItem } from './Postcard';
 import { t } from '../utils/i18n';
+import { analytics } from '../lib/analytics';
 
 interface AuthGateModalProps {
   onSuccess: () => void;
@@ -68,6 +69,9 @@ export function AuthGateModal({
     try {
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
+      analytics.track('signup_email_submitted', {
+        email_domain: email.split('@')[1] || 'unknown',
+      });
       setStep('otp');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -117,8 +121,12 @@ export function AuthGateModal({
         type: 'email',
       });
       if (error) throw error;
+      analytics.track('signup_otp_verified');
       onSuccess();
     } catch (err: unknown) {
+      analytics.track('signup_otp_failed', {
+        error: err instanceof Error ? err.message : 'unknown',
+      });
       setError(err instanceof Error ? err.message : 'Invalid code. Try again.');
     } finally {
       setLoading(false);
@@ -132,6 +140,7 @@ export function AuthGateModal({
     try {
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
+      analytics.track('signup_otp_resent');
       setOtpCode('');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not resend code');

@@ -66,8 +66,12 @@ interface PostcardProps {
   isInAlbum?: boolean;
   /** Tutorial: show pulsing claim guide on the first card */
   showClaimGuide?: boolean;
+  /** Hide the claim button entirely (e.g. in daily pack reveal) */
+  hideActions?: boolean;
   /** Called when the hero image finishes loading */
   onHeroReady?: () => void;
+  /** Called when user taps the expand icon to see fullscreen image */
+  onExpandImage?: (item: FeedItem) => void;
 }
 
 export function Postcard({
@@ -84,7 +88,9 @@ export function Postcard({
   isClaimLoading = false,
   isInAlbum = false,
   showClaimGuide = false,
+  hideActions = false,
   onHeroReady,
+  onExpandImage,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -206,6 +212,8 @@ export function Postcard({
           isClaimLoading={isClaimLoading}
           isInAlbum={isInAlbum}
           showClaimGuide={showClaimGuide}
+          hideActions={hideActions}
+          onExpandImage={onExpandImage}
         />
         {backView === 'coupon' ? (
           <PostcardCoupon item={activeSlideItem} />

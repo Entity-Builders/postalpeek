@@ -4,6 +4,7 @@ import { ArrowLeft, Trophy, MapPin, Library } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { Album } from '../hooks/useAlbums';
+import { analytics } from '../lib/analytics';
 
 interface AlbumsModalProps {
   albums: Album[];
@@ -162,7 +163,15 @@ export function AlbumsModal({
                 key={album.id}
                 album={album}
                 index={i}
-                onClick={() => onSelectAlbum(album)}
+                onClick={() => {
+                  analytics.track('album_selected', {
+                    album_id: album.id,
+                    album_title: album.title,
+                    progress: `${album.collected_slots}/${album.total_slots}`,
+                    is_complete: album.completed_at !== null,
+                  });
+                  onSelectAlbum(album);
+                }}
               />
             ))}
           </div>

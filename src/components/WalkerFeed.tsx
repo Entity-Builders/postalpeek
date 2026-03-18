@@ -20,6 +20,7 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
+import { ImageLightbox } from './ImageLightbox';
 import { DailyPackButton } from './DailyPackButton';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
@@ -76,7 +77,10 @@ export function WalkerFeed({
 
   useEffect(() => {
     onWelcomeChange?.(isOnWelcome);
-  }, [isOnWelcome, onWelcomeChange]);
+    if (showWelcome && !isOnWelcome) {
+      analytics.track('welcome_scroll_started');
+    }
+  }, [isOnWelcome, onWelcomeChange, showWelcome]);
 
   const {
     favoriteIds,
@@ -96,6 +100,10 @@ export function WalkerFeed({
   // URL-driven navigation
   const navigate = useNavigate();
   const [selectedPostcard, setSelectedPostcard] = useState<FeedItem | null>(null);
+  const [lightboxState, setLightboxState] = useState<{
+    items: FeedItem[];
+    initialIndex: number;
+  } | null>(null);
   const location = useLocation();
   const showCollection = location.pathname === '/collection';
   const urlAlbumId = location.pathname.startsWith('/album/') ? location.pathname.split('/')[2] : null;
@@ -278,6 +286,9 @@ export function WalkerFeed({
             refetchCollection();
             refetchAlbums();
           }}
+          onExpandImage={(item) => {
+            setLightboxState({ items: [item], initialIndex: 0 });
+          }}
         />
       )}
 
@@ -355,12 +366,31 @@ export function WalkerFeed({
         )}
       </AnimatePresence>
 
+      {/* Image Lightbox — fullscreen swipeable gallery */}
+      <AnimatePresence>
+        {lightboxState && (
+          <ImageLightbox
+            items={lightboxState.items}
+            initialIndex={lightboxState.initialIndex}
+            onClose={() => setLightboxState(null)}
+            onOpenDetail={(item) => {
+              setLightboxState(null);
+              setSelectedPostcard(item);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Postcard Detail / Validation Modal */}
       <AnimatePresence>
         {selectedPostcard && (
           <PostcardDetailModal
             item={selectedPostcard}
             onClose={() => setSelectedPostcard(null)}
+            onExpandImage={(item) => {
+              setSelectedPostcard(null);
+              setLightboxState({ items: [item], initialIndex: 0 });
+            }}
           />
         )}
       </AnimatePresence>
