@@ -17,6 +17,38 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+
+            // Heavy vendor groups — each gets its own chunk
+            if (id.includes('framer-motion')) return 'vendor-motion';
+            if (id.includes('embla-carousel')) return 'vendor-carousel';
+            if (id.includes('@lottiefiles') || id.includes('dotlottie'))
+              return 'vendor-lottie';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('react-native-web')) return 'vendor-rnw';
+            if (id.includes('@supabase') || id.includes('supabase-js'))
+              return 'vendor-supabase';
+            if (id.includes('posthog')) return 'vendor-analytics';
+
+            // React core
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('react-router') ||
+              id.includes('scheduler')
+            )
+              return 'vendor-react';
+
+            // Everything else from node_modules
+            return 'vendor-misc';
+          },
+        },
+      },
+    },
     plugins: [react(), tailwindcss(), cloudflare()],
     define: {
       'process.env.EXPO_PUBLIC_SUPABASE_URL': JSON.stringify(

@@ -84,43 +84,12 @@ export function DailyPackCard({
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center'>
-      {/* Pack counter badge with neon glow */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className='mb-3 text-center z-20'
-      >
-        <div className='relative inline-flex'>
-          {/* Neon glow layer */}
-          <motion.div
-            className='absolute inset-0 rounded-full'
-            style={{
-              background: 'linear-gradient(90deg, #f59e0b, #8b5cf6, #f59e0b)',
-              backgroundSize: '200% 100%',
-              filter: 'blur(12px)',
-            }}
-            animate={{
-              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-              opacity: [0.5, 0.8, 0.5],
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          {/* Badge */}
-          <div className='relative inline-flex items-center gap-2 bg-black/50 backdrop-blur-md text-white/90 px-3 py-1.5 rounded-full text-xs font-medium border border-white/15 shadow-lg'>
-            <Sparkles className='w-3.5 h-3.5 text-amber-300' />
-            <span>Sobre Diario · Postal {cardIndex + 1} de {totalCards}</span>
-            <Sparkles className='w-3.5 h-3.5 text-amber-300' />
-          </div>
-        </div>
-      </motion.div>
-
       {/* Card container with pack border */}
       <div
         className='relative w-[95vw] max-w-[480px] md:max-w-[520px] mx-auto'
         style={{ aspectRatio: '4/5' }}
       >
-        {/* Pack card border — subtle animated dark frame for all pack cards */}
+        {/* Pack card border — animated dark frame */}
         <div className='absolute -inset-1.5 z-0 rounded-[14px] overflow-hidden pointer-events-none'>
           <div
             className='absolute inset-0 rounded-[14px]'
@@ -137,6 +106,19 @@ export function DailyPackCard({
             }
           `}</style>
         </div>
+
+        {/* Tab badge — fused with top-left corner of the border */}
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 25 }}
+          className='absolute -top-1.5 left-2 z-20'
+        >
+          <div className='flex items-center gap-1.5 bg-stone-900 text-white/90 pl-2.5 pr-3 py-1 rounded-b-lg text-[11px] font-medium shadow-md'>
+            <Sparkles className='w-3 h-3 text-amber-400' />
+            <span>Sobre Diario · {cardIndex + 1}/{totalCards}</span>
+          </div>
+        </motion.div>
 
         {/* Album badge with neon amber glow */}
         {isInAlbum && (

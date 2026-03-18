@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -359,12 +359,64 @@ export function WalkerCarousel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scrollWithDebounce]);
 
+  // ── Global ambient background: derive URL from current active slide ──
+  const ambientUrl = useMemo(() => {
+    const slide = slides[currentSlideIndex];
+    if (!slide) return null;
+    if (slide.type === 'welcome') return null;
+    const item = slide.type === 'pack_card' ? slide.item : slide.item;
+    return cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 }) || null;
+  }, [slides, currentSlideIndex]);
+
+  // Keep track of previous ambient URL for crossfade
+  const [shownAmbientUrl, setShownAmbientUrl] = useState<string | null>(null);
+  const [prevAmbientUrl, setPrevAmbientUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (ambientUrl && ambientUrl !== shownAmbientUrl) {
+      setPrevAmbientUrl(shownAmbientUrl);
+      setShownAmbientUrl(ambientUrl);
+    }
+  }, [ambientUrl, shownAmbientUrl]);
+
   return (
-    <div
-      className='embla absolute inset-0 w-full h-full overflow-hidden'
-      ref={emblaRef}
-      onWheel={handleWheel}
-    >
+    <div className='absolute inset-0 w-full h-full overflow-hidden'>
+      {/* ── Global ambient blur background ── */}
+      <div className='absolute inset-0 z-0 pointer-events-none'>
+        {/* Base gradient fallback */}
+        <div className='absolute inset-0 bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50' />
+        {/* Previous image (fades out) */}
+        {prevAmbientUrl && (
+          <img
+            key={prevAmbientUrl}
+            src={prevAmbientUrl}
+            alt=''
+            className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] scale-125 transform-gpu opacity-0 transition-opacity duration-700'
+          />
+        )}
+        {/* Current image (fades in) */}
+        {shownAmbientUrl && (
+          <img
+            key={shownAmbientUrl}
+            src={shownAmbientUrl}
+            alt=''
+            onLoad={(e) => {
+              // Once loaded, fade in and clear previous
+              (e.target as HTMLImageElement).style.opacity = '1';
+              setPrevAmbientUrl(null);
+            }}
+            className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] scale-125 transform-gpu opacity-0 transition-opacity duration-700'
+          />
+        )}
+        {/* Radial wash overlay */}
+        <div className='absolute inset-0 bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
+      </div>
+
+      <div
+        className='embla absolute inset-0 w-full h-full overflow-hidden z-[1]'
+        ref={emblaRef}
+        onWheel={handleWheel}
+      >
       <div className='embla__container h-full flex flex-col'>
         {slides.map((slide, slideIndex) => {
           if (slide.type === 'welcome') {
@@ -378,26 +430,11 @@ export function WalkerCarousel({
           /* ── Pack card slide ── */
           if (slide.type === 'pack_card') {
             const { item: packItem, packIndex } = slide;
-            const difference = slideIndex - currentSlideIndex;
-            const isNearby = difference >= -1 && difference <= lookaheadOffset;
             return (
               <div
                 key={`pack-${packItem.id}`}
-                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50'
+                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
               >
-                {isNearby && (() => {
-                  const blurSrc = cdnImage(packItem.illustration_url, { width: WIDTHS.blur, quality: 50 });
-                  return blurSrc ? (
-                    <img
-                      src={blurSrc}
-                      alt=''
-                      loading='eager'
-                      decoding='async'
-                      className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
-                    />
-                  ) : null;
-                })()}
-                <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
                 <div className='z-10 w-full h-full flex items-center justify-center'>
                   <DailyPackCard
                     item={packItem}
@@ -434,28 +471,12 @@ export function WalkerCarousel({
 
           /* ── Normal postcard slide (unchanged) ── */
           const { item, index: itemIndex, isFirstShared } = slide;
-          const difference = slideIndex - currentSlideIndex;
-          const isNearby = difference >= -1 && difference <= lookaheadOffset;
 
           return (
             <div
               key={`${item.id}-${itemIndex}`}
-              className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50'
+              className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
             >
-              {/* Ambient blur — sits behind everything */}
-              {isNearby && (
-                <img
-                  src={cdnImage(item.illustration_url, {
-                    width: WIDTHS.blur,
-                    quality: 50,
-                  })}
-                  alt=''
-                  loading='eager'
-                  decoding='async'
-                  className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] pointer-events-none z-0 scale-125 transform-gpu'
-                />
-              )}
-              <div className='absolute inset-0 z-[1] pointer-events-none bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
 
               {/* Inline skeleton — strictly respecting the Polaroid shell dimensions */}
               {!heroReadyIds.has(item.id) && (
@@ -498,7 +519,7 @@ export function WalkerCarousel({
                       <AlbumCover
                         item={item}
                         isActive={true}
-                        isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
+                        isPriority={slideIndex === currentSlideIndex || (slideIndex - currentSlideIndex) === 1 || !!isFirstShared}
                         onOpenTrip={() => {
                           setOpenedAlbums((prev) => {
                             const next = new Set(prev);
@@ -524,7 +545,7 @@ export function WalkerCarousel({
                       <Postcard
                         item={item}
                         isActive={true}
-                        isPriority={slideIndex === currentSlideIndex || difference === 1 || !!isFirstShared}
+                        isPriority={slideIndex === currentSlideIndex || (slideIndex - currentSlideIndex) === 1 || !!isFirstShared}
                         isAdmin={isAdmin}
                         favoriteIds={favoriteIds}
                         onToggleFavorite={user ? toggleFavorite : undefined}
@@ -617,6 +638,7 @@ export function WalkerCarousel({
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

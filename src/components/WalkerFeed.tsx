@@ -349,7 +349,7 @@ export function WalkerFeed({
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
             favoriteItems={favoriteItems}
-            isFavoritesLoading={isLoading}
+            favoriteIds={favoriteIds}
           />
         )}
       </AnimatePresence>

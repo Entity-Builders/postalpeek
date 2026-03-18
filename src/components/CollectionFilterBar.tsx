@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Heart } from 'lucide-react';
 
 interface CollectionFilterBarProps {
   searchQuery: string;
@@ -7,6 +7,9 @@ interface CollectionFilterBarProps {
   activeFilters: string[];
   onToggleFilter: (filter: string) => void;
   suggestedTags: string[];
+  showOnlyFavorites: boolean;
+  onToggleFavorites: () => void;
+  favoritesCount?: number;
 }
 
 export function CollectionFilterBar({
@@ -15,6 +18,9 @@ export function CollectionFilterBar({
   activeFilters,
   onToggleFilter,
   suggestedTags,
+  showOnlyFavorites,
+  onToggleFavorites,
+  favoritesCount = 0,
 }: CollectionFilterBarProps) {
   return (
     <div className="px-4 pb-4">
@@ -40,8 +46,27 @@ export function CollectionFilterBar({
         )}
       </div>
 
-      {/* Suggested Tags (Chips) */}
+      {/* Filter Chips */}
       <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-1">
+        {/* ♥ Favoritos — special chip */}
+        {favoritesCount > 0 && (
+          <>
+            <button
+              onClick={onToggleFavorites}
+              className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+                showOnlyFavorites
+                  ? 'bg-rose-500 text-white border-rose-500'
+                  : 'bg-white text-rose-400 border-rose-200 hover:bg-rose-50 hover:text-rose-500'
+              }`}
+            >
+              <Heart className={`w-3 h-3 ${showOnlyFavorites ? 'fill-white' : 'fill-rose-200'}`} />
+              Favoritos
+            </button>
+            <div className="w-px bg-stone-200 shrink-0 my-1" />
+          </>
+        )}
+
+        {/* Dynamic tag chips */}
         {suggestedTags.map((tag) => {
           const isActive = activeFilters.includes(tag);
           return (

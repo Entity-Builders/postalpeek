@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Package, Heart, Trophy } from 'lucide-react';
+import { ArrowLeft, Package, Trophy } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
-import { WIDTHS, preSignUrls } from '../utils/imageUtils';
+import { WIDTHS } from '../utils/imageUtils';
 import { AlbumList } from './AlbumList';
 import { CollectionFilterBar } from './CollectionFilterBar';
 import type { FeedItem } from './Postcard';
@@ -10,7 +10,7 @@ import type { Album } from '../hooks/useAlbums';
 import { t } from '../utils/i18n';
 import { analytics } from '../lib/analytics';
 
-type SectionId = 'albums' | 'postcards' | 'favorites';
+type SectionId = 'albums' | 'postcards';
 
 interface CollectionGridProps {
   collection: FeedItem[];
@@ -25,7 +25,7 @@ interface CollectionGridProps {
   onSelectPostcard?: (item: FeedItem) => void;
   /** Favorites */
   favoriteItems?: FeedItem[];
-  isFavoritesLoading?: boolean;
+  favoriteIds?: Set<string>;
   albums?: Album[];
   isLoadingAlbums?: boolean;
   onOpenAlbum?: (album: Album) => void;
@@ -37,11 +37,6 @@ const SECTIONS: { key: SectionId; label: string; icon: React.ReactNode }[] = [
     key: 'postcards',
     label: 'Postales',
     icon: <Package className='w-3.5 h-3.5' />,
-  },
-  {
-    key: 'favorites',
-    label: 'Favoritos',
-    icon: <Heart className='w-3.5 h-3.5' />,
   },
 ];
 
@@ -188,13 +183,21 @@ export function CollectionGrid({
   onClose,
   onSelectPostcard,
   favoriteItems = [],
-  isFavoritesLoading = false,
+  favoriteIds = new Set(),
   albums = [],
   isLoadingAlbums = false,
   onOpenAlbum,
 }: CollectionGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+
+  // Merge collection + favorites (deduped, favorites that aren't in collection get added)
+  const allItems = React.useMemo(() => {
+    const seen = new Set(collection.map((c) => c.id));
+    const extras = favoriteItems.filter((f) => !seen.has(f.id));
+    return [...collection, ...extras];
+  }, [collection, favoriteItems]);
 
   // Debounced search tracking
   useEffect(() => {
@@ -205,14 +208,14 @@ export function CollectionGrid({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Dynamically calculate the top tags present in the user's collection
+  // Dynamically calculate the top tags present in the unified collection
   const suggestedTags = React.useMemo(() => {
-    if (!collection || collection.length === 0) return [];
+    if (!allItems || allItems.length === 0) return [];
 
     const tagCounts: Record<string, number> = {};
     const tagDisplayNames: Record<string, string> = {};
 
-    collection.forEach((item) => {
+    allItems.forEach((item) => {
       // Prefer detailed_tags labels (high weight only) for cleaner chips
       let itemTags: string[] = [];
 
@@ -258,17 +261,15 @@ export function CollectionGrid({
     return sortedTags
       .slice(0, 15)
       .map((normalized) => tagDisplayNames[normalized]);
-  }, [collection]);
+  }, [allItems]);
 
   const [activeSection, setActiveSection] = useState<SectionId>('albums');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Record<SectionId, HTMLDivElement | null>>({
     albums: null,
     postcards: null,
-    favorites: null,
   });
   const isManualScroll = useRef(false);
-  const favPreSigned = useRef(false);
 
   // Track active section via IntersectionObserver
   useEffect(() => {
@@ -315,32 +316,6 @@ export function CollectionGrid({
     return () => observer.disconnect();
   }, []);
 
-  // Lazy pre-sign favorite URLs when favorites section comes into view
-  useEffect(() => {
-    if (favPreSigned.current || favoriteItems.length === 0) return;
-
-    const favSection = sectionRefs.current.favorites;
-    const container = scrollContainerRef.current;
-    if (!favSection || !container) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !favPreSigned.current) {
-          favPreSigned.current = true;
-          preSignUrls(
-            favoriteItems.flatMap((i) =>
-              [i.illustration_url, i.original_image_url].filter(Boolean),
-            ),
-          ).catch((err) => console.error('Failed to pre-sign fav URLs', err));
-          observer.disconnect();
-        }
-      },
-      { root: container, rootMargin: '300px' },
-    );
-
-    observer.observe(favSection);
-    return () => observer.disconnect();
-  }, [favoriteItems]);
 
   // Scroll to section when tapping a nav pill
   const scrollToSection = useCallback((sectionId: SectionId) => {
@@ -457,14 +432,14 @@ export function CollectionGrid({
     [searchQuery, activeFilters],
   );
 
-  const filteredCollection = React.useMemo(
-    () => filterItems(collection),
-    [filterItems, collection],
-  );
-  const filteredFavorites = React.useMemo(
-    () => filterItems(favoriteItems),
-    [filterItems, favoriteItems],
-  );
+  // Apply filters to the unified list, then optionally narrow to favorites-only
+  const filteredItems = React.useMemo(() => {
+    let base = filterItems(allItems);
+    if (showOnlyFavorites) {
+      base = base.filter((item) => favoriteIds.has(item.id));
+    }
+    return base;
+  }, [filterItems, allItems, showOnlyFavorites, favoriteIds]);
 
   return (
     <motion.div
@@ -564,6 +539,12 @@ export function CollectionGrid({
               );
             }}
             suggestedTags={suggestedTags}
+            showOnlyFavorites={showOnlyFavorites}
+            onToggleFavorites={() => {
+              setShowOnlyFavorites((prev) => !prev);
+              analytics.track('collection_filtered', { filter_tag: '♥ Favoritos' });
+            }}
+            favoritesCount={favoriteItems.length}
           />
         </div>
 
@@ -577,77 +558,49 @@ export function CollectionGrid({
           <div className='flex items-center justify-between mb-3'>
             <h3 className='font-serif text-base text-stone-700 flex items-center gap-2'>
               <Package className='w-4 h-4 text-stone-500' />
-              Postales
+              {showOnlyFavorites ? 'Favoritos' : 'Postales'}
             </h3>
             <span className='text-xs text-stone-400 font-mono'>
-              {filteredCollection.length}{' '}
-              {filteredCollection.length !== collection.length
-                ? `de ${collection.length}`
-                : 'postales'}
+              {filteredItems.length}{' '}
+              {filteredItems.length !== allItems.length
+                ? `de ${showOnlyFavorites ? favoriteIds.size : allItems.length}`
+                : showOnlyFavorites ? 'favoritos' : 'postales'}
             </span>
           </div>
 
           <LazyGrid
-            items={filteredCollection}
+            items={filteredItems}
             isLoading={isLoading}
             onSelectPostcard={onSelectPostcard}
             emptyState={
-              <div className='flex flex-col items-center py-10 text-center'>
-                <span className='text-5xl mb-4'>🃏</span>
-                <h3 className='font-serif text-lg text-stone-700 mb-2'>
-                  Tu colección está vacía
-                </h3>
-                <p className='text-sm text-stone-400 max-w-xs'>
-                  ¡Empezá a reclamar postales del feed para llenar tu colección!
-                </p>
-                <button
-                  onClick={onClose}
-                  className='mt-4 px-5 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition-colors'
-                >
-                  Explorar postales
-                </button>
-              </div>
-            }
-          />
-        </div>
-
-        <div className='mx-4 border-t border-stone-300/40' />
-
-        {/* ── Favorites section ── */}
-        <div
-          ref={(el) => {
-            sectionRefs.current.favorites = el;
-          }}
-          className='px-4 pt-5 pb-6'
-        >
-          <div className='flex items-center justify-between mb-3'>
-            <h3 className='font-serif text-base text-stone-700 flex items-center gap-2'>
-              <Heart className='w-4 h-4 text-rose-400' />
-              Favoritos
-            </h3>
-            <span className='text-xs text-stone-400 font-mono'>
-              {filteredFavorites.length}{' '}
-              {filteredFavorites.length !== favoriteItems.length
-                ? `de ${favoriteItems.length}`
-                : 'favoritos'}
-            </span>
-          </div>
-
-          <LazyGrid
-            items={filteredFavorites}
-            isLoading={isFavoritesLoading}
-            onSelectPostcard={onSelectPostcard}
-            emptyState={
-              <div className='flex flex-col items-center py-10 text-center'>
-                <Heart className='w-14 h-14 mb-3 text-rose-300/80 fill-rose-200/40' />
-                <h3 className='font-serif text-lg text-stone-700 mb-2'>
-                  Sin favoritos todavía
-                </h3>
-                <p className='text-sm text-stone-400 max-w-xs'>
-                  Tocá el <span className='text-rose-400'>♥</span> en las
-                  postales que te gusten.
-                </p>
-              </div>
+              showOnlyFavorites ? (
+                <div className='flex flex-col items-center py-10 text-center'>
+                  <span className='text-5xl mb-4'>♥</span>
+                  <h3 className='font-serif text-lg text-stone-700 mb-2'>
+                    Sin favoritos todavía
+                  </h3>
+                  <p className='text-sm text-stone-400 max-w-xs'>
+                    Tocá el <span className='text-rose-400'>♥</span> en las
+                    postales que te gusten.
+                  </p>
+                </div>
+              ) : (
+                <div className='flex flex-col items-center py-10 text-center'>
+                  <span className='text-5xl mb-4'>🃏</span>
+                  <h3 className='font-serif text-lg text-stone-700 mb-2'>
+                    Tu colección está vacía
+                  </h3>
+                  <p className='text-sm text-stone-400 max-w-xs'>
+                    ¡Empezá a reclamar postales del feed para llenar tu colección!
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className='mt-4 px-5 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition-colors'
+                  >
+                    Explorar postales
+                  </button>
+                </div>
+              )
             }
           />
         </div>

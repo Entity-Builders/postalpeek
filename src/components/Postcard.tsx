@@ -169,7 +169,7 @@ export function Postcard({
         'w-full h-full perspective-1000 cursor-pointer mx-auto ease-in-out flex flex-col',
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
-        !isActive && 'scale-[0.85] opacity-40 pointer-events-none',
+        !isActive && 'opacity-40 pointer-events-none',
       )}
       onClick={handleFlip}
     >
