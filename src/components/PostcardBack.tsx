@@ -74,7 +74,7 @@ export function PostcardBack({
       ></div>
 
       {/* Main content – scrollable */}
-      <div className="relative flex flex-col w-full h-full text-black/80 overflow-y-auto pb-2">
+      <div className="relative flex flex-col w-full h-full text-black/80 overflow-hidden pb-2">
         
         {/* Trip-specific back: storytelling + letter */}
         {isAlbumGroup && storytelling ? (

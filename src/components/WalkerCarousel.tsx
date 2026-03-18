@@ -500,18 +500,18 @@ export function WalkerCarousel({
                 style={{ aspectRatio: '4/5' }}
               >
                 <div 
-                  className='relative w-full h-full bg-white flex flex-col overflow-hidden'
-                  style={{
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05)',
-                    padding: '8px 8px 32px 8px',
-                    borderRadius: '12px',
-                  }}
+                  className='relative w-full h-full flex flex-col'
                 >
                 <AnimatePresence mode='wait'>
                   {item.album_id && !openedAlbums.has(item.album_id) ? (
                     <motion.div
                       key={`cover-${item.album_id}`}
-                      className='w-full h-full flex items-center justify-center'
+                      className='w-full h-full flex items-center justify-center overflow-hidden bg-white'
+                      style={{
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05)',
+                        padding: '8px 8px 32px 8px',
+                        borderRadius: '12px',
+                      }}
                       initial={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95, y: 10 }}
                       transition={{ duration: 0.2, ease: 'easeIn' }}
