@@ -206,6 +206,8 @@ export function WalkerFeed({
   } = useDailyPack(user?.id);
 
   const isPackMode = packCards.length > 0;
+  // Focus mode: hide decorative chrome while spotlight search is active
+  const isSpotlightMode = spotlightResults.length > 0 || isSpotlightSearching;
 
 
 
@@ -295,7 +297,7 @@ export function WalkerFeed({
 
   return (
     <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
-      {!isOnWelcome && (
+      {!isOnWelcome && !isSpotlightMode && (
         <WalkerFilterMenu
           isIdle={isIdle}
           availableCountries={availableCountries}
@@ -527,8 +529,8 @@ export function WalkerFeed({
         </div>
       )}
 
-      {/* Daily Pack — floating button (hidden during pack mode) */}
-      {!isPackMode && (
+      {/* Daily Pack — floating button (hidden during pack mode and spotlight mode) */}
+      {!isPackMode && !isSpotlightMode && (
         <DailyPackButton
           isAvailable={isPackAvailable}
           isLoading={isPackLoading}
@@ -542,8 +544,8 @@ export function WalkerFeed({
         onPostcardGenerated={refetchFeed}
       />
 
-      {/* Language Toggle — floating bottom-left */}
-      <LanguageToggle isIdle={isIdle} isOnWelcome={isOnWelcome} />
+      {/* Language Toggle — hidden during spotlight focus mode */}
+      {!isSpotlightMode && <LanguageToggle isIdle={isIdle} isOnWelcome={isOnWelcome} />}
     </div>
   );
 }
