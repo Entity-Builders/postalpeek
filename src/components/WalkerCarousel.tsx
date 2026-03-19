@@ -3,7 +3,6 @@ import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { analytics } from '../lib/analytics';
-import { FeatureFlags } from '../lib/featureFlags';
 import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
@@ -11,8 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
-import { DailyPackCard, type RevealMode } from './DailyPackCard';
-import { DailyPackComplete } from './DailyPackComplete';
+import { PackRevealSlide } from './PackRevealSlide';
+import { EnvelopeSlide } from './EnvelopeSlide';
 import { SpotlightResultsSlide } from './SpotlightResultsSlide';
 import type { User } from '@supabase/supabase-js';
 
@@ -45,6 +44,9 @@ interface WalkerCarouselProps {
   albumPostcardIds?: Set<string>;
   /** Daily Pack inline mode */
   packCards?: FeedItem[];
+  isPackAvailable?: boolean;
+  isPackLoading?: boolean;
+  onOpenPack?: () => void;
   onPackComplete?: () => void;
   /** Expand image to fullscreen lightbox */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
@@ -76,48 +78,20 @@ export function WalkerCarousel({
   isClaimLoading = false,
   albumPostcardIds = new Set(),
   packCards = [],
+  isPackAvailable = false,
+  isPackLoading = false,
+  onOpenPack,
   onPackComplete,
   spotlightResults = [],
   spotlightQuery = '',
   onSelectPostcard,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [lookaheadOffset, setLookaheadOffset] = useState(1);
   // Track which album covers have been "opened" to show the full Postcard view
   const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   // Track which cards have loaded their hero image so we can hide the skeleton
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
-  // Daily pack: track revealed card indices
-  const [revealedPackCards, setRevealedPackCards] = useState<Set<number>>(new Set());
-  const [showPackSummary, setShowPackSummary] = useState(false);
   const isPackMode = packCards.length > 0;
-
-  // Show summary immediately when pack cards arrive
-  useEffect(() => {
-    if (isPackMode && packCards.length > 0) {
-      setShowPackSummary(true);
-    }
-  }, [isPackMode, packCards.length]);
-
-  // Read PostHog feature flag for reveal mode (defaults to 'tap')
-  const [revealMode, setRevealMode] = useState<RevealMode>('tap');
-  useEffect(() => {
-    if (!isPackMode) return;
-    const flag = analytics.getFeatureFlag(FeatureFlags.DAILY_PACK_REVEAL_MODE);
-    if (flag === 'auto-scroll' || flag === 'cascade') {
-      setRevealMode(flag);
-      analytics.track('daily_pack_variant_assigned', { variant: flag });
-    } else {
-      // Flag not loaded yet — listen for it
-      analytics.onFeatureFlagsLoaded(() => {
-        const resolved = analytics.getFeatureFlag(FeatureFlags.DAILY_PACK_REVEAL_MODE);
-        const mode: RevealMode =
-          resolved === 'auto-scroll' || resolved === 'cascade' ? resolved : 'tap';
-        setRevealMode(mode);
-        analytics.track('daily_pack_variant_assigned', { variant: mode });
-      });
-    }
-  }, [isPackMode]);
 
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
     displayItems.slice(0, 2),
@@ -145,7 +119,6 @@ export function WalkerCarousel({
   const [prevSlideIndex, setPrevSlideIndex] = useState(-1);
   if (currentSlideIndex !== prevSlideIndex) {
     setPrevSlideIndex(currentSlideIndex);
-    setLookaheadOffset(1);
   }
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -184,8 +157,9 @@ export function WalkerCarousel({
   type SlideEntry =
     | { type: 'spotlight' }
     | { type: 'welcome' }
-    | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean }
-    | { type: 'pack_card'; item: FeedItem; packIndex: number };
+    | { type: 'envelope' }
+    | { type: 'pack_reveal' }
+    | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean };
 
   const slides = React.useMemo((): SlideEntry[] => {
     const arr: SlideEntry[] = [];
@@ -200,11 +174,14 @@ export function WalkerCarousel({
       return arr;
     }
 
-    // ── Pack cards are prepended to the feed (no modal override) ──
+    // ── Envelope slide (pack available, not yet opened) ──
+    if (isPackAvailable && !isPackMode) {
+      arr.push({ type: 'envelope' });
+    }
+
+    // ── Pack reveal: single slide with all cards fanned ──
     if (isPackMode) {
-      packCards.forEach((card, i) => {
-        arr.push({ type: 'pack_card' as const, item: card, packIndex: i });
-      });
+      arr.push({ type: 'pack_reveal' });
     }
 
     // ── Normal feed follows ──
@@ -227,7 +204,7 @@ export function WalkerCarousel({
       }
     }
     return arr;
-  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, packCards, spotlightResults]);
+  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, packCards, spotlightResults, isPackAvailable]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -327,12 +304,6 @@ export function WalkerCarousel({
     isFetchingRef,
   ]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLookaheadOffset(2);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [currentSlideIndex]);
 
   const navTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -389,7 +360,7 @@ export function WalkerCarousel({
   const ambientUrl = useMemo(() => {
     const slide = slides[currentSlideIndex];
     if (!slide) return null;
-    if (slide.type === 'welcome' || slide.type === 'spotlight') return null;
+    if (slide.type === 'welcome' || slide.type === 'spotlight' || slide.type === 'envelope' || slide.type === 'pack_reveal') return null;
     const item = slide.item;
     return cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 }) || null;
   }, [slides, currentSlideIndex]);
@@ -463,6 +434,20 @@ export function WalkerCarousel({
             );
           }
 
+          if (slide.type === 'envelope') {
+            return (
+              <div
+                key='envelope-slide'
+                className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
+              >
+                <EnvelopeSlide
+                  isLoading={isPackLoading}
+                  onOpen={onOpenPack || (() => {})}
+                />
+              </div>
+            );
+          }
+
           if (slide.type === 'welcome') {
             return (
               <div key="welcome-slide" className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
@@ -471,43 +456,18 @@ export function WalkerCarousel({
             );
           }
 
-          /* ── Pack card slide ── */
-          if (slide.type === 'pack_card') {
-            const { item: packItem, packIndex } = slide;
+          /* ── Pack reveal slide ── */
+          if (slide.type === 'pack_reveal') {
             return (
               <div
-                key={`pack-${packItem.id}`}
+                key='pack-reveal-slide'
                 className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'
               >
-                <div className='z-10 w-full h-full flex items-center justify-center'>
-                  <DailyPackCard
-                    item={packItem}
-                    cardIndex={packIndex}
-                    totalCards={packCards.length}
-                    isActive={slideIndex === currentSlideIndex}
-                    isRevealed={revealedPackCards.has(packIndex)}
-                    onReveal={() => {
-                      setRevealedPackCards((prev) => {
-                        const next = new Set(prev);
-                        next.add(packIndex);
-                        return next;
-                      });
-                    }}
-                    revealMode={revealMode}
-                    cascadeDelay={packIndex * 300}
-                    isInAlbum={albumPostcardIds.has(packItem.id)}
-                    user={user}
-                    isAdmin={isAdmin}
-                    favoriteIds={favoriteIds}
-                    toggleFavorite={toggleFavorite}
-                    claimedIds={claimedIds}
-                    onClaimPostcard={onClaimPostcard}
-                    isClaimLoading={isClaimLoading}
-                    albumPostcardIds={albumPostcardIds}
-                    setShowAuthGate={setShowAuthGate}
-                    setPendingFavoriteId={setPendingFavoriteId}
-                  />
-                </div>
+                <PackRevealSlide
+                  cards={packCards}
+                  albumPostcardIds={albumPostcardIds}
+                  onAllCollected={() => onPackComplete?.()}
+                />
               </div>
             );
           }
@@ -652,36 +612,7 @@ export function WalkerCarousel({
         )}
       </div>
 
-      {/* Pack summary overlay — appears when all cards are revealed */}
-      <AnimatePresence>
-        {showPackSummary && (
-          <motion.div
-            key='pack-summary'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className='absolute inset-0 z-40 bg-gradient-to-br from-stone-200 via-stone-100 to-stone-200 flex items-center justify-center'
-            onWheel={(e) => {
-              if (e.deltaY > 30) {
-                setShowPackSummary(false);
-                // Pre-reveal all cards so they appear without blur
-                setRevealedPackCards(new Set(packCards.map((_, i) => i)));
-              }
-            }}
-          >
-            <DailyPackComplete
-              cards={packCards}
-              albumCardCount={packCards.filter(c => albumPostcardIds.has(c.id)).length}
-              onGoToFeed={() => {
-                setShowPackSummary(false);
-                // Pre-reveal all cards so they appear without blur
-                setRevealedPackCards(new Set(packCards.map((_, i) => i)));
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Pack summary overlay removed — handled by PackDoneToast in WalkerFeed */}
       </div>
     </div>
   );

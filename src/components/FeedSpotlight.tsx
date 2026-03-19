@@ -73,6 +73,7 @@ export function FeedSpotlight({
       // Extract available tags from items for the AI
       const tagSet = new Set<string>();
       items.forEach((item) => {
+        // detailed_tags (structured, bilingual)
         if (item.detailed_tags?.length) {
           item.detailed_tags.forEach(
             (dt: { label?: string | Record<string, string> }) => {
@@ -85,7 +86,10 @@ export function FeedSpotlight({
             },
           );
         }
+        // visual_tags (original street view tags)
         (item.visual_tags || []).forEach((t: string) => tagSet.add(t));
+        // illustration_tags (what user actually sees in the art)
+        (item.illustration_tags || []).forEach((t: string) => tagSet.add(t));
       });
 
       const response = await fetch(
@@ -127,6 +131,9 @@ export function FeedSpotlight({
           p_rarity: smartResult.rarity,
           p_free_text: smartResult.freeTextSearch,
           p_limit: MAX_RESULTS,
+          // true  → only postcards WITH illustration_tags are returned (strict)
+          // false → fallback: prefers illustration_tags, falls back to visual_tags
+          p_require_illustration_tags: false,
         },
       );
 

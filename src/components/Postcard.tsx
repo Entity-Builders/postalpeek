@@ -37,6 +37,7 @@ export interface FeedItem {
   claimed_at?: string | null;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
   visual_tags?: string[];
+  illustration_tags?: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   detailed_tags?: any[];
   aesthetic_vibes?: string[];

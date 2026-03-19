@@ -21,14 +21,13 @@ import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
 import { ImageLightbox } from './ImageLightbox';
-import { DailyPackButton } from './DailyPackButton';
 import { SpotlightPill } from './SpotlightPill';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AdminToolbar } from './AdminToolbar';
 import { useLang, toggleLang } from '../utils/i18n';
 import type { SmartSearchResult } from '../hooks/useSmartSearch';
@@ -206,6 +205,7 @@ export function WalkerFeed({
   } = useDailyPack(user?.id);
 
   const isPackMode = packCards.length > 0;
+  // PackDone toast — shown after the last card is revealed, stays 5 seconds
   // Focus mode: hide decorative chrome while spotlight search is active
   const isSpotlightMode = spotlightResults.length > 0 || isSpotlightSearching;
 
@@ -217,6 +217,7 @@ export function WalkerFeed({
       // Pack cards are now handled inline by WalkerCarousel
     }
   }, [openPack]);
+
 
   // ── Albums ──
   const {
@@ -256,6 +257,10 @@ export function WalkerFeed({
           );
       });
   }, [albums]);
+
+  // PackDone toast state — declared after albumPostcardIds so inline callbacks compile
+  const [showPackDoneToast, setShowPackDoneToast] = useState(false);
+  const [packDoneAlbumCount, setPackDoneAlbumCount] = useState(0);
 
   // Auto-open album detail when URL is /album/:id
   useEffect(() => {
@@ -371,10 +376,19 @@ export function WalkerFeed({
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
           packCards={packCards}
+          isPackAvailable={isPackAvailable}
+          isPackLoading={isPackLoading}
+          onOpenPack={handleOpenPack}
           onPackComplete={() => {
-            clearPack();
-            refetchCollection();
-            refetchAlbums();
+            const albumCount = packCards.filter(c => albumPostcardIds.has(c.id)).length;
+            setPackDoneAlbumCount(albumCount);
+            setShowPackDoneToast(true);
+            setTimeout(() => {
+              setShowPackDoneToast(false);
+              clearPack();
+              refetchCollection();
+              refetchAlbums();
+            }, 5000);
           }}
           onSelectPostcard={setSelectedPostcard}
         />
@@ -529,14 +543,33 @@ export function WalkerFeed({
         </div>
       )}
 
-      {/* Daily Pack — floating button (hidden during pack mode and spotlight mode) */}
-      {!isPackMode && !isSpotlightMode && (
-        <DailyPackButton
-          isAvailable={isPackAvailable}
-          isLoading={isPackLoading}
-          onOpen={handleOpenPack}
-        />
-      )}
+      {/* Daily Pack button — removed. Pack entry point is now the EnvelopeSlide in the feed */}
+
+      {/* Pack Done Toast — lightweight, non-blocking */}
+      <AnimatePresence>
+        {showPackDoneToast && (
+          <motion.div
+            key='pack-done-toast'
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className='fixed bottom-20 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3
+              bg-stone-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md
+              border border-white/10 max-w-[90vw]'
+          >
+            <span className='text-xl'>🎉</span>
+            <div>
+              <p className='text-sm font-semibold leading-tight'>¡Sobre abierto!</p>
+              {packDoneAlbumCount > 0 && (
+                <p className='text-xs text-amber-400 mt-0.5'>
+                  {packDoneAlbumCount === 1 ? '1 carta de álbum' : `${packDoneAlbumCount} cartas de álbum`}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Admin Toolbar — only visible when isAdmin */}
       <AdminToolbar
         isAdmin={isAdmin}
