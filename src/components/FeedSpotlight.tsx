@@ -133,7 +133,7 @@ export function FeedSpotlight({
           p_limit: MAX_RESULTS,
           // true  → only postcards WITH illustration_tags are returned (strict)
           // false → fallback: prefers illustration_tags, falls back to visual_tags
-          p_require_illustration_tags: false,
+          p_require_illustration_tags: true,
         },
       );
 
@@ -388,13 +388,21 @@ export function FeedSpotlight({
                       <motion.div
                         initial={{ rotateY: -15, scale: 0.9 }}
                         animate={{ rotateY: 0, scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 200, damping: 22, delay: 0.05 }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 200,
+                          damping: 22,
+                          delay: 0.05,
+                        }}
                         className='w-full max-w-[300px] aspect-[3/4] rounded-xl overflow-hidden
                           shadow-[0_24px_70px_rgba(0,0,0,0.65)] border border-white/10'
                         style={{ perspective: '600px' }}
                       >
                         <img
-                          src={cdnImage(previewItem.illustration_url, { width: 640, quality: 90 })}
+                          src={cdnImage(previewItem.illustration_url, {
+                            width: 640,
+                            quality: 90,
+                          })}
                           alt={previewItem.city || 'Postal'}
                           className='w-full h-full object-cover'
                         />
@@ -413,9 +421,12 @@ export function FeedSpotlight({
                       >
                         Ver detalle
                       </button>
-                      {claimedIds.has(previewItem.id) || sessionClaimedId === previewItem.id ? (
-                        <div className='flex-1 py-3 rounded-xl bg-emerald-500/20 border border-emerald-400/30
-                          flex items-center justify-center gap-1.5 text-emerald-400 text-sm font-medium'>
+                      {claimedIds.has(previewItem.id) ||
+                      sessionClaimedId === previewItem.id ? (
+                        <div
+                          className='flex-1 py-3 rounded-xl bg-emerald-500/20 border border-emerald-400/30
+                          flex items-center justify-center gap-1.5 text-emerald-400 text-sm font-medium'
+                        >
                           <Check className='w-4 h-4' />
                           Reclamada
                         </div>
@@ -426,14 +437,16 @@ export function FeedSpotlight({
                           }}
                           disabled={
                             isClaimLoading ||
-                            (!!sessionClaimedId && sessionClaimedId !== previewItem.id)
+                            (!!sessionClaimedId &&
+                              sessionClaimedId !== previewItem.id)
                           }
                           className='flex-1 py-3 rounded-xl bg-purple-500 text-white
                             text-sm font-semibold hover:bg-purple-600
                             active:scale-95 transition-all
                             disabled:opacity-40 disabled:cursor-not-allowed'
                         >
-                          {sessionClaimedId && sessionClaimedId !== previewItem.id
+                          {sessionClaimedId &&
+                          sessionClaimedId !== previewItem.id
                             ? 'Ya reclamaste una'
                             : 'Reclamar'}
                         </button>
