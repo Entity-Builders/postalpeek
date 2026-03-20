@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { FeedItem } from './Postcard';
-import { t, useLang } from '../utils/i18n';
+import { t, useLang, type BilingualText } from '../utils/i18n';
 
 interface PostcardBackProps {
   item: FeedItem;
@@ -42,11 +42,14 @@ export function PostcardBack({
   useLang(); // subscribe — triggers re-render on language change
   const isAlbumGroup = !!item.album_id;
   const tripCtx = item.generation_metadata?.tripContext;
-  const visualTags: string[] = item.visual_tags || [];
+  const detailedTags: (BilingualText | string)[] = item.detailed_tags || [];
   const vibeInjected: string = item.generation_metadata?.vibe_injected || '';
 
   // Debug log — inspect full postal data in browser console
   console.log('[PostalPeek Debug]', item.id?.slice(0, 8), {
+    description_raw: item.description,
+    description_type: typeof item.description,
+    description_t: t(item.description),
     visual_tags: item.visual_tags,
     generation_metadata: item.generation_metadata,
     streetview_pov: item.streetview_pov,
@@ -162,33 +165,74 @@ export function PostcardBack({
           </>
         ) : (
           /* ── Original non-trip back ── */
-          <div className="flex flex-col sm:flex-row w-full h-full gap-4 sm:gap-6">
-            {/* Right side: Stamp, Address & Photo */}
-            <div className="w-full sm:w-[40%] flex flex-col relative sm:shrink-0 order-last sm:order-last">
+          /* Always 2-column grid: left=story, right=stamp+coords+photo */
+          <div className="grid grid-cols-[1fr_auto] w-full h-full gap-3">
+            {/* LEFT: Description + Tags */}
+            <div className="flex flex-col min-h-0 border-r border-black/10 pr-3">
+              <span className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] md:text-xs font-medium rounded-full mb-2 tracking-wide uppercase w-fit">
+                {t(item.category)}
+              </span>
+
+              <p className="font-poetic italic text-sm sm:text-xl md:text-2xl leading-snug text-stone-900 line-clamp-6 sm:line-clamp-none">
+                "{t(item.description)}"
+              </p>
+
+              {/* Visual Tags — what the AI saw */}
+              <div className="mt-auto pt-2 border-t border-stone-300/50">
+                {vibeInjected && (
+                  <p className="font-mono text-[8px] md:text-[9px] text-stone-400 uppercase tracking-wider mb-1.5 line-clamp-2">
+                    🎨 {vibeInjected}
+                  </p>
+                )}
+                {detailedTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {detailedTags.map((tag, idx) => {
+                        const translatedTag = t(tag);
+                        if (!translatedTag) return null;
+                        return (
+                          <span
+                            key={`det-${idx}`}
+                            className="inline-block px-1.5 py-0.5 bg-stone-100 text-stone-500 text-[8px] md:text-[9px] font-mono rounded-full border border-stone-200/80 tracking-wide"
+                          >
+                            {translatedTag.replace(/_/g, ' ')}
+                          </span>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="font-mono text-[8px] md:text-[10px] text-stone-400">
+                    {new Date(item.created_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT: Stamp + Coords + Polaroid */}
+            <div className="flex flex-col items-end w-[100px] sm:w-[130px] md:w-[160px] shrink-0">
               {/* Stamp */}
-              <div className="w-16 h-20 sm:w-20 sm:h-24 border border-stone-300 rounded flex bg-stone-100 items-center justify-center rotate-3 shadow-sm self-end mb-4 sm:mb-8">
-                <span className="text-[9px] sm:text-[10px] text-stone-400 font-mono tracking-widest -rotate-45 block">
+              <div className="w-14 h-16 sm:w-18 sm:h-20 border border-stone-300 rounded flex bg-stone-100 items-center justify-center rotate-3 shadow-sm mb-3">
+                <span className="text-[8px] sm:text-[9px] text-stone-400 font-mono tracking-widest -rotate-45 block text-center leading-tight">
                   STAMP
                   <br />
                   HERE
                 </span>
               </div>
 
-              {/* Address Lines */}
-              <div className="w-full flex flex-col gap-0 mb-4 sm:mb-8">
-                <div className="w-full border-b border-black/10 pb-1 mb-3 sm:mb-5">
-                  <span className="font-handwriting text-lg sm:text-xl md:text-3xl text-slate-800 rotate-[-1deg] block truncate">
+              {/* Address / Coords */}
+              <div className="w-full flex flex-col gap-0 mb-3">
+                <div className="w-full border-b border-black/10 pb-1 mb-1.5">
+                  <span className="font-handwriting text-sm sm:text-base md:text-xl text-slate-800 block truncate">
                     {item.location_name || `${item.city}, ${item.country}`}
                   </span>
                 </div>
-                <div className="w-full border-b border-black/10 pb-1 mb-3 sm:mb-5">
-                  <span className="font-mono text-[10px] md:text-xs text-slate-500 tracking-widest block">
-                    LAT: {item.lat.toFixed(6)}° N
+                <div className="w-full border-b border-black/10 pb-1 mb-1.5">
+                  <span className="font-mono text-[8px] md:text-[10px] text-slate-500 tracking-widest block">
+                    LAT: {item.lat.toFixed(4)}° N
                   </span>
                 </div>
                 <div className="w-full border-b border-black/10 pb-1">
-                  <span className="font-mono text-[10px] md:text-xs text-slate-500 tracking-widest block">
-                    LNG: {Math.abs(item.lng).toFixed(6)}°{' '}
+                  <span className="font-mono text-[8px] md:text-[10px] text-slate-500 tracking-widest block">
+                    LNG: {Math.abs(item.lng).toFixed(4)}°{' '}
                     {item.lng >= 0 ? 'E' : 'W'}
                   </span>
                 </div>
@@ -196,7 +240,7 @@ export function PostcardBack({
 
               {/* The "Polaroid" Snapshot */}
               <div
-                className="relative p-1.5 pb-6 bg-white shadow-md rounded-sm rotate-[-2deg] hover:rotate-0 transition-all hover:scale-105 z-10 group/photo cursor-pointer w-[65%] sm:w-[80%] self-center sm:mt-auto"
+                className="relative p-1 pb-5 bg-white shadow-md rounded-sm rotate-[-2deg] hover:rotate-0 transition-all hover:scale-105 z-10 group/photo cursor-pointer w-full mt-auto"
                 onClick={(e) => {
                   e.stopPropagation();
                   window.open(
@@ -222,50 +266,12 @@ export function PostcardBack({
                     />
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <span className="flex items-center gap-1.5 text-white text-xs font-semibold tracking-wide bg-black/60 px-3 py-1.5 rounded-full">
-                      Inspect <ArrowUpRight className="w-3 h-3" />
-                    </span>
+                    <ArrowUpRight className="w-4 h-4 text-white" />
                   </div>
                 </div>
-                <p className="absolute bottom-1.5 left-0 right-0 text-center text-[10px] text-stone-500 font-mono tracking-wider uppercase">
-                  Source Image
+                <p className="absolute bottom-1 left-0 right-0 text-center text-[7px] text-stone-500 font-mono tracking-wider uppercase">
+                  Street View
                 </p>
-              </div>
-            </div>
-
-            {/* Left side: The Story */}
-            <div className="flex-1 flex flex-col pt-2 sm:border-r border-black/10 sm:pr-6 order-first sm:order-first min-h-0">
-              <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] md:text-sm font-medium rounded-full mb-3 md:mb-6 tracking-wide uppercase w-fit">
-                {t(item.category)}
-              </span>
-
-              <p className="font-poetic italic text-lg sm:text-2xl md:text-3xl leading-relaxed text-stone-900 whitespace-pre-wrap">
-                "{t(item.description)}"
-              </p>
-
-              {/* Visual Tags — what the AI saw */}
-              <div className="mt-auto border-t border-stone-300/50 pt-3 sm:pt-4">
-                {vibeInjected && (
-                  <p className="font-mono text-[9px] md:text-[10px] text-stone-400 uppercase tracking-wider mb-2">
-                    🎨 {vibeInjected}
-                  </p>
-                )}
-                {visualTags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {visualTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-block px-2 py-0.5 bg-stone-100 text-stone-500 text-[9px] md:text-[10px] font-mono rounded-full border border-stone-200/80 tracking-wide"
-                      >
-                        {tag.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="font-mono text-[9px] md:text-xs text-stone-400">
-                    Date: {new Date(item.created_at).toLocaleString()}
-                  </p>
-                )}
               </div>
             </div>
           </div>

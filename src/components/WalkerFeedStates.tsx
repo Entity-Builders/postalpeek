@@ -103,10 +103,18 @@ export function WalkerEmptyState({
   onClearFilter,
   lastRefillAt,
   onUnlockMore,
+  title,
+  message,
+  primaryActionText,
+  icon: Icon = Compass,
 }: {
   onClearFilter?: () => void;
   lastRefillAt?: string | null;
   onUnlockMore?: () => void;
+  title?: string;
+  message?: React.ReactNode;
+  primaryActionText?: string;
+  icon?: React.ElementType;
 }) {
   const [timeLeft, setTimeLeft] = React.useState<string>('00:00:00');
 
@@ -143,7 +151,7 @@ export function WalkerEmptyState({
         <div className="absolute top-8 left-1/2 -translate-x-1/2 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl -z-10" />
 
         <div className="relative w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-amber-50/80 to-amber-100/30 border border-amber-200/50 flex items-center justify-center shadow-inner">
-          <Compass className='w-12 h-12 text-amber-500/80 drop-shadow-sm z-10' strokeWidth={1.5} />
+          <Icon className='w-12 h-12 text-amber-500/80 drop-shadow-sm z-10' strokeWidth={1.5} />
         </div>
         
         {lastRefillAt ? (
@@ -171,10 +179,10 @@ export function WalkerEmptyState({
         ) : (
            <>
              <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-3 drop-shadow-sm'>
-               Región sin explorar
+               {title || 'Región sin explorar'}
              </h3>
              <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-8'>
-               Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.
+               {message || 'Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.'}
              </p>
            </>
         )}
@@ -185,8 +193,8 @@ export function WalkerEmptyState({
             className="group relative px-6 py-3.5 bg-stone-800 hover:bg-stone-900 transition-all duration-300 rounded-full flex items-center gap-2 overflow-hidden shadow-md hover:shadow-lg active:scale-95 cursor-pointer mt-2"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/10 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-            <Map className="w-4 h-4 text-amber-400 group-hover:-translate-y-0.5 transition-transform duration-300" strokeWidth={2.5} />
-            <span className="text-sm font-semibold text-white tracking-wide">Volver a todas</span>
+            {!primaryActionText && <Map className="w-4 h-4 text-amber-400 group-hover:-translate-y-0.5 transition-transform duration-300" strokeWidth={2.5} />}
+            <span className="text-sm font-semibold text-white tracking-wide">{primaryActionText || 'Volver a todas'}</span>
           </button>
         )}
       </div>

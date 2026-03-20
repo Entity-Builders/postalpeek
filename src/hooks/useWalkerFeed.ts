@@ -18,6 +18,10 @@ export function useWalkerFeed() {
 
   const isFetchingRef = useRef(false);
   const currentFetchIdRef = useRef(0);
+  // Stable ref so fetchMoreFeed doesn't need items in its deps (avoids observer reconnects)
+  const itemsRef = useRef<FeedItem[]>(items);
+  const hasMoreRef = useRef(hasMore);
+  const selectedCountryRef = useRef(selectedCountry);
 
   // Parse Initial URL State
   useEffect(() => {
@@ -139,6 +143,7 @@ export function useWalkerFeed() {
       });
 
       setItems(allItems);
+      itemsRef.current = allItems;
     } catch (error) {
       if (fetchId !== currentFetchIdRef.current) return;
       console.error('Error loading initial feed:', error);
@@ -151,23 +156,30 @@ export function useWalkerFeed() {
     }
   }, []);
 
+  // Keep refs in sync so fetchMoreFeed can read them without needing them as deps
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
+  useEffect(() => { selectedCountryRef.current = selectedCountry; }, [selectedCountry]);
+
   useEffect(() => {
     fetchInitialFeed(selectedCountry);
   }, [fetchInitialFeed, selectedCountry]);
 
+  // Stable function — reads state via refs to avoid recreating on every items change.
+  // This prevents the IntersectionObserver in WalkerGrid from reconnecting and jumping scroll.
   const fetchMoreFeed = useCallback(async () => {
-    if (isFetchingRef.current || !hasMore || items.length === 0) return;
+    if (isFetchingRef.current || !hasMoreRef.current || itemsRef.current.length === 0) return;
 
     isFetchingRef.current = true;
     setIsFetchingMore(true);
 
     try {
-      const excludeIds = items.map((i) => i.id);
+      const excludeIds = itemsRef.current.map((i) => i.id);
 
       const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
         p_limit: PAGE_SIZE,
         p_exclude_ids: excludeIds,
-        p_country: selectedCountry,
+        p_country: selectedCountryRef.current,
       });
 
       if (error) throw error;
@@ -175,10 +187,14 @@ export function useWalkerFeed() {
       const newItems = (data as FeedItem[]) || [];
       if (newItems.length === 0) {
         setHasMore(false);
+        hasMoreRef.current = false;
         return;
       }
 
-      if (newItems.length < PAGE_SIZE) setHasMore(false);
+      if (newItems.length < PAGE_SIZE) {
+        setHasMore(false);
+        hasMoreRef.current = false;
+      }
 
       const allUrls = newItems.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
       await preSignUrls(allUrls).catch(console.error);
@@ -186,17 +202,19 @@ export function useWalkerFeed() {
       setItems((prev) => {
         const existingIds = new Set(prev.map(p => p.id));
         const filteredNew = newItems.filter(p => !existingIds.has(p.id));
-        return [...prev, ...filteredNew];
+        const merged = [...prev, ...filteredNew];
+        itemsRef.current = merged;
+        return merged;
       });
 
     } catch (error) {
       console.error('Error loading more feed:', error);
-      analytics.captureError(error, { context: 'fetch_more_feed', country: selectedCountry });
+      analytics.captureError(error, { context: 'fetch_more_feed', country: selectedCountryRef.current });
     } finally {
       setIsFetchingMore(false);
       isFetchingRef.current = false;
     }
-  }, [items, hasMore, selectedCountry]);
+  }, []); // stable — reads state via refs
 
   const refetchFeed = useCallback(() => {
     fetchInitialFeed(selectedCountry);

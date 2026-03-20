@@ -62,8 +62,18 @@ export function useLang(): Lang {
 export function t(value: MaybeBilingual, lang: Lang = currentLang): string {
   if (!value) return '';
   if (typeof value === 'string') return value;
+  
   const result = value[lang] || value.es || '';
-  // Defensive: guard against malformed JSONB (e.g., nested objects)
+  
+  // Defensive logic: if we somehow got a double-wrapped object like { es: { es: '...' } }
+  // Extract the inner string safely.
+  if (typeof result === 'object' && result !== null) {
+      const inner = result as Record<string, unknown>;
+      const innerValue = inner[lang] || inner.es || '';
+      if (typeof innerValue === 'string') return innerValue;
+      return '';
+  }
+  
   if (typeof result !== 'string') return '';
   return result;
 }

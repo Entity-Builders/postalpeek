@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { ILLUSTRATION_STYLES, ACTIVE_STYLE_KEY } from '../../../../eb-infra/supabase/functions/_shared/postcard-engine/illustration-styles.ts';
 import type { User } from '@supabase/supabase-js';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -129,6 +130,12 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
 
   // Generation
   const [genStatus, setGenStatus] = useState<{ status: ActionStatus; message: string }>({
+    status: 'idle',
+    message: '',
+  });
+  const [illustrationStyleKey, setIllustrationStyleKey] = useState<string>(ACTIVE_STYLE_KEY);
+  const [huntTheme, setHuntTheme] = useState('monuments');
+  const [huntStatus, setHuntStatus] = useState<{ status: ActionStatus; message: string }>({
     status: 'idle',
     message: '',
   });
@@ -355,7 +362,7 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
     setGenStatus({ status: 'loading', message: 'Generating wander postcard...' });
     try {
       const { data, error } = await supabase.functions.invoke('postalpeek-walker-wander', {
-        body: {},
+        body: { illustration_style_key: illustrationStyleKey },
         headers: {},
       });
       if (error) throw error;
@@ -373,7 +380,7 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
               'Content-Type': 'application/json',
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o'}`,
             },
-            body: JSON.stringify({}),
+            body: JSON.stringify({ illustration_style_key: illustrationStyleKey }),
           },
         );
         const forceData = await forceRes.json();
@@ -390,7 +397,7 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
       const msg = err instanceof Error ? err.message : String(err);
       setGenStatus({ status: 'error', message: msg });
     }
-  }, [onPostcardGenerated]);
+  }, [onPostcardGenerated, illustrationStyleKey]);
 
   const triggerTrip = useCallback(async () => {
     setGenStatus({ status: 'loading', message: 'Generating trip postcard...' });
@@ -421,6 +428,40 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
       setGenStatus({ status: 'error', message: msg });
     }
   }, [onPostcardGenerated]);
+
+  const HUNT_THEME_OPTIONS = [
+    { slug: 'monuments',   label: '🏛️ Monumentos Históricos' },
+    { slug: 'skyscrapers', label: '🏙️ Rascacielos' },
+    { slug: 'bridges',     label: '🌉 Puentes' },
+    { slug: 'markets',     label: '🛒 Mercados y Bazares' },
+    { slug: 'churches',    label: '⛪ Iglesias y Catedrales' },
+    { slug: 'street_art',  label: '🎨 Arte Urbano' },
+    { slug: 'staircases',  label: '🪜 Escaleras y Callejones' },
+  ];
+
+  const triggerHunt = useCallback(async () => {
+    setHuntStatus({ status: 'loading', message: `Hunting for ${huntTheme}...` });
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o';
+      const res = await fetch(
+        `${baseUrl}/functions/v1/postalpeek-walker-hunt?theme=${huntTheme}&force=true`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonKey}` }, body: JSON.stringify({ illustration_style_key: illustrationStyleKey }) },
+      );
+      const data = await res.json();
+      if (data?.success) {
+        const attempts = data.attempts ?? 1;
+        const visible = data.data?.theme_visible !== false;
+        const note = visible ? '' : ' (theme not perfectly visible)';
+        setHuntStatus({ status: 'success', message: `✅ ${data.data?.location} (${attempts} attempt${attempts > 1 ? 's' : ''})${note}` });
+        onPostcardGenerated?.();
+      } else {
+        throw new Error(data?.error || 'Hunt failed');
+      }
+    } catch (err: unknown) {
+      setHuntStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [huntTheme, onPostcardGenerated, illustrationStyleKey]);
 
   const copyEnrichCommand = useCallback(() => {
     const count = stats?.unenrichedCount ?? 0;
@@ -755,6 +796,42 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
               {/* ── Tab: Generation ── */}
               {activeTab === 'generation' && (
                 <div className="space-y-4">
+              {/* ── Illustration style selector ── */}
+                  <div
+                    className="pb-3 border-b"
+                    style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-white/60 text-xs font-medium tracking-wide uppercase">🎨 Illustration Style</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                        style={{ background: 'rgba(99,102,241,0.2)', color: 'rgb(165,180,252)' }}
+                      >
+                        {illustrationStyleKey === ACTIVE_STYLE_KEY ? 'default' : 'override'}
+                      </span>
+                    </div>
+                    <select
+                      value={illustrationStyleKey}
+                      onChange={(e) => setIllustrationStyleKey(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white',
+                        outline: 'none',
+                      }}
+                    >
+                      {Object.entries(ILLUSTRATION_STYLES).map(([key, style]) => (
+                        <option key={key} value={key} style={{ background: '#1a1a2e', color: 'white' }}>
+                          {key === ACTIVE_STYLE_KEY ? `⭐ ` : ''}{style.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-white/25 text-[10px] mt-1.5">
+                      {ILLUSTRATION_STYLES[illustrationStyleKey as keyof typeof ILLUSTRATION_STYLES]?.description}
+                    </p>
+                  </div>
+
                   {/* Generation buttons */}
                   <div className="space-y-2">
                     <ActionButton
@@ -776,6 +853,43 @@ export function AdminPanelModal({ isOpen, onClose, user, onPostcardGenerated }: 
                   </div>
 
                   <StatusBadge status={genStatus.status} message={genStatus.message} />
+
+                  {/* ── Hunt Mode ── */}
+                  <div
+                    className="pt-4 border-t space-y-3"
+                    style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-white/60 text-xs font-medium tracking-wide uppercase">🎯 Hunt Mode</span>
+                      <span className="text-white/25 text-[10px]">— busca un tema específico</span>
+                    </div>
+                    <select
+                      value={huntTheme}
+                      onChange={(e) => setHuntTheme(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white',
+                        outline: 'none',
+                      }}
+                    >
+                      {HUNT_THEME_OPTIONS.map((opt) => (
+                        <option key={opt.slug} value={opt.slug} style={{ background: '#1a1a2e', color: 'white' }}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ActionButton
+                      onClick={triggerHunt}
+                      disabled={huntStatus.status === 'loading'}
+                      gradient="linear-gradient(135deg, rgba(245,158,11,0.6), rgba(217,119,6,0.6))"
+                    >
+                      <span>🎯</span>
+                      <span>Hunt {HUNT_THEME_OPTIONS.find(o => o.slug === huntTheme)?.label.split(' ').slice(1).join(' ') ?? huntTheme}</span>
+                    </ActionButton>
+                    <StatusBadge status={huntStatus.status} message={huntStatus.message} />
+                  </div>
 
                   {/* Enrichment */}
                   <div
