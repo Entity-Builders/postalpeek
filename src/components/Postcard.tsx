@@ -9,7 +9,7 @@ import {
   useSignedSrcSet,
   useRawSignedImage,
 } from '../utils/useSignedImage';
-import { cn } from './SearchBar';
+import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import { PostcardFront } from './PostcardFront';
 import { PostcardBack } from './PostcardBack';

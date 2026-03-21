@@ -13,6 +13,7 @@ import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import { PackRevealSlide } from './PackRevealSlide';
 import { EnvelopeSlide } from './EnvelopeSlide';
 import type { User } from '@supabase/supabase-js';
+import { AmbientBackground } from './ui/AmbientBackground';
 
 const FREE_CARD_LIMIT = 4;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -347,48 +348,11 @@ export function WalkerCarousel({
   }, [slides, currentSlideIndex]);
 
   // Keep track of previous ambient URL for crossfade
-  const [shownAmbientUrl, setShownAmbientUrl] = useState<string | null>(null);
-  const [prevAmbientUrl, setPrevAmbientUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (ambientUrl && ambientUrl !== shownAmbientUrl) {
-      setPrevAmbientUrl(shownAmbientUrl);
-      setShownAmbientUrl(ambientUrl);
-    }
-  }, [ambientUrl, shownAmbientUrl]);
 
   return (
     <div className='absolute inset-0 w-full h-full overflow-hidden'>
-      {/* ── Global ambient blur background ── */}
-      <div className='absolute inset-0 z-0 pointer-events-none'>
-        {/* Base gradient fallback */}
-        <div className='absolute inset-0 bg-gradient-to-br from-stone-300/60 via-stone-200/40 to-stone-300/50' />
-        {/* Previous image (fades out) */}
-        {prevAmbientUrl && (
-          <img
-            key={prevAmbientUrl}
-            src={prevAmbientUrl}
-            alt=''
-            className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] scale-125 transform-gpu opacity-0 transition-opacity duration-700'
-          />
-        )}
-        {/* Current image (fades in) */}
-        {shownAmbientUrl && (
-          <img
-            key={shownAmbientUrl}
-            src={shownAmbientUrl}
-            alt=''
-            onLoad={(e) => {
-              // Once loaded, fade in and clear previous
-              (e.target as HTMLImageElement).style.opacity = '1';
-              setPrevAmbientUrl(null);
-            }}
-            className='absolute inset-0 w-full h-full object-cover blur-[100px] brightness-125 saturate-[0.8] scale-125 transform-gpu opacity-0 transition-opacity duration-700'
-          />
-        )}
-        {/* Radial wash overlay */}
-        <div className='absolute inset-0 bg-radial-gradient from-white/40 via-transparent to-transparent opacity-80' />
-      </div>
+      <AmbientBackground imageUrl={ambientUrl} />
 
       <div
         className='embla absolute inset-0 w-full h-full overflow-hidden z-[1]'

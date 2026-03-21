@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { MapPin, Gem, Library, Search, X, Sparkles } from 'lucide-react';
-import { cn } from './SearchBar';
+import { cn } from '../utils/cn';
 
 interface WalkerFilterMenuProps {
   isIdle?: boolean;

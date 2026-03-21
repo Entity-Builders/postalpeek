@@ -1,6 +1,6 @@
 import React, { useRef, useCallback } from 'react';
 import { Play } from 'lucide-react';
-import { cn } from './SearchBar';
+import { cn } from '../utils/cn';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
 import { t } from '../utils/i18n';
@@ -9,6 +9,7 @@ import {
   useSignedSrcSet,
   useRawSignedImage,
 } from '../utils/useSignedImage';
+import { PostageStamp } from './ui/PostageStamp';
 
 interface TripSlideProps {
   slideItem: FeedItem;
@@ -129,9 +130,9 @@ export function TripSlide({
 
   const handleMouseLeave = useCallback(() => {
     if (lensRef.current) {
+      // Only hide via opacity — keep clipPath & transform so the lens
+      // doesn't flash at its unscaled size during the opacity transition
       lensRef.current.style.opacity = '0';
-      lensRef.current.style.clipPath = '';
-      lensRef.current.style.transform = '';
     }
     setIsHovered(false);
   }, [setIsHovered]);
@@ -187,9 +188,8 @@ export function TripSlide({
 
   const handleTouchEnd = useCallback(() => {
     if (!lensRef.current) return;
+    // Only hide via opacity — keep clipPath & transform to avoid flash
     lensRef.current.style.opacity = '0';
-    lensRef.current.style.clipPath = '';
-    lensRef.current.style.transform = '';
   }, []);
 
   return (
@@ -423,19 +423,7 @@ export function TripSlide({
       )}
 
       {/* Postage stamp badge — hidden in clean/loupe mode */}
-      {!isClean && (
-        <div className='absolute top-4 right-4 w-12 h-16 md:w-16 md:h-20 border-[3px] border-white/40 border-dashed rounded opacity-70 flex flex-col items-center justify-center -rotate-6 pointer-events-none z-[3]'>
-          <span className='text-[10px] md:text-xs font-bold text-white uppercase tracking-widest bg-black/20 px-1 rounded backdrop-blur-sm -rotate-12'>
-            POST
-          </span>
-          <span className='text-[8px] md:text-[10px] text-white/90 font-mono mt-1 drop-shadow-md'>
-            {new Date(slideItem.created_at).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-            })}
-          </span>
-        </div>
-      )}
+      {!isClean && <PostageStamp createdAt={slideItem.created_at} />}
     </div>
   );
 }

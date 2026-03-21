@@ -19,6 +19,7 @@ import {
   MapPin,
   CheckCircle,
   Loader,
+  Scissors,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { ILLUSTRATION_STYLES, ACTIVE_STYLE_KEY } from '../../../../eb-infra/supabase/functions/_shared/postcard-engine/illustration-styles.ts';
@@ -268,6 +269,36 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
   // User actions
   const [userStatus, setUserStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
 
+  // Pipeline state (3-step modular)
+  interface PipelineTag { label: string; type: string; box_2d: number[]; }
+  interface SegResult { label: string; mask_url: string; status: 'pending' | 'loading' | 'done' | 'error'; }
+  interface DinoBox { label: string; box: number[]; bbox?: number[]; confidence: number; }
+
+  const [pipelinePhotoUrl, setPipelinePhotoUrl] = useState<string | null>(null);
+  const [detectedTags, setDetectedTags] = useState<PipelineTag[]>([]);
+  const [detectStatus, setDetectStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  const [dinoBoxes, setDinoBoxes] = useState<DinoBox[]>([]);
+  const [dinoStatus, setDinoStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  const [segments, setSegments] = useState<SegResult[]>([]);
+  const [segmentStatus, setSegmentStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  // Grounded SAM state
+  const [gsamStatus, setGsamStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  const [gsamResult, setGsamResult] = useState<{ annotated_url: string | null; mask_url: string | null; inverted_mask_url: string | null; outputs: string[] } | null>(null);
+
+  const edgeBase = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+  const edgeKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o';
+
+  const callEdgeFn = async (fn: string, body: Record<string, unknown>) => {
+    const r = await fetch(`${edgeBase}/functions/v1/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${edgeKey}` },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok || d?.error) throw new Error(d?.error || `Failed (${r.status})`);
+    return d;
+  };
+
   const { entries: logEntries, isLoading: logLoading, lastFetched, refetch: refetchLog } = useGenerationLog(15_000);
 
   // ── Fetch stats ──
@@ -413,6 +444,127 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       setPostcardStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
   }, [postcardId, fetchStats, refetchLog]);
+
+  // ── Step 1: Detect objects ──
+  const runDetection = useCallback(async () => {
+    if (!postcardId.trim()) return;
+    setDetectStatus({ status: 'loading', message: 'Fetching postcard…' });
+    setDetectedTags([]);
+    setSegments([]);
+    try {
+      const { data: pc, error } = await supabase
+        .from('postalpeek_postcards')
+        .select('original_image_url, illustration_url')
+        .eq('id', postcardId.trim())
+        .single();
+      if (error || !pc?.illustration_url) throw new Error('Postcard not found or no illustration');
+      setPipelinePhotoUrl(pc.illustration_url);
+
+      setDetectStatus({ status: 'loading', message: 'Calling Gemini on illustration…' });
+      const data = await callEdgeFn('postalpeek-detect-objects', { image_url: pc.illustration_url });
+      const tags: PipelineTag[] = data.tags || [];
+      setDetectedTags(tags);
+      setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
+      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (${data.raw_count} raw)` });
+    } catch (err: unknown) {
+      setDetectStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [postcardId]);
+
+  // ── Step 1.5: Refine with Grounding DINO ──
+  const runDino = useCallback(async () => {
+    if (!pipelinePhotoUrl || detectedTags.length === 0) return;
+    setDinoStatus({ status: 'loading', message: 'Calling Grounding DINO…' });
+    setDinoBoxes([]);
+    try {
+      const labels = detectedTags.map(t => t.label);
+      const data = await callEdgeFn('postalpeek-detect-boxes', { image_url: pipelinePhotoUrl, labels });
+      const boxes: DinoBox[] = data.detections || [];
+      setDinoBoxes(boxes);
+      // Update segments to match DINO detections
+      setSegments(boxes.map((b: DinoBox) => ({ label: b.label, mask_url: '', status: 'pending' as const })));
+      setDinoStatus({ status: 'success', message: `✅ ${boxes.length} precise boxes` });
+    } catch (err: unknown) {
+      setDinoStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [pipelinePhotoUrl, detectedTags]);
+
+  // ── Step 2: Segment one object (uses DINO boxes if available, else Gemini) ──
+  const runSegmentOne = useCallback(async (idx: number) => {
+    // Use DINO boxes if available, otherwise fall back to Gemini tags
+    const boxes = dinoBoxes.length > 0 ? dinoBoxes : null;
+    const source = boxes ? boxes[idx] : detectedTags[idx];
+    if (!pipelinePhotoUrl || !source) return;
+
+    let clickX: number, clickY: number;
+    if (boxes && idx < boxes.length) {
+      // DINO box format: [x_min, y_min, x_max, y_max] normalized 0-1
+      const b = boxes[idx];
+      const coords = b.box || b.bbox || [0, 0, 0, 0];
+      const [xMin, yMin, xMax, yMax] = coords;
+      clickX = Math.round(((xMin + xMax) / 2) * 512);
+      clickY = Math.round(((yMin + yMax) / 2) * 384);
+    } else {
+      // Gemini box_2d: [y_min, x_min, y_max, x_max] normalized 0-1000
+      const [yMin, xMin, yMax, xMax] = (source as PipelineTag).box_2d;
+      clickX = Math.round(((xMin + xMax) / 2 / 1000) * 512);
+      clickY = Math.round(((yMin + yMax) / 2 / 1000) * 384);
+    }
+
+    setSegments(prev => prev.map((s, i) => i === idx ? { ...s, status: 'loading' } : s));
+
+    let cfUrl = pipelinePhotoUrl;
+    try {
+      const u = new URL(pipelinePhotoUrl);
+      cfUrl = `${u.origin}/cdn-cgi/image/format=jpeg,width=512,quality=80/${u.pathname.replace(/^\//, '')}`;
+    } catch { /* use original */ }
+
+    try {
+      const data = await callEdgeFn('postalpeek-segment', {
+        image_url: cfUrl, click_x: clickX, click_y: clickY, label: source.label,
+      });
+      setSegments(prev => prev.map((s, i) => i === idx ? { ...s, mask_url: data.mask_url, status: 'done' } : s));
+    } catch {
+      setSegments(prev => prev.map((s, i) => i === idx ? { ...s, status: 'error' } : s));
+    }
+  }, [pipelinePhotoUrl, detectedTags, dinoBoxes]);
+
+  // ── Step 2: Segment ALL ──
+  const runSegmentAll = useCallback(async () => {
+    setSegmentStatus({ status: 'loading', message: 'Starting…' });
+    for (let i = 0; i < detectedTags.length; i++) {
+      setSegmentStatus({ status: 'loading', message: `Segmenting ${i + 1}/${detectedTags.length} (${detectedTags[i].label})…` });
+      await runSegmentOne(i);
+      if (i < detectedTags.length - 1) await new Promise(r => setTimeout(r, 2000));
+    }
+    setSegmentStatus({ status: 'success', message: `✅ Done` });
+  }, [detectedTags, runSegmentOne]);
+
+  // ── Grounded SAM (one-shot detect + segment) ──
+  const runGroundedSam = useCallback(async () => {
+    if (!pipelinePhotoUrl || detectedTags.length === 0) return;
+    setGsamStatus({ status: 'loading', message: 'Calling Grounded SAM (~16s)…' });
+    setGsamResult(null);
+    try {
+      // Use type-based generic labels for DINO (better detection than specific labels)
+      const uniqueTypes = [...new Set(detectedTags.map(t => t.type))];
+      // Map types to natural language for better DINO matching
+      const typeLabels: Record<string, string> = {
+        sign: 'sign', person: 'person', vehicle: 'car', architecture: 'building',
+        landmark: 'landmark', animal: 'animal', plant: 'plant', street_furniture: 'bench',
+        object: 'object',
+      };
+      const labels = uniqueTypes.map(t => typeLabels[t] || t).join(', ');
+      const data = await callEdgeFn('postalpeek-grounded-sam', {
+        image_url: pipelinePhotoUrl,
+        labels,
+      });
+      setGsamResult(data);
+      setGsamStatus({ status: 'success', message: `✅ Done — ${data.outputs?.length || 0} output images` });
+    } catch (err: unknown) {
+      setGsamStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [pipelinePhotoUrl, detectedTags]);
 
   // ── User Actions ──
 
@@ -748,8 +900,240 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                 </ActionBtn>
               </div>
               <StatusMsg status={postcardStatus.status} message={postcardStatus.message} />
+
+              {/* ── Sticker Pipeline (3-Step Modular) ── */}
+              <div className="pt-2">
+                <SectionTitle>🧩 Sticker Pipeline (Step-by-Step)</SectionTitle>
+
+                {/* ── STEP 1: Detect Objects ── */}
+                <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Step 1 — Detect Objects (Gemini)</p>
+                    <ActionBtn
+                      onClick={runDetection}
+                      disabled={!postcardId.trim() || detectStatus.status === 'loading'}
+                    >
+                      {detectStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                      <span>Run</span>
+                    </ActionBtn>
+                  </div>
+                  <StatusMsg status={detectStatus.status} message={detectStatus.message} />
+
+                  {/* Photo with bounding boxes */}
+                  {pipelinePhotoUrl && detectedTags.length > 0 && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
+                      <div className="relative rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                        <img src={pipelinePhotoUrl} alt="Photo" className="w-full block" />
+                        {detectedTags.map((tag, i) => {
+                          const top = `${tag.box_2d[0] / 10}%`;
+                          const left = `${tag.box_2d[1] / 10}%`;
+                          const height = `${(tag.box_2d[2] - tag.box_2d[0]) / 10}%`;
+                          const width = `${(tag.box_2d[3] - tag.box_2d[1]) / 10}%`;
+                          return (
+                            <div key={i} style={{ position: 'absolute', top, left, width, height, border: '2px solid #f43f5e', pointerEvents: 'none' }}>
+                              <div style={{ position: 'absolute', top: '50%', left: '50%', width: 6, height: 6, background: '#f43f5e', borderRadius: '50%', transform: 'translate(-50%,-50%)' }} />
+                              <span className="absolute -top-4 left-0 text-[8px] bg-rose-500/90 text-white px-1 rounded-sm whitespace-nowrap">
+                                {tag.label} ({tag.type})
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-white/30 text-[10px] mt-1">{detectedTags.length} objects detected</p>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* ── STEP 1.5: Refine with Grounding DINO ── */}
+                {detectedTags.length > 0 && (
+                  <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,197,94,0.15)' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Step 1.5 — Refine Boxes (Grounding DINO)</p>
+                      <ActionBtn onClick={runDino} disabled={dinoStatus.status === 'loading'}>
+                        {dinoStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                        <span>Run DINO</span>
+                      </ActionBtn>
+                    </div>
+                    <StatusMsg status={dinoStatus.status} message={dinoStatus.message} />
+
+                    {/* Photo with DINO boxes (green) vs Gemini boxes (red, faded) */}
+                    {pipelinePhotoUrl && dinoBoxes.length > 0 && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
+                        <div className="relative rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(34,197,94,0.2)' }}>
+                          <img src={pipelinePhotoUrl} alt="Photo" className="w-full block" />
+                          {/* Gemini boxes (faded red) */}
+                          {detectedTags.map((tag, i) => {
+                            const top = `${tag.box_2d[0] / 10}%`;
+                            const left = `${tag.box_2d[1] / 10}%`;
+                            const height = `${(tag.box_2d[2] - tag.box_2d[0]) / 10}%`;
+                            const width = `${(tag.box_2d[3] - tag.box_2d[1]) / 10}%`;
+                            return (
+                              <div key={`g-${i}`} style={{ position: 'absolute', top, left, width, height, border: '1px dashed rgba(244,63,94,0.3)', pointerEvents: 'none' }} />
+                            );
+                          })}
+                          {/* DINO boxes (solid green) */}
+                          {dinoBoxes.map((det, i) => {
+                            const b = det.box || det.bbox;
+                            if (!b || b.length < 4) return null;
+                            const left = `${b[0] * 100}%`;
+                            const top = `${b[1] * 100}%`;
+                            const width = `${(b[2] - b[0]) * 100}%`;
+                            const height = `${(b[3] - b[1]) * 100}%`;
+                            return (
+                              <div key={`d-${i}`} style={{ position: 'absolute', top, left, width, height, border: '2px solid #22c55e', pointerEvents: 'none' }}>
+                                <div style={{ position: 'absolute', top: '50%', left: '50%', width: 6, height: 6, background: '#22c55e', borderRadius: '50%', transform: 'translate(-50%,-50%)' }} />
+                                <span className="absolute -top-4 left-0 text-[8px] bg-emerald-500/90 text-white px-1 rounded-sm whitespace-nowrap">
+                                  {det.label} ({(det.confidence * 100).toFixed(0)}%)
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-3 mt-1">
+                          <span className="text-[9px] text-rose-400/50">■ Gemini (approximate)</span>
+                          <span className="text-[9px] text-emerald-400">■ DINO (precise)</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── STEP 2: Segment Objects (SAM 2) ── */}
+                {(dinoBoxes.length > 0 || detectedTags.length > 0) && (
+                  <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Step 2 — Segment Objects (SAM 2)</p>
+                      <ActionBtn onClick={runSegmentAll} disabled={segmentStatus.status === 'loading'}>
+                        {segmentStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <Scissors className="w-3 h-3" />}
+                        <span>Run All</span>
+                      </ActionBtn>
+                    </div>
+                    <StatusMsg status={segmentStatus.status} message={segmentStatus.message} />
+
+                    {/* Per-object segment cards */}
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      {segments.map((seg, i) => (
+                        <div
+                          key={seg.label}
+                          className="rounded-lg p-2 border"
+                          style={{
+                            background: seg.status === 'done' ? 'rgba(16,185,129,0.05)' : seg.status === 'error' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)',
+                            borderColor: seg.status === 'done' ? 'rgba(16,185,129,0.2)' : seg.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)',
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-white/70 text-[10px] font-medium truncate">{seg.label}</span>
+                            {seg.status === 'pending' && (
+                              <button onClick={() => runSegmentOne(i)} className="text-[9px] text-indigo-400 hover:text-indigo-300">▶ Run</button>
+                            )}
+                            {seg.status === 'loading' && <Loader className="w-3 h-3 animate-spin text-amber-400" />}
+                            {seg.status === 'done' && <CheckCircle className="w-3 h-3 text-emerald-400" />}
+                            {seg.status === 'error' && (
+                              <button onClick={() => runSegmentOne(i)} className="text-[9px] text-red-400 hover:text-red-300">↻ Retry</button>
+                            )}
+                          </div>
+                          {seg.mask_url && (
+                            <a href={seg.mask_url} target="_blank" rel="noopener noreferrer">
+                              <img src={seg.mask_url} alt={`Mask ${seg.label}`} className="w-full rounded bg-black" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Combined masks overlay */}
+                    {segments.some(s => s.mask_url) && pipelinePhotoUrl && (
+                      <div className="mt-4">
+                        <p className="text-white/40 text-[10px] uppercase tracking-wider mb-2">🎭 Combined Masks (Debug)</p>
+                        <div className="relative w-full rounded-lg overflow-hidden bg-black" style={{ aspectRatio: '4/3' }}>
+                          <img src={pipelinePhotoUrl} className="absolute inset-0 w-full h-full object-cover opacity-30" />
+                          {segments.map((s, i) => s.mask_url ? (
+                            <img key={i} src={s.mask_url} alt={`Mask ${s.label}`} className="absolute inset-0 w-full h-full object-cover mix-blend-screen opacity-80" />
+                          ) : null)}
+                          {detectedTags.map((tag, i) => {
+                            const top = `${tag.box_2d[0] / 10}%`;
+                            const left = `${tag.box_2d[1] / 10}%`;
+                            const height = `${(tag.box_2d[2] - tag.box_2d[0]) / 10}%`;
+                            const width = `${(tag.box_2d[3] - tag.box_2d[1]) / 10}%`;
+                            return (
+                              <div key={`b-${i}`} style={{ position: 'absolute', top, left, width, height, border: '1px dashed red', pointerEvents: 'none' }}>
+                                <div style={{ position: 'absolute', top: '50%', left: '50%', width: 6, height: 6, background: 'red', borderRadius: '50%', transform: 'translate(-50%,-50%)' }} />
+                                <span className="absolute -top-4 left-0 text-[8px] bg-red-500/80 text-white px-1 whitespace-nowrap rounded-sm">{tag.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── STEP 3: Grounded SAM (One-Shot) ── */}
+                {detectedTags.length > 0 && (
+                  <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">Step 2 — Grounded SAM (DINO + SAM)</p>
+                        <p className="text-white/30 text-[9px]">One-shot detect + segment on illustration • $0.015/run</p>
+                      </div>
+                      <ActionBtn onClick={runGroundedSam} disabled={gsamStatus.status === 'loading'}>
+                        {gsamStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <Scissors className="w-3 h-3" />}
+                        <span>Run</span>
+                      </ActionBtn>
+                    </div>
+                    <StatusMsg status={gsamStatus.status} message={gsamStatus.message} />
+
+                    {gsamResult && (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 space-y-3">
+                        {/* Annotated image (illustration with mask overlay) */}
+                        {gsamResult.annotated_url && (
+                          <div>
+                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">🎯 Detected + Segmented</p>
+                            <a href={gsamResult.annotated_url} target="_blank" rel="noopener noreferrer">
+                              <img src={gsamResult.annotated_url} alt="Annotated" className="w-full rounded-lg border" style={{ borderColor: 'rgba(139,92,246,0.2)' }} />
+                            </a>
+                          </div>
+                        )}
+                        {/* Mask + Inverted mask side by side */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {gsamResult.mask_url && (
+                            <div>
+                              <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">🎭 Mask</p>
+                              <a href={gsamResult.mask_url} target="_blank" rel="noopener noreferrer">
+                                <img src={gsamResult.mask_url} alt="Mask" className="w-full rounded bg-black" />
+                              </a>
+                            </div>
+                          )}
+                          {gsamResult.inverted_mask_url && (
+                            <div>
+                              <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">⬛ Inverted</p>
+                              <a href={gsamResult.inverted_mask_url} target="_blank" rel="noopener noreferrer">
+                                <img src={gsamResult.inverted_mask_url} alt="Inverted Mask" className="w-full rounded bg-black" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                        {/* All outputs */}
+                        {gsamResult.outputs.length > 2 && (
+                          <details className="text-white/30 text-[9px]">
+                            <summary className="cursor-pointer hover:text-white/50">All {gsamResult.outputs.length} output images</summary>
+                            <div className="grid grid-cols-2 gap-1 mt-1">
+                              {gsamResult.outputs.map((url: string, i: number) => (
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                  <img src={url} alt={`Output ${i}`} className="w-full rounded" />
+                                </a>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
+
 
           {/* ── User Actions ── */}
           {activeSection === 'settings' && (

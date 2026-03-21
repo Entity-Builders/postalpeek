@@ -132,12 +132,13 @@ export function useWalkerFeed() {
 
       if (fetchId !== currentFetchIdRef.current) return;
 
-      allItems.slice(0, 3).forEach((item) => {
+      // Prefetch the first screen of grid images + blur placeholders
+      allItems.slice(0, 12).forEach((item) => {
         if (item.illustration_url) {
           const img = new Image();
-          img.src = cdnImage(item.illustration_url, { width: WIDTHS.mobile });
+          img.src = cdnImage(item.illustration_url, { width: WIDTHS.grid });
           const blurImg = new Image();
-          blurImg.src = cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
+          blurImg.src = cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
         }
       });
 
@@ -197,6 +198,16 @@ export function useWalkerFeed() {
 
       const allUrls = newItems.flatMap(i => [i.illustration_url, i.original_image_url].filter(Boolean));
       await preSignUrls(allUrls).catch(console.error);
+
+      // Prefetch grid + blur images so GridCard shows them instantly
+      newItems.slice(0, 9).forEach((item) => {
+        if (item.illustration_url) {
+          const img = new Image();
+          img.src = cdnImage(item.illustration_url, { width: WIDTHS.grid });
+          const blurImg = new Image();
+          blurImg.src = cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
+        }
+      });
 
       setItems((prev) => {
         const existingIds = new Set(prev.map(p => p.id));

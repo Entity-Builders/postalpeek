@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, ChevronRight } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { cn } from './SearchBar';
+import { cn } from '../utils/cn';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
 import {
   useSignedImage,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Map, Loader2, Sparkles } from 'lucide-react';
-import { cn } from './SearchBar';
+import { cn } from '../utils/cn';
 
 interface StreetViewImageProps {
   imageUrl: string | null;

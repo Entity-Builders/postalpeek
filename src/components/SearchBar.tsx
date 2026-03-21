@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { Search, MapPin } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-/** Utility to merge tailwind classes */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils/cn';
+export { cn };
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
