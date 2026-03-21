@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, RotateCcw } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, useLang, type BilingualText } from '../utils/i18n';
 
@@ -7,6 +7,7 @@ interface PostcardBackProps {
   item: FeedItem;
   polaroidUrl: string;
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+  onFlipBack?: () => void;
 }
 
 function factTypeEmoji(type: string): string {
@@ -37,6 +38,7 @@ export function PostcardBack({
   item,
   polaroidUrl,
   handleImageError,
+  onFlipBack,
 }: PostcardBackProps) {
   const storytelling = item.generation_metadata?.storytelling;
   useLang(); // subscribe — triggers re-render on language change
@@ -75,6 +77,20 @@ export function PostcardBack({
           borderRadius: 'inherit',
         }}
       ></div>
+
+      {/* Flip-back button — positioned to mirror the ℹ️ button on the front */}
+      {onFlipBack && (
+        <button
+          className='absolute bottom-3 right-3 z-40 p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors shadow-sm'
+          onClick={(e) => {
+            e.stopPropagation();
+            onFlipBack();
+          }}
+          title='Volver al frente'
+        >
+          <RotateCcw className='w-4 h-4 md:w-5 md:h-5' />
+        </button>
+      )}
 
       {/* Main content – scrollable */}
       <div className="relative flex flex-col w-full h-full text-black/80 overflow-hidden pb-2">

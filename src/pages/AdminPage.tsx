@@ -128,9 +128,39 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
           <p className="text-white/40 text-xs truncate">{categoryLabel(entry.category)}</p>
         )}
 
-        <div className="flex items-center gap-1 mt-1.5">
+        {entry.lat != null && entry.lng != null && (
+          <div className="flex items-center gap-1 mt-1">
+            <MapPin className="w-3 h-3 text-white/25 shrink-0" />
+            <a
+              href={`https://www.google.com/maps?q=${entry.lat},${entry.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-indigo-400/70 hover:text-indigo-300 text-[10px] font-mono transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              {entry.lat.toFixed(4)}, {entry.lng.toFixed(4)}
+            </a>
+            {entry.streetview_pov?.heading != null && (
+              <span className="text-white/20 text-[10px] font-mono">
+                h:{Math.round(entry.streetview_pov.heading)}°
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-1 mt-1">
           <Clock className="w-3 h-3 text-white/20" />
           <span className="text-white/30 text-[10px] font-mono">{timeAgo(entry.created_at)}</span>
+          <span className="text-white/10 mx-0.5">·</span>
+          <a
+            href={`/p/${entry.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-white/20 hover:text-indigo-300 text-[10px] font-mono transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            🔍 {entry.id.slice(0, 8)}
+          </a>
         </div>
       </div>
     </motion.a>
@@ -220,7 +250,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
 
   // Generation
   const [genStatus, setGenStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
-  const [illustrationStyleKey, setIllustrationStyleKey] = useState<string>(ACTIVE_STYLE_KEY);
+  const [illustrationStyleKeys, setIllustrationStyleKeys] = useState<string[]>([ACTIVE_STYLE_KEY]);
   const [huntTheme, setHuntTheme] = useState('monuments');
   const [huntCountry, setHuntCountry] = useState('');
   const [huntLat, setHuntLat] = useState('');
@@ -287,29 +317,33 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
 
   // ── Generation ──
 
+  const getRandomStyle = useCallback(() => {
+    return illustrationStyleKeys[Math.floor(Math.random() * illustrationStyleKeys.length)];
+  }, [illustrationStyleKeys]);
+
   const triggerWander = useCallback(async () => {
     setGenStatus({ status: 'loading', message: 'Generating wander postcard…' });
     try {
-      const data = await callEdgeFunction('postalpeek-walker-wander', '', { illustration_style_key: illustrationStyleKey });
+      const data = await callEdgeFunction('postalpeek-walker-wander', '', { illustration_style_key: getRandomStyle() });
       setGenStatus({ status: 'success', message: `✅ ${data?.data?.location || 'done'}` });
       onPostcardGenerated?.();
       setTimeout(refetchLog, 2000);
     } catch (err: unknown) {
       setGenStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [callEdgeFunction, illustrationStyleKey, onPostcardGenerated, refetchLog]);
+  }, [callEdgeFunction, getRandomStyle, onPostcardGenerated, refetchLog]);
 
   const triggerTrip = useCallback(async () => {
     setGenStatus({ status: 'loading', message: 'Generating trip postcard…' });
     try {
-      const data = await callEdgeFunction('postalpeek-walker-trip');
+      const data = await callEdgeFunction('postalpeek-walker-trip', '', { illustration_style_key: getRandomStyle() });
       setGenStatus({ status: 'success', message: `✅ Trip: ${data?.postcards_created ?? 0} created` });
       onPostcardGenerated?.();
       setTimeout(refetchLog, 2000);
     } catch (err: unknown) {
       setGenStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [callEdgeFunction, onPostcardGenerated, refetchLog]);
+  }, [callEdgeFunction, getRandomStyle, onPostcardGenerated, refetchLog]);
 
   const triggerHunt = useCallback(async () => {
     setHuntStatus({ status: 'loading', message: `Hunting ${huntTheme}${huntCountry ? ` in ${huntCountry}` : ''}…` });
@@ -322,7 +356,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       } else if (huntCountry.trim()) {
         params.push(`country=${encodeURIComponent(huntCountry.trim())}`);
       }
-      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: illustrationStyleKey });
+      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: getRandomStyle() });
       const attempts = data?.attempts ?? 1;
       const visible = data?.data?.theme_visible !== false;
       setHuntStatus({ status: 'success', message: `✅ ${data?.data?.location} · ${attempts} attempt${attempts > 1 ? 's' : ''}${visible ? '' : ' (theme not visible)'}` });
@@ -331,7 +365,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     } catch (err: unknown) {
       setHuntStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [huntTheme, huntCountry, huntLat, huntLng, illustrationStyleKey, callEdgeFunction, onPostcardGenerated, refetchLog]);
+  }, [huntTheme, huntCountry, huntLat, huntLng, getRandomStyle, callEdgeFunction, onPostcardGenerated, refetchLog]);
 
   const triggerDynamicHunt = useCallback(async () => {
     if (!dynSubject.trim()) return;
@@ -339,7 +373,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     try {
       const params: string[] = [`subject=${encodeURIComponent(dynSubject.trim())}`, 'theme=monuments'];
       if (dynCountry.trim()) params.push(`country=${encodeURIComponent(dynCountry.trim())}`);
-      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: illustrationStyleKey });
+      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: getRandomStyle() });
       const attempts = data?.attempts ?? 1;
       setDynStatus({ status: 'success', message: `✅ ${data?.data?.location} · ${attempts} attempt${attempts > 1 ? 's' : ''}` });
       onPostcardGenerated?.();
@@ -347,7 +381,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     } catch (err: unknown) {
       setDynStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [dynSubject, dynCountry, illustrationStyleKey, callEdgeFunction, onPostcardGenerated, refetchLog]);
+  }, [dynSubject, dynCountry, getRandomStyle, callEdgeFunction, onPostcardGenerated, refetchLog]);
 
   // ── Postcard Actions ──
 
@@ -453,7 +487,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
         {/* Back to feed */}
         <div className="p-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/feed?debug')}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -510,30 +544,55 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
 
               {/* Illustration style selector — applies to ALL pipelines below */}
               <div className="rounded-xl p-4 border" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(99,102,241,0.2)' }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">🎨 Illustration Style</span>
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                    style={{ background: 'rgba(99,102,241,0.2)', color: 'rgb(165,180,252)' }}
-                  >
-                    {illustrationStyleKey === ACTIVE_STYLE_KEY ? 'default' : 'override'}
-                  </span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">🎨 Illustration Style</span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                      style={{ background: 'rgba(99,102,241,0.2)', color: 'rgb(165,180,252)' }}
+                    >
+                      {illustrationStyleKeys.length > 1 ? 'multi-override' : (illustrationStyleKeys[0] === ACTIVE_STYLE_KEY ? 'default' : 'override')}
+                    </span>
+                  </div>
                 </div>
-                <select
-                  value={illustrationStyleKey}
-                  onChange={(e) => setIllustrationStyleKey(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl text-sm transition-all"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', outline: 'none' }}
-                >
-                  {Object.entries(ILLUSTRATION_STYLES).map(([key, style]) => (
-                    <option key={key} value={key} style={{ background: '#1a1a2e', color: 'white' }}>
-                      {key === ACTIVE_STYLE_KEY ? '⭐ ' : ''}{style.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-white/30 text-[10px] mt-1.5">
-                  {ILLUSTRATION_STYLES[illustrationStyleKey as keyof typeof ILLUSTRATION_STYLES]?.description}
-                </p>
+                
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto px-1 -mx-1 custom-scrollbar">
+                  {Object.entries(ILLUSTRATION_STYLES).map(([key, style]) => {
+                    const isSelected = illustrationStyleKeys.includes(key);
+                    return (
+                      <label 
+                        key={key} 
+                        className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-all border"
+                        style={{ 
+                          background: isSelected ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
+                          borderColor: isSelected ? 'rgba(99,102,241,0.3)' : 'transparent',
+                        }}
+                      >
+                        <input 
+                          type="checkbox"
+                          className="mt-1 flex-shrink-0 cursor-pointer"
+                          style={{ accentColor: 'rgba(99,102,241,1)' }}
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setIllustrationStyleKeys(prev => [...prev, key]);
+                            } else if (illustrationStyleKeys.length > 1) {
+                              setIllustrationStyleKeys(prev => prev.filter(k => k !== key));
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span style={{ color: isSelected ? 'white' : 'rgba(255,255,255,0.7)' }} className="text-sm font-medium">
+                            {key === ACTIVE_STYLE_KEY ? `⭐ ` : ''}{style.label}
+                          </span>
+                          <span className="text-[10px] text-white/30 leading-tight mt-0.5">
+                            {style.description}
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Standard pipelines */}

@@ -4,7 +4,11 @@ import { motion, useMotionValue, useAnimate } from 'framer-motion';
 
 import { WIDTHS } from '../utils/imageUtils';
 
-import { useSignedImage, useSignedSrcSet, useRawSignedImage } from '../utils/useSignedImage';
+import {
+  useSignedImage,
+  useSignedSrcSet,
+  useRawSignedImage,
+} from '../utils/useSignedImage';
 import { cn } from './SearchBar';
 import { analytics } from '../lib/analytics';
 import { PostcardFront } from './PostcardFront';
@@ -76,20 +80,22 @@ interface PostcardProps {
   onHeroReady?: () => void;
   /** Called when user taps the expand icon to see fullscreen image */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
+  /** Called on quick tap (replaces flip — parent decides the behavior) */
+  onTap?: () => void;
 }
 
-// ── Tuning constants ──
-/** Max tilt in degrees the card can be dragged to (in each direction from rest) */
-const MAX_TILT = 40;
-/** Degrees past which releasing the card triggers a full flip */
-const FLIP_THRESHOLD = 30;
-/** How long (ms) the pointer must be held before entering drag-peek mode */
-const PEEK_DELAY_MS = 250;
-/** Pixels of horizontal movement per degree of rotation — lower = more sensitive */
-const PX_PER_DEGREE = 3;
-
-const springFlip = { type: 'spring' as const, stiffness: 60, damping: 15, duration: 0.8 };
-const springSnap = { type: 'spring' as const, stiffness: 400, damping: 30, duration: 0.2 };
+const springFlip = {
+  type: 'spring' as const,
+  stiffness: 300,
+  damping: 28,
+  duration: 0.1,
+};
+const springSnap = {
+  type: 'spring' as const,
+  stiffness: 400,
+  damping: 30,
+  duration: 0.1,
+};
 
 export function Postcard({
   item,
@@ -107,32 +113,28 @@ export function Postcard({
   showClaimGuide = false,
   hideActions = false,
   onHeroReady,
+  onTap,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
   const [heroReady, setHeroReady] = useState(false);
+  /** Clean/expand mode — hides chrome, enables loupe zoom */
+  const [isClean, setIsClean] = useState(
+    () => localStorage.getItem('pp_clean_mode') === 'true',
+  );
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // ── Animation primitives ──
-  // useMotionValue drives rotateY at 60fps without React re-renders
   const rotateY = useMotionValue(0);
-  // useAnimate for spring-based completion animations
   const [scope, animate] = useAnimate();
 
-  // Gesture refs (no re-renders needed)
-  const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
   const isFlippedRef = useRef(false);
-  const isAnimating = useRef(false);
 
-  // Keep the ref in sync with state
   React.useEffect(() => {
     isFlippedRef.current = isFlipped;
   }, [isFlipped]);
 
-  // React to item updates from feed navigation
   React.useEffect(() => {
     setActiveSlideItem(item);
   }, [item]);
@@ -145,183 +147,68 @@ export function Postcard({
       rotateY.set(0);
       setTimeout(() => setBackView('info'), 400);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, isFlipped]);
 
-  /** Programmatic flip used by child buttons (info, coupon) */
-  const flipTo = useCallback((flipped: boolean) => {
-    setIsFlipped(flipped);
-    const target = flipped ? 180 : 0;
-    animate(scope.current, { rotateY: target }, springFlip).then(() => {
-      rotateY.set(target);
-    });
-    if (flipped) {
-      analytics.track('postcard_flipped', {
-        postcard_id: item.id,
-        country: item.country,
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id, item.country]);
-
-  // ── Gesture handlers ──
-
-  const cancelPeek = useCallback(() => {
-    if (peekTimer.current) {
-      clearTimeout(peekTimer.current);
-      peekTimer.current = null;
-    }
-  }, []);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // Don't start drag/flip if clicking on a button or link
-    if ((e.target as HTMLElement).closest('button, a')) return;
-    if (isAnimating.current) return;
-    cancelPeek();
-    isDragging.current = false;
-    startX.current = e.clientX;
-
-    peekTimer.current = setTimeout(() => {
-      peekTimer.current = null;
-      isDragging.current = true;
-      // Capture pointer so we keep getting move events even outside the element
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    }, PEEK_DELAY_MS);
-  }, [cancelPeek]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current || isAnimating.current) return;
-
-    // Prevent scroll while dragging the card
-    e.preventDefault();
-    e.stopPropagation();
-
-    const deltaX = e.clientX - startX.current;
-    const baseAngle = isFlippedRef.current ? 180 : 0;
-    // Convert pixels to degrees, clamp to [-MAX_TILT, MAX_TILT]
-    const rawDeg = deltaX / PX_PER_DEGREE;
-    const clampedDeg = Math.max(-MAX_TILT, Math.min(MAX_TILT, rawDeg));
-
-    // Set directly on the motion value — zero overhead, GPU-driven
-    rotateY.set(baseAngle + clampedDeg);
-  }, [rotateY]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    // Ignore releases on buttons/links
-    if ((e.target as HTMLElement).closest('button, a')) {
-      cancelPeek();
-      return;
-    }
-    const wasDragging = isDragging.current;
-    isDragging.current = false;
-    cancelPeek();
-
-    // Release pointer capture
-    try { (e.target as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* */ }
-
-    if (isAnimating.current) return;
-
-    const baseAngle = isFlippedRef.current ? 180 : 0;
-
-    if (wasDragging) {
-      // Check if dragged past threshold
-      const currentAngle = rotateY.get();
-      const delta = currentAngle - baseAngle;
-
-      if (Math.abs(delta) >= FLIP_THRESHOLD) {
-        // Dragged far enough → flip the card
-        // If card is at back (180) and dragged → flip to 0
-        const target = isFlippedRef.current ? 0 : 180;
-        setIsFlipped(!isFlippedRef.current);
-
-        isAnimating.current = true;
-        animate(scope.current, { rotateY: target }, springFlip).then(() => {
-          rotateY.set(target);
-          isAnimating.current = false;
-        });
-
-        if (!isFlippedRef.current) {
-          analytics.track('postcard_flipped', {
-            postcard_id: item.id,
-            country: item.country,
-          });
-        }
-      } else {
-        // Snap back — didn't drag far enough
-        isAnimating.current = true;
-        animate(scope.current, { rotateY: baseAngle }, springSnap).then(() => {
-          rotateY.set(baseAngle);
-          isAnimating.current = false;
-        });
-      }
-    } else {
-      // Quick tap — full flip instantly
-      const newFlipped = !isFlippedRef.current;
-      const target = newFlipped ? 180 : 0;
-      setIsFlipped(newFlipped);
-
-      isAnimating.current = true;
+  /** Programmatic flip — only triggered by ℹ️ / 🎫 buttons */
+  const flipTo = useCallback(
+    (flipped: boolean) => {
+      setIsFlipped(flipped);
+      const target = flipped ? 180 : 0;
       animate(scope.current, { rotateY: target }, springFlip).then(() => {
         rotateY.set(target);
-        isAnimating.current = false;
       });
-
-      if (newFlipped) {
+      if (flipped) {
         analytics.track('postcard_flipped', {
           postcard_id: item.id,
           country: item.country,
         });
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cancelPeek, item.id, item.country]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [item.id, item.country],
+  );
 
-  const handlePointerLeave = useCallback(() => {
-    if (isDragging.current) {
-      // Was dragging → snap back without flipping
-      isDragging.current = false;
-      cancelPeek();
-      const baseAngle = isFlippedRef.current ? 180 : 0;
-      isAnimating.current = true;
-      animate(scope.current, { rotateY: baseAngle }, springSnap).then(() => {
-        rotateY.set(baseAngle);
-        isAnimating.current = false;
-      });
-    } else {
-      cancelPeek();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cancelPeek]);
-
-  // Block scroll (wheel + touch) while dragging — must be native listener with { passive: false }
-  const containerRef = useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const blockScroll = (e: WheelEvent | TouchEvent) => {
-      if (isDragging.current) {
-        e.preventDefault();
-        e.stopPropagation();
+  // ── Simple click handler (replaces drag/peek) ──
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button, a')) return;
+      if (onTap) {
+        onTap();
+      } else {
+        // Toggle clean/expand mode
+        setIsClean((prev) => {
+          const next = !prev;
+          localStorage.setItem('pp_clean_mode', String(next));
+          analytics.track(
+            next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
+            {
+              postcard_id: item.id,
+              country: item.country,
+            },
+          );
+          return next;
+        });
       }
-    };
-    el.addEventListener('wheel', blockScroll, { passive: false });
-    el.addEventListener('touchmove', blockScroll, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', blockScroll);
-      el.removeEventListener('touchmove', blockScroll);
-    };
-  }, []);
+    },
+    [onTap, item.id, item.country],
+  );
+
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // Prevent infinite loop if the fallback itself fails
+  const handleImageError = (
+    e: React.SyntheticEvent<HTMLImageElement, Event>,
+  ) => {
     if (fallbackEnabled) return;
-    
+
     const currentSrc = e.currentTarget.src;
-    
+
     if (currentSrc.includes('/cdn-cgi/image/')) {
-      console.warn(`[Image Fallback] Cloudflare Limit (429) detected. Falling back to raw R2 images for card ${item.id}`);
+      console.warn(
+        `[Image Fallback] Cloudflare Limit (429) detected. Falling back to raw R2 images for card ${item.id}`,
+      );
       setTimeout(() => {
         setFallbackEnabled(true);
       }, 0);
@@ -334,50 +221,84 @@ export function Postcard({
     });
   };
 
-  // Derive non-blocking signed Cloudflare URLs for the main item images
-  const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 20 });
-  const baseMainUrl = useSignedImage(item.illustration_url, { width: WIDTHS.desktop });
-  const baseSrcSet = useSignedSrcSet(item.illustration_url, [WIDTHS.mobile, WIDTHS.tablet]);
+  const placeholderUrl = useSignedImage(item.illustration_url, {
+    width: WIDTHS.blur,
+    quality: 20,
+  });
+  const baseMainUrl = useSignedImage(item.illustration_url, {
+    width: WIDTHS.desktop,
+  });
+  const baseSrcSet = useSignedSrcSet(item.illustration_url, [
+    WIDTHS.mobile,
+    WIDTHS.tablet,
+  ]);
   const rawMainUrl = useRawSignedImage(item.illustration_url);
 
-  // Derive polaroid URLs dynamically from the activeSlideItem
-  const basePolaroidUrl = useSignedImage(activeSlideItem.original_image_url, { width: WIDTHS.thumb });
+  const basePolaroidUrl = useSignedImage(activeSlideItem.original_image_url, {
+    width: WIDTHS.thumb,
+  });
   const rawPolaroidUrl = useRawSignedImage(activeSlideItem.original_image_url);
 
-  // If fallback is triggered, bypass the signed transformations and use raw signed URLs
   const mainImgUrl = fallbackEnabled ? rawMainUrl : baseMainUrl;
   const srcSetString = fallbackEnabled ? undefined : baseSrcSet;
   const polaroidUrl = fallbackEnabled ? rawPolaroidUrl : basePolaroidUrl;
   const finalPlaceholder = fallbackEnabled ? undefined : placeholderUrl;
 
+  // Reset clean mode when card loses focus
+  React.useEffect(() => {
+    if (!isActive && isClean) {
+      setIsClean(false);
+    }
+  }, [isActive, isClean]);
+
+  const toggleClean = useCallback(() => {
+    setIsClean((prev) => {
+      const next = !prev;
+      localStorage.setItem('pp_clean_mode', String(next));
+      analytics.track(
+        next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
+        {
+          postcard_id: item.id,
+          country: item.country,
+        },
+      );
+      return next;
+    });
+  }, [item.id, item.country]);
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        'w-full h-full perspective-1000 cursor-grab mx-auto ease-in-out flex flex-col',
+        'w-full h-full perspective-1000 mx-auto ease-in-out flex flex-col transition-opacity duration-200',
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
         !isActive && 'opacity-40 pointer-events-none',
+        isClean ? 'cursor-zoom-in' : 'cursor-pointer',
       )}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerLeave}
-      onPointerCancel={handlePointerLeave}
+      onClick={handleClick}
     >
       <motion.div
         ref={scope}
-        className="w-full h-full relative bg-white"
+        className={cn(
+          'w-full h-full relative transition-[background-color,padding,border-radius,box-shadow] duration-200',
+          isClean && !isFlipped ? 'bg-transparent' : 'bg-white',
+        )}
         style={{
           transformStyle: 'preserve-3d',
           willChange: 'transform',
           rotateY,
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05)',
-          padding: '8px 8px 32px 8px',
-          borderRadius: '12px',
+          boxShadow: isClean && !isFlipped
+            ? 'none'
+            : '0 8px 30px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05)',
+          padding: isClean && !isFlipped ? '0' : '8px 8px 32px 8px',
+          borderRadius: isClean && !isFlipped ? '0' : '12px',
         }}
       >
-        <div className="relative w-full h-full" style={{ transformStyle: 'preserve-3d' }}>
+        <div
+          className='relative w-full h-full'
+          style={{ transformStyle: 'preserve-3d' }}
+        >
           <PostcardFront
             item={item}
             isAdmin={isAdmin}
@@ -407,14 +328,20 @@ export function Postcard({
             isInAlbum={isInAlbum}
             showClaimGuide={showClaimGuide}
             hideActions={hideActions}
+            isClean={isClean}
+            onToggleClean={toggleClean}
           />
           {backView === 'coupon' ? (
-            <PostcardCoupon item={activeSlideItem} />
+            <PostcardCoupon
+              item={activeSlideItem}
+              onFlipBack={() => flipTo(false)}
+            />
           ) : (
             <PostcardBack
               item={activeSlideItem}
               polaroidUrl={polaroidUrl}
               handleImageError={handleImageError}
+              onFlipBack={() => flipTo(false)}
             />
           )}
         </div>

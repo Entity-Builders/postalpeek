@@ -5,7 +5,7 @@
  * Shows ALL available data from postalpeek_postcards.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -23,8 +23,14 @@ import {
   Film,
   Hash,
   Globe,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Loader,
+  CheckCircle,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 
@@ -173,7 +179,7 @@ function ImgPanel({ url, label }: { url: string | null; label: string }) {
 }
 
 function DetailedTagsTable({ tags }: { tags: unknown[] }) {
-  type Tag = { label?: string | { en?: string; es?: string }; spanish_label?: string | { en?: string; es?: string }; type?: string; weight?: number; confidence?: number; count?: number; position?: string };
+  type Tag = { label?: string | { en?: string; es?: string }; spanish_label?: string | { en?: string; es?: string }; type?: string; weight?: number; confidence?: number; count?: number; position?: string; box_2d?: number[]; bbox?: number[] };
   const typed = tags as Tag[];
   if (!typed.length) return <p className="text-white/20 text-xs">Empty</p>;
   return (
@@ -181,7 +187,7 @@ function DetailedTagsTable({ tags }: { tags: unknown[] }) {
       <table className="text-xs w-full border-collapse">
         <thead>
           <tr className="text-white/25 text-left">
-            {['Label', 'ES', 'Type', 'Weight', 'Confidence', 'Count', 'Position'].map((h) => (
+            {['Label', 'ES', 'Type', 'Weight', 'Confidence', 'Count', 'Position', 'Bbox'].map((h) => (
               <th key={h} className="py-1.5 pr-4 font-normal">{h}</th>
             ))}
           </tr>
@@ -196,11 +202,292 @@ function DetailedTagsTable({ tags }: { tags: unknown[] }) {
               <td className="py-1.5 pr-4 text-amber-300/70">{tag.confidence != null ? tag.confidence.toFixed(2) : '—'}</td>
               <td className="py-1.5 pr-4 text-white/40">{tag.count ?? '—'}</td>
               <td className="py-1.5 pr-4 text-white/30">{tag.position ?? '—'}</td>
+              <td className="py-1.5 pr-4 text-white/30 font-mono text-[10px]">{(tag.box_2d ?? tag.bbox) ? `[${(tag.box_2d ?? tag.bbox)!.join(', ')}]` : '—'}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ── Discoveries Section ─────────────────────────────────────────────────
+
+type IllTag = { label?: string | { en?: string }; tag_type?: string; type?: string; box_2d?: number[]; bbox?: number[] };
+
+function getTagLabel(t: IllTag): string {
+  if (typeof t.label === 'string') return t.label;
+  if (typeof t.label === 'object' && t.label?.en) return t.label.en;
+  return JSON.stringify(t.label);
+}
+
+interface DiscoveryRow {
+  id: string;
+  postcard_id: string;
+  user_id: string;
+  tag_label_en: string;
+  tag_type: string;
+  bbox: number[];
+  sticker_url: string | null;
+  sticker_status: string;
+  discovered_at: string;
+}
+
+function DiscoveriesSection({ postcard }: { postcard: PostcardDetail }) {
+  const [discoveries, setDiscoveries] = useState<DiscoveryRow[]>([]);
+  const [cropUrls, setCropUrls] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState<Set<string>>(new Set());
+  const [genAllStatus, setGenAllStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [genProgress, setGenProgress] = useState({ done: 0, total: 0 });
+  const [cropStatus, setCropStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+
+  // Fetch discoveries for this postcard (all users — admin view)
+  const fetchDiscoveries = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('postalpeek_discoveries')
+      .select('*')
+      .eq('postcard_id', postcard.id)
+      .order('discovered_at', { ascending: false });
+    if (data) setDiscoveries(data as DiscoveryRow[]);
+    setLoading(false);
+  }, [postcard.id]);
+
+  useEffect(() => { fetchDiscoveries(); }, [fetchDiscoveries]);
+
+  // Tags that have a bbox and can be vectorized
+  const tagsWithBbox = useMemo(() =>
+    (postcard.illustration_tags as IllTag[] | null)?.filter(
+      (t) => {
+        const coords = t?.box_2d ?? t?.bbox;
+        return coords && Array.isArray(coords) && coords.length === 4;
+      },
+    ) ?? [],
+    [postcard.illustration_tags],
+  );
+
+  const isAlreadyDiscovered = useCallback(
+    (tagLabel: string) =>
+      discoveries.some((d) => d.tag_label_en === tagLabel && d.sticker_status === 'done'),
+    [discoveries],
+  );
+
+  // Batch crop all tags (FREE — no AI)
+  const cropAll = useCallback(async () => {
+    setCropStatus('loading');
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-crop-tags`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({ postcard_id: postcard.id }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const urls: Record<string, string> = {};
+      for (const crop of data.crops || []) {
+        urls[crop.tag_label_en] = crop.crop_url;
+      }
+      setCropUrls(urls);
+      setCropStatus('done');
+    } catch (err) {
+      console.error('[CropAll]', err);
+      setCropStatus('idle');
+    }
+  }, [postcard.id]);
+
+  // Generate a single sticker (Gemini vectorize — $)
+  const generateOne = useCallback(async (tag: IllTag) => {
+    const label = getTagLabel(tag);
+    setGenerating((prev) => new Set(prev).add(label));
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-vectorize-tag`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          postcard_id: postcard.id,
+          tag_label_en: label,
+          tag_type: tag.tag_type || tag.type || 'object',
+          bbox: tag.box_2d ?? tag.bbox,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      await fetchDiscoveries();
+    } catch (err) {
+      console.error('[GenSticker]', err);
+    } finally {
+      setGenerating((prev) => { const n = new Set(prev); n.delete(label); return n; });
+    }
+  }, [postcard.id, fetchDiscoveries]);
+
+  // Generate ALL stickers sequentially
+  const generateAll = useCallback(async () => {
+    const pending = tagsWithBbox.filter((t) => !isAlreadyDiscovered(getTagLabel(t)));
+    if (pending.length === 0) return;
+    setGenAllStatus('loading');
+    setGenProgress({ done: 0, total: pending.length });
+    for (let i = 0; i < pending.length; i++) {
+      await generateOne(pending[i]);
+      setGenProgress({ done: i + 1, total: pending.length });
+    }
+    setGenAllStatus('done');
+  }, [tagsWithBbox, generateOne, isAlreadyDiscovered]);
+
+  const discoveredCount = discoveries.filter((d) => d.sticker_status === 'done').length;
+  const pendingTags = tagsWithBbox.filter((t) => !isAlreadyDiscovered(getTagLabel(t)));
+  const hasCrops = Object.keys(cropUrls).length > 0;
+
+  return (
+    <Section icon={<Search className="w-3.5 h-3.5" />} title="Discoveries / Objects">
+      {/* Summary */}
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-white/60 text-xs">
+          {discoveredCount} vectorized · {Object.keys(cropUrls).length} cropped
+        </span>
+        <span className="text-white/20 text-xs">·</span>
+        <span className="text-white/40 text-xs">
+          {tagsWithBbox.length} tag{tagsWithBbox.length !== 1 ? 's' : ''} with bbox
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-white/30 text-sm py-4">
+          <Loader className="w-4 h-4 animate-spin" /> Loading discoveries…
+        </div>
+      ) : (
+        <>
+          {/* Action buttons row */}
+          <div className="flex gap-3 mb-4">
+            {/* Crop All — FREE */}
+            <button
+              onClick={cropAll}
+              disabled={cropStatus === 'loading'}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 hover:brightness-110 border border-white/5"
+              style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.5), rgba(5,150,105,0.5))' }}
+            >
+              {cropStatus === 'loading' ? (
+                <><Loader className="w-4 h-4 animate-spin" /> Cropping…</>
+              ) : cropStatus === 'done' ? (
+                <><CheckCircle className="w-4 h-4" /> Crops ready!</>
+              ) : (
+                <><ImageIcon className="w-4 h-4" /> Crop All (Free)</>
+              )}
+            </button>
+
+            {/* Vectorize All — $ */}
+            {pendingTags.length > 0 && (
+              <button
+                onClick={generateAll}
+                disabled={genAllStatus === 'loading'}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 hover:brightness-110 border border-white/5"
+                style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.5), rgba(217,119,6,0.5))' }}
+              >
+                {genAllStatus === 'loading' ? (
+                  <><Loader className="w-4 h-4 animate-spin" /> Vectorizing… {genProgress.done}/{genProgress.total}</>
+                ) : genAllStatus === 'done' ? (
+                  <><CheckCircle className="w-4 h-4" /> All done!</>
+                ) : (
+                  <><Sparkles className="w-4 h-4" /> Vectorize All · ${(pendingTags.length * 0.001).toFixed(3)}</>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Comparison grid */}
+          {(hasCrops || discoveries.length > 0) && (
+            <div className="overflow-x-auto mb-4">
+              <table className="text-xs w-full border-collapse">
+                <thead>
+                  <tr className="text-white/25 text-left">
+                    <th className="py-1.5 pr-3 font-normal">Label</th>
+                    <th className="py-1.5 pr-3 font-normal">Type</th>
+                    <th className="py-1.5 pr-3 font-normal">Bbox</th>
+                    <th className="py-1.5 pr-3 font-normal text-center">
+                      <span className="text-emerald-400/70">Crop ($0)</span>
+                    </th>
+                    <th className="py-1.5 pr-3 font-normal text-center">
+                      <span className="text-amber-400/70">Vectorized ($)</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tagsWithBbox.map((tag, i) => {
+                    const label = getTagLabel(tag);
+                    const disc = discoveries.find((d) => d.tag_label_en === label);
+                    const cropUrl = cropUrls[label];
+                    const isGen = generating.has(label);
+                    return (
+                      <tr key={i} className="border-t" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                        <td className="py-2 pr-3 text-white/80 font-medium">{label}</td>
+                        <td className="py-2 pr-3 text-indigo-300/70">{tag.tag_type || tag.type || '—'}</td>
+                        <td className="py-2 pr-3 text-white/30 font-mono text-[10px]">[{(tag.box_2d ?? tag.bbox)!.join(', ')}]</td>
+                        {/* Crop column */}
+                        <td className="py-2 pr-3 text-center">
+                          {cropUrl ? (
+                            <a href={cropUrl} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={cropUrl}
+                                alt={label}
+                                className="w-14 h-14 object-cover rounded-lg mx-auto hover:scale-110 transition-transform"
+                                style={{ background: 'rgba(255,255,255,0.06)', filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 2px white)' }}
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-white/15">—</span>
+                          )}
+                        </td>
+                        {/* Vectorized column */}
+                        <td className="py-2 pr-3 text-center">
+                          {disc?.sticker_url ? (
+                            <a href={disc.sticker_url} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={disc.sticker_url}
+                                alt={label}
+                                className="w-14 h-14 object-contain rounded-lg mx-auto hover:scale-110 transition-transform"
+                                style={{ background: 'rgba(255,255,255,0.06)' }}
+                              />
+                            </a>
+                          ) : (
+                            <button
+                              onClick={() => generateOne(tag)}
+                              disabled={isGen}
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all hover:bg-white/10 disabled:opacity-40 mx-auto"
+                              style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(245,158,11,0.9)' }}
+                            >
+                              {isGen ? <Loader className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              {isGen ? '…' : 'Gen'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {tagsWithBbox.length === 0 && discoveries.length === 0 && (
+            <p className="text-white/20 text-sm py-4">
+              No illustration tags with bbox — regenerate illustration tags first.
+            </p>
+          )}
+        </>
+      )}
+    </Section>
   );
 }
 
@@ -211,6 +498,46 @@ export function PostcardDetailPage() {
   const [postcard, setPostcard] = useState<PostcardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regenLoading, setRegenLoading] = useState<Record<string, boolean>>({});
+
+  const handleRegenerate = async (target: 'detailed' | 'illustration') => {
+    if (!postcard) return;
+    setRegenLoading((prev) => ({ ...prev, [target]: true }));
+    try {
+      const { error: fnError } = await supabase.functions.invoke(
+        'postalpeek-regenerate-tags',
+        { body: { postcard_id: postcard.id, targets: [target] } },
+      );
+      if (fnError) throw fnError;
+
+      // Re-fetch the postcard to get updated data
+      const { data: refreshed, error: refreshErr } = await supabase
+        .from('postalpeek_postcards')
+        .select(`
+          id, created_at, city, country, location_name, lat, lng,
+          illustration_url, original_image_url,
+          category, description,
+          streetview_pov, generation_metadata,
+          owner_id,
+          scene_type, time_of_day, weather, human_activity,
+          detailed_tags, illustration_tags,
+          aesthetic_vibes, architecture_style, color_palette,
+          video_generation_status, imagine_task_id, should_animate
+        `)
+        .eq('id', postcard.id)
+        .single();
+
+      if (!refreshErr && refreshed) {
+        setPostcard(refreshed as PostcardDetail);
+      }
+    } catch (err: unknown) {
+      console.error(`[Regen] ${target} failed:`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Regeneration failed: ${msg}`);
+    } finally {
+      setRegenLoading((prev) => ({ ...prev, [target]: false }));
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -275,6 +602,18 @@ export function PostcardDetailPage() {
           <span className="text-white/25 text-xs font-mono ml-2">{strategy}</span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {postcard && (
+            <a
+              href={`/${encodeUuidToHash(postcard.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-indigo-300 hover:bg-indigo-500/15 transition-colors border border-indigo-500/20"
+              title="View in feed"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Feed
+            </a>
+          )}
           <span className="text-white/15 text-xs font-mono truncate max-w-[200px]">{id}</span>
           <button
             onClick={() => copyToClipboard(id ?? '')}
@@ -306,8 +645,8 @@ export function PostcardDetailPage() {
             {/* Two-column layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-              {/* LEFT: Images */}
-              <div className="space-y-6">
+              {/* LEFT: Images — sticky so they follow scroll */}
+              <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
                 <Section icon={<ImageIcon className="w-3.5 h-3.5" />} title="Images">
                   <ImgPanel url={postcard.illustration_url} label="Illustration" />
                   <ImgPanel url={postcard.original_image_url} label="Original (Street View)" />
@@ -405,6 +744,17 @@ export function PostcardDetailPage() {
 
                 {/* Detailed tags */}
                 <Section icon={<Tag className="w-3.5 h-3.5" />} title="Detailed Tags (AI Analysis)">
+                  <div className="flex justify-end -mt-1 mb-2">
+                    <button
+                      onClick={() => handleRegenerate('detailed')}
+                      disabled={regenLoading.detailed}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
+                      style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${regenLoading.detailed ? 'animate-spin' : ''}`} />
+                      {regenLoading.detailed ? 'Regenerating…' : 'Regenerate'}
+                    </button>
+                  </div>
                   {Array.isArray(postcard.detailed_tags) && postcard.detailed_tags.length > 0 ? (
                     <DetailedTagsTable tags={postcard.detailed_tags} />
                   ) : (
@@ -414,6 +764,17 @@ export function PostcardDetailPage() {
 
                 {/* Illustration tags */}
                 <Section icon={<Hash className="w-3.5 h-3.5" />} title="Illustration Tags">
+                  <div className="flex justify-end -mt-1 mb-2">
+                    <button
+                      onClick={() => handleRegenerate('illustration')}
+                      disabled={regenLoading.illustration}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
+                      style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${regenLoading.illustration ? 'animate-spin' : ''}`} />
+                      {regenLoading.illustration ? 'Regenerating…' : 'Regenerate'}
+                    </button>
+                  </div>
                   {Array.isArray(postcard.illustration_tags) && postcard.illustration_tags.length > 0 ? (
                     typeof postcard.illustration_tags[0] === 'object' && postcard.illustration_tags[0] !== null ? (
                       <DetailedTagsTable tags={postcard.illustration_tags} />
@@ -431,6 +792,9 @@ export function PostcardDetailPage() {
                     <p className="text-white/20 text-sm">No illustration tags</p>
                   )}
                 </Section>
+
+                {/* Discoveries / Objects */}
+                <DiscoveriesSection postcard={postcard} />
 
               </div>
             </div>

@@ -207,6 +207,14 @@ h6 {
   z-index: 2;
 }
 
+/* In loupe/clean mode, disable protection so mouse events reach TripSlide */
+.image-protected.loupe-active::after {
+  display: none;
+}
+.image-protected.loupe-active img {
+  pointer-events: auto;
+}
+
 /* Confetti burst for album claims */
 @keyframes confetti-burst {
   0% {

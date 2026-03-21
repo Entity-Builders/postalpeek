@@ -26,6 +26,7 @@ import { t, useLang } from '../utils/i18n';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
 import { TripSlide } from './TripSlide';
+import { useDiscoveries } from '../hooks/useDiscoveries';
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -60,6 +61,10 @@ interface PostcardFrontProps {
   isActive?: boolean;
   /** Called when user taps expand to see fullscreen image */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
+  /** Controlled clean/expand mode from parent */
+  isClean?: boolean;
+  /** Toggle clean mode callback */
+  onToggleClean?: () => void;
 }
 
 export function PostcardFront({
@@ -84,25 +89,22 @@ export function PostcardFront({
   isInAlbum = false,
   showClaimGuide = false,
   hideActions = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isActive = true,
+  isClean = false,
+  onToggleClean,
 }: PostcardFrontProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showClaimedTooltip, setShowClaimedTooltip] = useState(false);
   const [showClaimTooltip, setShowClaimTooltip] = useState(false);
+
+  // Sticker discovery system
+  const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isClean, setIsClean] = useState(
-    () => localStorage.getItem('pp_clean_mode') === 'true'
-  );
   useLang(); // subscribe to language changes
 
-  // Reset clean mode when the card loses focus (swipe away)
-  React.useEffect(() => {
-    if (!isActive && isClean) {
-      setIsClean(false);
-    }
-  }, [isActive, isClean]);
   const [showIdCopied, setShowIdCopied] = useState(false);
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = React.useRef(false);
@@ -256,26 +258,20 @@ export function PostcardFront({
 
       {/* Main card */}
       <div
-        className='relative w-full h-full flex flex-col transition-all duration-300 bg-white'
+        className={cn('relative w-full h-full flex flex-col transition-all duration-300', isClean ? 'bg-transparent' : 'bg-white')}
         style={{ zIndex: 1 }}
       >
         <div className={cn(
-          "flex-1 w-full min-h-0 relative overflow-hidden flex flex-col transition-all duration-300",
-          isClean ? 'p-0' : 'p-1 pb-0 bg-white',
+          "flex-1 w-full min-h-0 relative flex flex-col transition-all duration-300",
+          isClean ? 'p-0' : 'p-1 pb-0 bg-white overflow-hidden',
         )}>
           <div
             className={cn(
-              'relative overflow-hidden shadow-inner image-protected bg-stone-200 flex-1 min-h-0 transition-all duration-300',
-              isClean ? 'rounded-none' : 'rounded',
+              'relative image-protected flex-1 min-h-0 transition-all duration-300',
+              isClean ? 'rounded-none loupe-active' : 'overflow-hidden shadow-inner bg-stone-200 rounded',
             )}
             onContextMenu={(e) => e.preventDefault()}
           >
-          {/* Dev-only album badge (all postcards) */}
-          {isAdmin && isInAlbum && (
-            <span className='absolute top-2 left-2 z-40 inline-flex items-center gap-1 bg-amber-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm'>
-              🏆 Album
-            </span>
-          )}
 
           {isAlbumGroup ? (
             <>
@@ -308,6 +304,10 @@ export function PostcardFront({
                         slideItem.id === item.id ? srcSetString : undefined
                       }
                       onHeroLoad={slideItem.id === item.id ? onHeroLoad : undefined}
+                      isClean={isClean}
+                      onDiscoverTag={discoverTag}
+                      isTagDiscovered={isDiscovered}
+                      isTagGenerating={isGenerating}
                     />
                   ))}
                 </div>
@@ -342,6 +342,10 @@ export function PostcardFront({
               preloadedPlaceholder={placeholderUrl}
               preloadedSrcSet={srcSetString}
               onHeroLoad={onHeroLoad}
+              isClean={isClean}
+              onDiscoverTag={discoverTag}
+              isTagDiscovered={isDiscovered}
+              isTagGenerating={isGenerating}
             />
           )}
 
@@ -355,13 +359,7 @@ export function PostcardFront({
             )}
             onClick={(e) => {
               e.stopPropagation();
-              const nextClean = !isClean;
-              setIsClean(nextClean);
-              localStorage.setItem('pp_clean_mode', String(nextClean));
-              analytics.track(nextClean ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off', {
-                postcard_id: activeSlideItem.id,
-                country: activeSlideItem.country,
-              });
+              onToggleClean?.();
             }}
             title={isClean ? 'Volver' : 'Ver imagen'}
           >

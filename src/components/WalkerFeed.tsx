@@ -10,11 +10,6 @@ import { useDailyPack } from '../hooks/useDailyPack';
 import type { FeedItem } from './Postcard';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerGrid } from './WalkerGrid';
-import { WalkerFilterMenu } from './WalkerFilterMenu';
-import {
-  WalkerLoadingState,
-  WalkerEmptyState,
-} from './WalkerFeedStates';
 import { AlbumsModal } from './AlbumsModal';
 import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
@@ -28,7 +23,6 @@ import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AdminPanelModal } from './AdminPanelModal';
 import { useLang, toggleLang } from '../utils/i18n';
 import type { SmartSearchResult } from '../hooks/useSmartSearch';
 
@@ -40,15 +34,11 @@ export function WalkerFeed({
   isAdmin = false,
   user = null,
   onWelcomeChange,
-  isAdminPanelOpen,
-  setIsAdminPanelOpen,
 }: {
   isIdle?: boolean;
   isAdmin?: boolean;
   user?: User | null;
   onWelcomeChange?: (isOnWelcome: boolean) => void;
-  isAdminPanelOpen?: boolean;
-  setIsAdminPanelOpen?: (open: boolean) => void;
 }) {
   const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
 
@@ -58,12 +48,10 @@ export function WalkerFeed({
     isLoading,
     setIsLoading,
     selectedCountry,
-    setSelectedCountry,
     hasSharedCard,
     hasMore,
     isFetchingMore,
     fetchMoreFeed,
-    refetchFeed,
   } = useWalkerFeed();
 
   // ── Spotlight search state (needs items from useWalkerFeed) ──
@@ -219,7 +207,8 @@ export function WalkerFeed({
 
 
   const [showWelcome] = useState(() => !hasSeenWelcome());
-  const [isOnWelcome, setIsOnWelcome] = useState(showWelcome);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isOnWelcome, _setIsOnWelcome] = useState(showWelcome);
 
   useEffect(() => {
     onWelcomeChange?.(isOnWelcome);
@@ -252,8 +241,8 @@ export function WalkerFeed({
     sourceRect?: DOMRect;
   } | null>(null);
   const location = useLocation();
-  const showCollection = location.pathname === '/collection';
-  const urlAlbumId = location.pathname.startsWith('/album/') ? location.pathname.split('/')[2] : null;
+  const showCollection = location.pathname === '/feed/collection';
+  const urlAlbumId = location.pathname.startsWith('/feed/album/') ? location.pathname.split('/')[3] : null;
   const [claimLimitInfo, setClaimLimitInfo] = useState<{
     type: 'daily' | 'monthly';
     used: number;
@@ -365,141 +354,34 @@ export function WalkerFeed({
     [claim, refetchCollection, refetchAlbums, albumPostcardIds],
   );
 
-  // ── Anonymous: show Pinterest grid (or carousel focus mode) ────────────
+  // ── Unified flow: Grid (default) → Feed (carousel) ────────────
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null);
 
-  if (!user) {
-    // Focus mode: user tapped a card → fullscreen carousel
-    if (focusedIndex !== null) {
-      const focusItems = items.slice(focusedIndex); // start from tapped card
-      return (
-        <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
-          {/* Back button */}
-          <button
-            onClick={() => setFocusedIndex(null)}
-            className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
-          >
-            ← Explorar
-          </button>
-          <WalkerCarousel
-            items={focusItems}
-            displayItems={focusItems}
-            hasMore={hasMore}
-            isFetchingMore={isFetchingMore}
-            isFetchingRef={isFetchingRef}
-            fetchMoreFeed={fetchMoreFeed}
-            selectedCountry={selectedCountry}
-            user={null}
-            isAdmin={false}
-            showWelcome={false}
-            isOnWelcome={false}
-            setIsOnWelcome={() => {}}
-            favoriteIds={new Set()}
-            toggleFavorite={() => {}}
-            setShowAuthGate={() => {}}
-            setPendingFavoriteId={() => {}}
-            hasSharedCard={false}
-            claimedIds={new Set()}
-          />
-        </div>
-      );
+  // Auto-enter carousel mode for share links
+  React.useEffect(() => {
+    if (hasSharedCard && items.length > 0 && focusedIndex === null) {
+      setFocusedIndex(0);
     }
+  }, [hasSharedCard, items.length]);
 
-    // Grid mode (default for anonymous)
+  // Feed mode: user tapped a card in the grid → show fullscreen carousel
+  if (focusedIndex !== null) {
+    const feedItems = isSpotlightMode && spotlightResults.length > 0
+      ? spotlightResults.slice(focusedIndex)
+      : items.slice(focusedIndex);
+
     return (
       <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
-        {!isLoading && (
-          <WalkerGrid
-            items={items}
-            isLoading={isLoading}
-            hasMore={hasMore}
-            isFetchingMore={isFetchingMore}
-            fetchMoreFeed={fetchMoreFeed}
-            availableCountries={availableCountries}
-            selectedCountry={selectedCountry}
-            onSelectCountry={(country) => {
-              if (country === selectedCountry) return;
-              handleSpotlightDismiss();
-              setIsLoading(true);
-              window.history.pushState({}, '', country ? `/${encodeURIComponent(country).replace(/%20/g, '-')}` : '/');
-            }}
-            spotlightResults={spotlightResults}
-            spotlightQuery={spotlightQuery}
-            isSpotlightSearching={isSpotlightSearching}
-            onSpotlightSearch={handleSpotlightSearch}
-            onSpotlightDismiss={handleSpotlightDismiss}
-            onAuthSuccess={() => {
-              sessionStorage.removeItem(AUTH_GATE_KEY);
-              sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
-            }}
-            onCardClick={(index) => setFocusedIndex(index)}
-            viewedItems={items.slice(0, 5)}
-          />
-        )}
-        {isLoading && <WalkerLoadingState />}
-        <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
-      </div>
-    );
-  }
-
-  // ── Logged-in: show the full carousel game ───────────────────────────────
-  return (
-    <div className='w-full h-full flex flex-col items-center justify-center relative bg-[#e6e2da] overflow-hidden'>
-      {!isOnWelcome && !isSpotlightMode && (
-        <WalkerFilterMenu
-          isIdle={isIdle}
-          availableCountries={availableCountries}
-          unlockedCountries={unlockedCountries}
-          selectedCountry={selectedCountry}
-          onSelectCountry={(country) => {
-            if (country === selectedCountry) return;
-            handleSpotlightDismiss();
-            setIsLoading(true);
-            if (country === null) {
-              window.history.pushState({}, '', '/');
-            } else {
-              const countrySlug = encodeURIComponent(country).replace(/%20/g, '-');
-              window.history.pushState({}, '', `/${countrySlug}`);
-            }
-          }}
-          onOpenAlbumsModal={() => {
-            setIsAlbumsModalOpen(true);
-            analytics.track('albums_opened');
-          }}
-          isLoggedIn={!!user}
-          onToggleCollection={
-            user
-              ? () => {
-                  navigate('/collection');
-                  refetchCollection();
-                  analytics.track('collection_opened');
-                }
-              : undefined
-          }
-          spotlightQuery={spotlightQuery}
-          isSpotlightSearching={isSpotlightSearching}
-          onSpotlightSearch={handleSpotlightSearch}
-          onSpotlightDismiss={handleSpotlightDismiss}
-        />
-      )}
-
-      {isLoading && !showWelcome ? (
-        <WalkerLoadingState />
-      ) : (items.length === 0 && !showWelcome && (!isSpotlightMode || spotlightResults.length === 0)) ? (
-        <WalkerEmptyState 
-          onClearFilter={selectedCountry ? () => {
-            setIsLoading(true);
-            setSelectedCountry(null);
-          } : undefined} 
-          onUnlockMore={() => {
-             alert('¡Vuelve pronto para ver más postales!');
-             analytics.track('unlock_feed_clicked');
-          }}
-        />
-      ) : (
+        {/* Back button */}
+        <button
+          onClick={() => { setFocusedIndex(null); navigate('/feed'); }}
+          className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
+        >
+          ← Explorar
+        </button>
         <WalkerCarousel
-          items={isSpotlightMode && spotlightResults.length > 0 ? spotlightResults : items}
-          displayItems={isSpotlightMode && spotlightResults.length > 0 ? spotlightResults : items}
+          items={feedItems}
+          displayItems={feedItems}
           hasMore={isSpotlightMode && spotlightResults.length > 0 ? hasMoreSpotlight : hasMore}
           isFetchingMore={isSpotlightMode && spotlightResults.length > 0 ? isFetchingMoreSpotlight : isFetchingMore}
           isFetchingRef={isFetchingRef}
@@ -507,23 +389,23 @@ export function WalkerFeed({
           selectedCountry={selectedCountry}
           user={user}
           isAdmin={isAdmin}
-          showWelcome={showWelcome}
-          isOnWelcome={isOnWelcome}
-          setIsOnWelcome={setIsOnWelcome}
-          favoriteIds={favoriteIds}
-          toggleFavorite={toggleFavorite}
-          setShowAuthGate={() => {}} // no-op: auth gate no longer used for logged-in users
-          setPendingFavoriteId={() => {}} // no-op
-          hasSharedCard={hasSharedCard}
-          claimedIds={claimedIds}
-          onClaimPostcard={handleClaimPostcard}
+          showWelcome={false}
+          isOnWelcome={false}
+          setIsOnWelcome={() => {}}
+          favoriteIds={user ? favoriteIds : new Set()}
+          toggleFavorite={user ? toggleFavorite : () => {}}
+          setShowAuthGate={() => {}}
+          setPendingFavoriteId={() => {}}
+          hasSharedCard={false}
+          claimedIds={user ? claimedIds : new Set()}
+          onClaimPostcard={user ? handleClaimPostcard : undefined}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
-          packCards={packCards}
-          isPackAvailable={isPackAvailable}
+          packCards={user ? packCards : []}
+          isPackAvailable={user ? isPackAvailable : false}
           isPackLoading={isPackLoading}
-          onOpenPack={handleOpenPack}
-          onPackComplete={() => {
+          onOpenPack={user ? handleOpenPack : undefined}
+          onPackComplete={user ? () => {
             const albumCount = packCards.filter(c => albumPostcardIds.has(c.id)).length;
             setPackDoneAlbumCount(albumCount);
             setShowPackDoneToast(true);
@@ -533,21 +415,94 @@ export function WalkerFeed({
               refetchCollection();
               refetchAlbums();
             }, 5000);
-          }}
+          } : undefined}
         />
-      )}
 
-      {/* AuthGateModal removed — anonymous users now see the Pinterest grid with inline AuthCTASection */}
+        {/* Claim Limit Modal */}
+        {claimLimitInfo && (
+          <ClaimLimitModal
+            type={claimLimitInfo.type}
+            used={claimLimitInfo.used}
+            limit={claimLimitInfo.limit}
+            onClose={() => setClaimLimitInfo(null)}
+          />
+        )}
 
-      {/* Claim Limit Modal */}
-      {claimLimitInfo && (
-        <ClaimLimitModal
-          type={claimLimitInfo.type}
-          used={claimLimitInfo.used}
-          limit={claimLimitInfo.limit}
-          onClose={() => setClaimLimitInfo(null)}
-        />
-      )}
+        {/* Pack Done Toast — lightweight, non-blocking */}
+        <AnimatePresence>
+          {showPackDoneToast && (
+            <motion.div
+              key='pack-done-toast'
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              className='fixed bottom-20 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3
+                bg-stone-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md
+                border border-white/10 max-w-[90vw]'
+            >
+              <span className='text-xl'>🎉</span>
+              <div>
+                <p className='text-sm font-semibold leading-tight'>¡Sobre abierto!</p>
+                {packDoneAlbumCount > 0 && (
+                  <p className='text-xs text-amber-400 mt-0.5'>
+                    {packDoneAlbumCount === 1 ? '1 carta de álbum' : `${packDoneAlbumCount} cartas de álbum`}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+      </div>
+    );
+  }
+
+  // ── Grid mode (default for all users) ───────────────────────────────
+  return (
+    <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
+      <WalkerGrid
+        items={items}
+        isLoading={isLoading}
+        hasMore={hasMore}
+        isFetchingMore={isFetchingMore}
+        fetchMoreFeed={fetchMoreFeed}
+        availableCountries={availableCountries}
+        selectedCountry={selectedCountry}
+        onSelectCountry={(country) => {
+          if (country === selectedCountry) return;
+          handleSpotlightDismiss();
+          setIsLoading(true);
+          window.history.pushState({}, '', country ? `/feed/${encodeURIComponent(country).replace(/%20/g, '-')}` : '/feed');
+        }}
+        spotlightResults={spotlightResults}
+        spotlightQuery={spotlightQuery}
+        isSpotlightSearching={isSpotlightSearching}
+        onSpotlightSearch={handleSpotlightSearch}
+        onSpotlightDismiss={handleSpotlightDismiss}
+        onAuthSuccess={() => {
+          sessionStorage.removeItem(AUTH_GATE_KEY);
+          sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
+        }}
+        onCardClick={(index) => setFocusedIndex(index)}
+        viewedItems={items.slice(0, 5)}
+        user={user}
+        unlockedCountries={unlockedCountries}
+        onOpenAlbumsModal={() => {
+          setIsAlbumsModalOpen(true);
+          analytics.track('albums_opened');
+        }}
+        onToggleCollection={
+          user
+            ? () => {
+                navigate('/feed/collection');
+                refetchCollection();
+                analytics.track('collection_opened');
+              }
+            : undefined
+        }
+      />
 
       {/* Collection Grid */}
       <AnimatePresence>
@@ -556,7 +511,7 @@ export function WalkerFeed({
             collection={collection}
             isLoading={isCollectionLoading}
             claimStatus={claimStatus}
-            onClose={() => navigate('/')}
+            onClose={() => navigate('/feed')}
             onSelectPostcard={setSelectedPostcard}
             albums={albums}
             isLoadingAlbums={isLoadingAlbums}
@@ -572,7 +527,7 @@ export function WalkerFeed({
           <AlbumDetail
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
-            onClose={() => navigate(showCollection ? '/collection' : '/')}
+            onClose={() => navigate(showCollection ? '/feed/collection' : '/feed')}
           />
         )}
       </AnimatePresence>
@@ -611,7 +566,7 @@ export function WalkerFeed({
             onClose={() => setIsAlbumsModalOpen(false)}
             onSelectAlbum={(album) => {
               setIsAlbumsModalOpen(false);
-              navigate(`/album/${album.id}`);
+              navigate(`/feed/album/${album.id}`);
             }}
           />
         )}
@@ -623,11 +578,10 @@ export function WalkerFeed({
           <WelcomeToast
             onOpenAlbums={() => {
               setShowWelcomeToast(false);
-              // Open first album detail directly
               if (albums.length > 0) {
-                navigate(`/album/${albums[0].id}`);
+                navigate(`/feed/album/${albums[0].id}`);
               } else {
-                navigate('/collection');
+                navigate('/feed/collection');
                 refetchCollection();
               }
               refetchAlbums();
@@ -635,36 +589,6 @@ export function WalkerFeed({
             }}
             onDismiss={() => setShowWelcomeToast(false)}
           />
-        )}
-      </AnimatePresence>
-
-      {/* AI Spotlight Pill — Removed as search is now in WalkerFilterMenu */}
-
-      {/* Daily Pack button — removed. Pack entry point is now the EnvelopeSlide in the feed */}
-
-      {/* Pack Done Toast — lightweight, non-blocking */}
-      <AnimatePresence>
-        {showPackDoneToast && (
-          <motion.div
-            key='pack-done-toast'
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className='fixed bottom-20 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-3
-              bg-stone-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md
-              border border-white/10 max-w-[90vw]'
-          >
-            <span className='text-xl'>🎉</span>
-            <div>
-              <p className='text-sm font-semibold leading-tight'>¡Sobre abierto!</p>
-              {packDoneAlbumCount > 0 && (
-                <p className='text-xs text-amber-400 mt-0.5'>
-                  {packDoneAlbumCount === 1 ? '1 carta de álbum' : `${packDoneAlbumCount} cartas de álbum`}
-                </p>
-              )}
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
 
@@ -692,18 +616,8 @@ export function WalkerFeed({
         )}
       </AnimatePresence>
 
-      {/* Admin Panel triggered from Footer */}
-      {isAdminPanelOpen && setIsAdminPanelOpen && (
-        <AdminPanelModal
-          isOpen={isAdminPanelOpen}
-          onClose={() => setIsAdminPanelOpen(false)}
-          user={user}
-          onPostcardGenerated={refetchFeed}
-        />
-      )}
-
-      {/* Language Toggle — hidden during spotlight focus mode */}
-      {!isSpotlightMode && <LanguageToggle isIdle={isIdle} isOnWelcome={isOnWelcome} />}
+      {/* Language Toggle */}
+      <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
     </div>
   );
 }

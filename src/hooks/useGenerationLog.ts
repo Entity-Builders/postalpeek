@@ -13,6 +13,9 @@ export interface GenerationLogEntry {
   created_at: string;
   city: string;
   country: string;
+  lat: number | null;
+  lng: number | null;
+  streetview_pov: { heading?: number; pitch?: number; fov?: number; zoom?: number } | null;
   illustration_url: string | null;
   category: { es: string; en: string } | string | null;
   strategy: string | null;
@@ -43,7 +46,7 @@ export function useGenerationLog(pollingIntervalMs = 15_000) {
       const { data, error } = await supabase
         .from('postalpeek_postcards')
         .select(
-          'id, created_at, city, country, illustration_url, category, generation_metadata, detailed_tags',
+          'id, created_at, city, country, lat, lng, streetview_pov, illustration_url, category, generation_metadata, detailed_tags',
         )
         .order('created_at', { ascending: false })
         .limit(30);
@@ -58,6 +61,9 @@ export function useGenerationLog(pollingIntervalMs = 15_000) {
           created_at: row.created_at,
           city: row.city || '—',
           country: row.country || '',
+          lat: row.lat as number | null,
+          lng: row.lng as number | null,
+          streetview_pov: row.streetview_pov as GenerationLogEntry['streetview_pov'],
           illustration_url: row.illustration_url,
           category: row.category,
           strategy,

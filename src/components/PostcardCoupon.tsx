@@ -1,13 +1,14 @@
 import React from 'react';
-import { Ticket, Scissors, MapPin } from 'lucide-react';
+import { Ticket, Scissors, MapPin, RotateCcw } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t } from '../utils/i18n';
 
 interface PostcardCouponProps {
   item: FeedItem;
+  onFlipBack?: () => void;
 }
 
-export function PostcardCoupon({ item }: PostcardCouponProps) {
+export function PostcardCoupon({ item, onFlipBack }: PostcardCouponProps) {
   // Create a Maps URL query based on location name and city
   const mapQuery = encodeURIComponent(
     `${item.location_name || ''} ${item.city || ''}`,
@@ -40,6 +41,20 @@ export function PostcardCoupon({ item }: PostcardCouponProps) {
           borderRadius: 'inherit',
         }}
       ></div>
+
+      {/* Flip-back button — positioned to mirror the ℹ️ button on the front */}
+      {onFlipBack && (
+        <button
+          className='absolute bottom-3 right-3 z-40 p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors shadow-sm'
+          onClick={(e) => {
+            e.stopPropagation();
+            onFlipBack();
+          }}
+          title='Volver al frente'
+        >
+          <RotateCcw className='w-4 h-4 md:w-5 md:h-5' />
+        </button>
+      )}
 
       <div className='relative w-full max-w-[320px] mx-auto bg-white border-2 border-dashed border-stone-300 rounded-lg p-6 flex flex-col items-center shadow-sm'>
         {/* Cutout dashes indicator */}

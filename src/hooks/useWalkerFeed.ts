@@ -24,24 +24,24 @@ export function useWalkerFeed() {
   const selectedCountryRef = useRef(selectedCountry);
 
   // Parse Initial URL State
+  // Routes: /feed, /feed/:country, /:shortcode, /:shortcode (share link)
   useEffect(() => {
-    const segments = window.location.pathname.split('/').filter(Boolean);
-    const APP_ROUTES = ['collection', 'album'];
+    const rawSegments = window.location.pathname.split('/').filter(Boolean);
+    const APP_ROUTES = ['feed', 'collection', 'album', 'admin', 'p'];
 
-    if (segments.length === 2) {
+    // Strip the /feed prefix to get meaningful segments
+    const segments = rawSegments[0] === 'feed' ? rawSegments.slice(1) : rawSegments;
+    const isUnderFeed = rawSegments[0] === 'feed';
+
+    if (isUnderFeed && segments.length === 1) {
+      // /feed/:country — e.g. /feed/Argentina
       if (APP_ROUTES.includes(segments[0])) return;
       const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
       setSelectedCountry(decodedCountry);
-    } else if (segments.length === 1) {
+    } else if (!isUnderFeed && segments.length === 1) {
+      // /:shortcode — share link (not an app route)
       if (APP_ROUTES.includes(segments[0])) return;
-      const segment = segments[0];
-      const maybePrefix = decodeHashToUuidPrefix(segment);
-      const isValidHex = maybePrefix !== null && /^[0-9a-f]{8}$/i.test(maybePrefix);
-
-      if (!isValidHex && segment.length > 0) {
-        const decodedCountry = decodeURIComponent(segment).replace(/-/g, ' ');
-        setSelectedCountry(decodedCountry);
-      }
+      // Don't set country for share links — handled in fetchInitialFeed
     }
   }, []);
 
@@ -66,17 +66,16 @@ export function useWalkerFeed() {
     setHasMore(true);
 
     try {
-      const segments = window.location.pathname.split('/').filter(Boolean);
+      const rawSegments = window.location.pathname.split('/').filter(Boolean);
+      const isUnderFeed = rawSegments[0] === 'feed';
+      // For /feed routes, work with sub-segments; for /:shortcode, use raw
+      const segments = isUnderFeed ? rawSegments.slice(1) : rawSegments;
       let sharedCardPrefix = null;
 
-      if (segments.length === 2 && country) {
-        const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
-        if (decodedSegment === country) sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
-      } else if (segments.length === 1) {
-        const decodedSegment = decodeURIComponent(segments[0]).replace(/-/g, ' ');
-        if (country && decodedSegment === country) {
-          sharedCardPrefix = null;
-        } else {
+      if (!isUnderFeed && segments.length === 1) {
+        // /:shortcode — direct share link
+        const APP_ROUTES = ['feed', 'collection', 'album', 'admin', 'p'];
+        if (!APP_ROUTES.includes(segments[0])) {
           sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
         }
       }

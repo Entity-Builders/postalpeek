@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import './index.css';
 import { WalkerFeed } from './components/WalkerFeed';
 import { useMouseIdle } from './hooks/useMouseIdle';
@@ -25,7 +25,6 @@ function FeedApp({
   const isIdle = useMouseIdle(5000);
   const [showLogin, setShowLogin] = useState(false);
   const [isOnWelcome, setIsOnWelcome] = useState(false);
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const { signIn } = useAuth();
 
   // --- Footer click: single = /admin (if admin), triple = login/logout ---
@@ -65,8 +64,6 @@ function FeedApp({
           isAdmin={isAdmin}
           user={user}
           onWelcomeChange={setIsOnWelcome}
-          isAdminPanelOpen={isAdminPanelOpen}
-          setIsAdminPanelOpen={setIsAdminPanelOpen}
         />
       </div>
 
@@ -122,30 +119,34 @@ function App() {
     }
   }, [user]);
 
+  const feedElement = <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />;
+
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Main feed */}
-        <Route
-          path="/"
-          element={
-            <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />
-          }
-        />
+        {/* SEO-friendly feed route */}
+        <Route path="/feed" element={feedElement} />
+        <Route path="/feed/collection" element={feedElement} />
+        <Route path="/feed/album/:albumId" element={feedElement} />
 
-        {/* Full-page admin (protected: redirect to feed if not admin) */}
+        {/* Root redirects to /feed */}
+        <Route path="/" element={<Navigate to="/feed" replace />} />
+
+        {/* Full-page admin (protected) */}
         <Route
           path="/admin"
           element={
             isAdmin
               ? <AdminPage user={user} onPostcardGenerated={() => {}} />
-              : <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />
+              : <Navigate to="/feed" replace />
           }
         />
 
-        {/* Postcard detail — /p/:id (direct UUID) or /:id (share link UUID) */}
+        {/* Postcard admin detail — /p/:id only */}
         <Route path="/p/:id" element={<PostcardDetailPage />} />
-        <Route path="/:id" element={<PostcardDetailPage />} />
+
+        {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
+        <Route path="/:id" element={feedElement} />
       </Routes>
     </ErrorBoundary>
   );
