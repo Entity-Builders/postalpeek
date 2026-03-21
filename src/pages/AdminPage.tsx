@@ -274,7 +274,8 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
   interface SegResult { label: string; mask_url: string; status: 'pending' | 'loading' | 'done' | 'error'; }
   interface DinoBox { label: string; box: number[]; bbox?: number[]; confidence: number; }
 
-  const [pipelinePhotoUrl, setPipelinePhotoUrl] = useState<string | null>(null);
+  const [pipelinePhotoUrl, setPipelinePhotoUrl] = useState<string | null>(null); // real photo
+  const [pipelineIllustrationUrl, setPipelineIllustrationUrl] = useState<string | null>(null);
   const [detectedTags, setDetectedTags] = useState<PipelineTag[]>([]);
   const [detectStatus, setDetectStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
   const [dinoBoxes, setDinoBoxes] = useState<DinoBox[]>([]);
@@ -457,11 +458,12 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
         .select('original_image_url, illustration_url')
         .eq('id', postcardId.trim())
         .single();
-      if (error || !pc?.illustration_url) throw new Error('Postcard not found or no illustration');
-      setPipelinePhotoUrl(pc.illustration_url);
+      if (error || !pc?.original_image_url) throw new Error('Postcard not found');
+      setPipelinePhotoUrl(pc.original_image_url);
+      if (pc.illustration_url) setPipelineIllustrationUrl(pc.illustration_url);
 
-      setDetectStatus({ status: 'loading', message: 'Calling Gemini on illustration…' });
-      const data = await callEdgeFn('postalpeek-detect-objects', { image_url: pc.illustration_url });
+      setDetectStatus({ status: 'loading', message: 'Calling Gemini on real photo…' });
+      const data = await callEdgeFn('postalpeek-detect-objects', { image_url: pc.original_image_url });
       const tags: PipelineTag[] = data.tags || [];
       setDetectedTags(tags);
       setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
@@ -543,7 +545,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
   // ── Grounded SAM (one-shot detect + segment) ──
   const runGroundedSam = useCallback(async () => {
     if (!pipelinePhotoUrl || detectedTags.length === 0) return;
-    setGsamStatus({ status: 'loading', message: 'Calling Grounded SAM (~16s)…' });
+    setGsamStatus({ status: 'loading', message: 'Calling Grounded SAM on real photo (~16s)…' });
     setGsamResult(null);
     try {
       // Use type-based generic labels for DINO (better detection than specific labels)
@@ -555,6 +557,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
         object: 'object',
       };
       const labels = uniqueTypes.map(t => typeLabels[t] || t).join(', ');
+      // Use the REAL PHOTO for Grounded SAM (SAM works best on real images)
       const data = await callEdgeFn('postalpeek-grounded-sam', {
         image_url: pipelinePhotoUrl,
         labels,
@@ -1085,13 +1088,29 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
 
                     {gsamResult && (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 space-y-3">
-                        {/* Annotated image (illustration with mask overlay) */}
+                        {/* Annotated image (real photo with mask overlay) */}
                         {gsamResult.annotated_url && (
                           <div>
-                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">🎯 Detected + Segmented</p>
+                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">🎯 Real Photo — Detected + Segmented</p>
                             <a href={gsamResult.annotated_url} target="_blank" rel="noopener noreferrer">
                               <img src={gsamResult.annotated_url} alt="Annotated" className="w-full rounded-lg border" style={{ borderColor: 'rgba(139,92,246,0.2)' }} />
                             </a>
+                          </div>
+                        )}
+                        {/* Illustration + Mask overlay */}
+                        {pipelineIllustrationUrl && gsamResult.mask_url && (
+                          <div>
+                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">🎨 Illustration + Mask Overlay</p>
+                            <div className="relative rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+                              <img src={pipelineIllustrationUrl} alt="Illustration" className="w-full block" />
+                              <img
+                                src={gsamResult.mask_url}
+                                alt="Mask overlay"
+                                className="absolute inset-0 w-full h-full"
+                                style={{ mixBlendMode: 'multiply', opacity: 0.5 }}
+                              />
+                            </div>
+                            <p className="text-white/30 text-[9px] mt-1">Masks from real photo applied to illustration</p>
                           </div>
                         )}
                         {/* Mask + Inverted mask side by side */}
