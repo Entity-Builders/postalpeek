@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
-import { useSignedImage } from '../../utils/useSignedImage';
+import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { CityLabel } from './CityLabel';
@@ -112,6 +112,7 @@ const ANIMATE_THRESHOLD = 12;
 
 export const GridCard = React.memo(function GridCard({ item, index, layout, onClick }: GridCardProps) {
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
+  const srcSet = useSignedSrcSet(item.illustration_url, WIDTHS.gridSrcSet as unknown as number[]);
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
 
   const [loaded, setLoaded] = React.useState(false);
@@ -119,6 +120,11 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category);
 
   const { aspectRatio, showCaption } = layout;
+
+  /* Masonry breakpoints → column widths (approx):
+     5 cols @ ≥1536 ≈ 20vw,  4 cols @ ≥1280 ≈ 25vw,
+     3 cols @ ≥1024 ≈ 33vw,  2 cols @ ≥640  ≈ 50vw */
+  const sizes = '(min-width:1536px) 20vw, (min-width:1280px) 25vw, (min-width:1024px) 33vw, 50vw';
 
   // ── Scroll-vs-tap detection ───────────────────────────────────────
   const DRAG_THRESHOLD = 10;
@@ -185,6 +191,8 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
           {imgUrl && (
             <img
               src={imgUrl}
+              srcSet={srcSet || undefined}
+              sizes={sizes}
               alt={categoryLabel}
               className={`w-full h-full object-cover block transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setLoaded(true)}

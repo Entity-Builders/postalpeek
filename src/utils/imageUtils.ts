@@ -252,8 +252,10 @@ export const WIDTHS = {
   blur: 64,
   /** Thumbnails (welcome, auth gate stacked cards) */
   thumb: 280,
-  /** Grid cards — 3-col masonry, each ~1/3 screen width */
-  grid: 240,
+  /** Grid cards — fallback width (src attribute) */
+  grid: 480,
+  /** Grid cards — srcSet widths for 1×/2×/3× DPR */
+  gridSrcSet: [240, 480, 720] as readonly number[],
   /** Mobile illustration */
   mobile: 480,
   /** Tablet illustration */

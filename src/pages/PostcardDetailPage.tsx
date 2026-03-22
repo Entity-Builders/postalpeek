@@ -222,6 +222,8 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
   const [isScanning, setIsScanning] = useState(false);
   const [showAllBoxes, setShowAllBoxes] = useState(false);
   const [localTags, setLocalTags] = useState<any[] | null>(null);
+  const [lastScanInfo, setLastScanInfo] = useState<{ count: number; cost: string } | null>(null);
+  const [discoveredLabels, setDiscoveredLabels] = useState<Set<string>>(new Set());
 
   const BOX_COLORS = [
     'rgba(251,191,36,0.85)',   // amber
@@ -236,6 +238,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
 
   const runSemanticScan = async () => {
     setIsScanning(true);
+    setLastScanInfo(null);
     try {
       const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
       const res = await fetch(`${baseUrl}/functions/v1/postalpeek-semantic-segment`, {
@@ -252,6 +255,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
       // Update local state immediately — no reload needed
       setLocalTags(data.layers);
       setShowAllBoxes(true);
+      setLastScanInfo({ count: data.count, cost: data.cost_estimate || '~$0.02' });
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
@@ -261,6 +265,33 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
 
   // Use localTags (from scan) if available, otherwise fall back to DB data
   const activeTags = localTags ?? postcard.illustration_tags;
+
+  // Remove a bad detection — updates local state + DB
+  const removeTag = async (tagIdx: number) => {
+    const current = (activeTags as any[]) || [];
+    const removed = current[tagIdx];
+    const updated = current.filter((_: any, i: number) => i !== tagIdx);
+    setLocalTags(updated);
+    console.log(`[Admin] Removed "${removed?.label}"`);
+
+    // Persist to DB
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      await fetch(`${baseUrl}/rest/v1/postalpeek_postcards?id=eq.${postcard.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ illustration_tags: updated }),
+      });
+    } catch (e) {
+      console.error('[Admin] Failed to persist tag removal:', e);
+    }
+  };
 
   const tagsWithBbox = useMemo(() =>
     (activeTags as { label?: string | { en?: string }; box_2d?: number[]; bbox?: number[]; confidence?: number }[] | null)?.filter(
@@ -310,10 +341,60 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
         </div>
       </div>
 
+      {/* Scan result info */}
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 text-[11px]">
+          <span className="text-emerald-400">
+            🔍 {discoveredLabels.size}/{tagsWithBbox.length} discovered
+            {discoveredLabels.size === tagsWithBbox.length && tagsWithBbox.length > 0 && ' — 🎉 All found!'}
+          </span>
+          {lastScanInfo && <span className="text-white/30">Est. cost: {lastScanInfo.cost}</span>}
+        </div>
+
       {/* Image preview — full width, no column constraint */}
       {signed ? (
         <>
-          <div className="relative rounded-xl overflow-hidden border" style={{ borderColor: showAllBoxes ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)' }}>
+          <div
+            className="relative rounded-xl overflow-hidden border cursor-pointer"
+            style={{ borderColor: showAllBoxes ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)' }}
+            onClick={(e) => {
+              // Find click position in 0-1000 coords
+              const rect = e.currentTarget.getBoundingClientRect();
+              const clickX = ((e.clientX - rect.left) / rect.width) * 1000;
+              const clickY = ((e.clientY - rect.top) / rect.height) * 1000;
+
+              // Find all boxes whose expanded zone contains the click, then pick the smallest
+              const PAD_FACTOR = 0.2;
+              const MIN_PAD = 15;
+
+              const matches = tagsWithBbox
+                .map((tag, idx) => {
+                  const coords = tag.box_2d ?? tag.bbox;
+                  if (!coords) return null;
+                  const [ymin, xmin, ymax, xmax] = coords;
+                  const label = typeof tag.label === 'string' ? tag.label : tag.label?.en || 'Object';
+                  if (discoveredLabels.has(label)) return null;
+
+                  const boxW = xmax - xmin;
+                  const boxH = ymax - ymin;
+                  const padX = Math.max(boxW * PAD_FACTOR, MIN_PAD);
+                  const padY = Math.max(boxH * PAD_FACTOR, MIN_PAD);
+
+                  if (clickX >= (xmin - padX) && clickX <= (xmax + padX) &&
+                      clickY >= (ymin - padY) && clickY <= (ymax + padY)) {
+                    return { label, area: boxW * boxH, idx };
+                  }
+                  return null;
+                })
+                .filter(Boolean) as { label: string; area: number; idx: number }[];
+
+              if (matches.length > 0) {
+                matches.sort((a, b) => a.area - b.area);
+                const found = matches[0].label;
+                setDiscoveredLabels(prev => new Set([...prev, found]));
+                setShowReward(found);
+              }
+            }}
+          >
             <img src={signed} alt="Illustration" className="w-full block" style={{ maxHeight: '75vh' }} />
             {tagsWithBbox.map((tag, idx) => {
               const coords = tag.box_2d ?? tag.bbox;
@@ -322,41 +403,48 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
               const label = typeof tag.label === 'string' ? tag.label : tag.label?.en || 'Object';
               const color = BOX_COLORS[idx % BOX_COLORS.length];
               const isVisible = showAllBoxes;
+              const isFound = discoveredLabels.has(label);
+
               return (
                 <div
                   key={idx}
-                  onClick={() => setShowReward(label)}
-                  className="absolute z-30 cursor-pointer transition-all duration-200 pointer-events-auto"
+                  className="absolute z-30 pointer-events-none transition-all duration-500"
                   style={{
                     top: `${(ymin / 1000) * 100}%`, left: `${(xmin / 1000) * 100}%`,
                     height: `${((ymax - ymin) / 1000) * 100}%`, width: `${((xmax - xmin) / 1000) * 100}%`,
-                    border: isVisible ? `2px solid ${color}` : '2px dashed rgba(251,191,36,0)',
-                    backgroundColor: isVisible ? color.replace('0.85', '0.08') : 'transparent',
-                    boxShadow: isVisible ? `0 0 8px ${color.replace('0.85', '0.3')}` : 'none',
+                    border: isFound
+                      ? '2px solid rgba(16,185,129,0.6)'
+                      : isVisible ? `2px solid ${color}` : '2px dashed rgba(251,191,36,0)',
+                    backgroundColor: isFound
+                      ? 'rgba(16,185,129,0.1)'
+                      : isVisible ? color.replace('0.85', '0.08') : 'transparent',
+                    boxShadow: isFound
+                      ? '0 0 12px rgba(16,185,129,0.3)'
+                      : isVisible ? `0 0 8px ${color.replace('0.85', '0.3')}` : 'none',
+                    opacity: isFound ? 0.5 : 1,
                   }}
-                  title={`${label}${tag.confidence ? ` (${tag.confidence}/10)` : ''}`}
-                  onMouseEnter={(e) => {
-                    if (!isVisible) {
-                      e.currentTarget.style.border = '2px dashed rgba(251,191,36,0.8)';
-                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                      e.currentTarget.style.boxShadow = '0 0 15px rgba(251,191,36,0.4)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isVisible) {
-                      e.currentTarget.style.border = '2px dashed rgba(251,191,36,0)';
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }
-                  }}
+                  title={`${label}${isFound ? ' ✅' : ''}${tag.confidence ? ` (${tag.confidence}/10)` : ''}`}
                 >
-                  {/* Label badge — only visible in show-all mode */}
+                  {/* Delete button — only in Show All mode */}
+                  {isVisible && !isFound && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeTag(idx); }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] font-bold flex items-center justify-center pointer-events-auto z-40 shadow-md transition-all hover:scale-110"
+                      title={`Remove "${label}"`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                  {/* Found checkmark */}
+                  {isFound && (
+                    <span className="absolute inset-0 flex items-center justify-center text-emerald-400 text-lg font-bold">✓</span>
+                  )}
                   {isVisible && (
                     <span
-                      className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap"
-                      style={{ backgroundColor: color, color: '#000' }}
+                      className={`absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${isFound ? 'line-through opacity-60' : ''}`}
+                      style={{ backgroundColor: isFound ? 'rgba(16,185,129,0.7)' : color, color: '#000' }}
                     >
-                      {label}
+                      {isFound ? `✓ ${label}` : label}
                     </span>
                   )}
                 </div>
@@ -383,23 +471,24 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
             </div>
           )}
 
+          {/* Discovery toast — floating overlay, auto-dismiss */}
           {showReward && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              className="mt-2 p-5 rounded-2xl text-center border overflow-hidden relative shadow-xl"
-              style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(217,119,6,0.3) 100%)', borderColor: 'rgba(245,158,11,0.4)' }}
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              onAnimationComplete={() => {
+                setTimeout(() => setShowReward(null), 2500);
+              }}
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-md"
+              style={{
+                background: 'linear-gradient(135deg, rgba(245,158,11,0.85) 0%, rgba(217,119,6,0.95) 100%)',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}
             >
-              <Sparkles className="w-10 h-10 text-amber-400 mx-auto mb-3 animate-pulse drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
-              <h3 className="text-amber-100 font-bold text-xl mb-1 tracking-tight">{showReward} Found!</h3>
-              <p className="text-amber-200/80 text-sm mb-4 font-medium">+1 Travel Stamp Earned</p>
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={() => setShowReward(null)}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-all shadow-sm"
-                >
-                  Keep Exploring
-                </button>
-              </div>
+              <Sparkles className="w-4 h-4 text-white animate-pulse" />
+              <span className="text-white font-bold text-sm tracking-tight">{showReward} Found!</span>
+              <span className="text-white/70 text-xs">+1 ⭐</span>
             </motion.div>
           )}
         </>
