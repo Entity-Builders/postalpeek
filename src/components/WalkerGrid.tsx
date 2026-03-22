@@ -121,8 +121,8 @@ export function WalkerGrid({
   return (
     <div ref={scrollContainerRef} className="w-full h-full overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Filter menu */}
-      <div className="sticky top-0 z-30 px-3 pt-3 pb-5 bg-gradient-to-b from-[#e6e2da] via-[#e6e2da]/95 to-transparent">
-        <div className="max-w-4xl mx-auto">
+      <div className="sticky top-0 z-30 px-3 pt-4 pb-6 bg-gradient-to-b from-[#e6e2da] via-[#e6e2da]/95 to-transparent" style={{ minHeight: '64px' }}>
+        <div className="relative w-full max-w-[1800px] mx-auto md:px-4 lg:px-8" style={{ minHeight: '44px' }}>
           <WalkerFilterMenu
             availableCountries={availableCountries}
             unlockedCountries={unlockedCountries}
@@ -140,7 +140,7 @@ export function WalkerGrid({
       </div>
 
       {/* Pinterest masonry grid */}
-      <div className="max-w-4xl mx-auto px-2 pb-2">
+      <div className="w-full max-w-[1800px] mx-auto px-4 md:px-8 pb-4">
         <style>{`
           .walker-masonry { display: flex; width: auto; gap: 8px; }
           .walker-masonry_column { display: flex; flex-direction: column; gap: 8px; }
@@ -150,7 +150,7 @@ export function WalkerGrid({
           <SkeletonGrid />
         ) : (
           <Masonry
-            breakpointCols={{ default: 3, 1024: 3, 768: 2, 640: 2 }}
+            breakpointCols={{ default: 5, 1536: 5, 1280: 4, 1024: 3, 768: 2, 640: 2 }}
             className="walker-masonry"
             columnClassName="walker-masonry_column"
           >

@@ -100,7 +100,7 @@ function FeedApp({
 // ── App root ───────────────────────────────────────────────────────────
 
 function App() {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, loading, signOut } = useAuth();
 
   // Initialize PostHog analytics once on mount
   useEffect(() => {
@@ -118,6 +118,16 @@ function App() {
       analytics.reset();
     }
   }, [user]);
+
+  // Don't render routes until auth state is resolved
+  // (prevents /admin from redirecting to /feed during initial session check)
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#0a0a12' }}>
+        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
+      </div>
+    );
+  }
 
   const feedElement = <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />;
 

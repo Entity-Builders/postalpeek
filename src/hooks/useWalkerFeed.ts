@@ -5,7 +5,7 @@ import { analytics } from '../lib/analytics';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from '../components/Postcard';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 30;
 
 export function useWalkerFeed() {
   const [items, setItems] = useState<FeedItem[]>([]);

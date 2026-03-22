@@ -44,7 +44,7 @@ export function SkeletonGrid() {
         .walker-masonry_column { display: flex; flex-direction: column; gap: 8px; }
       `}</style>
       <Masonry
-        breakpointCols={{ default: 3, 1024: 3, 768: 2, 640: 2 }}
+        breakpointCols={{ default: 5, 1536: 5, 1280: 4, 1024: 3, 768: 2, 640: 2 }}
         className='walker-masonry'
         columnClassName='walker-masonry_column'
       >

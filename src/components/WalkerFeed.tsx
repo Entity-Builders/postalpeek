@@ -62,7 +62,7 @@ export function WalkerFeed({
   const [hasMoreSpotlight, setHasMoreSpotlight] = useState(false);
   const [showNoResultsToast, setShowNoResultsToast] = useState(false);
   const spotlightAbortRef = useRef<AbortController | null>(null);
-  const SPOTLIGHT_PAGE_SIZE = 15;
+  const SPOTLIGHT_PAGE_SIZE = 30;
 
   const handleSpotlightSearch = useCallback(async (query: string) => {
     if (spotlightAbortRef.current) spotlightAbortRef.current.abort();

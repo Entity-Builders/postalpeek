@@ -28,6 +28,7 @@ import {
   Sparkles,
   Loader,
   CheckCircle,
+  Scissors,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -72,6 +73,9 @@ interface PostcardDetail {
   video_generation_status: string | null;
   imagine_task_id: string | null;
   should_animate: boolean | null;
+  // SAM2
+  sam2_masks: string[] | null;
+  semantic_layers: Record<string, any>[] | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -211,7 +215,205 @@ function DetailedTagsTable({ tags }: { tags: unknown[] }) {
   );
 }
 
+
+function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }) {
+  const signed = useSignedImage(postcard.illustration_url, { width: WIDTHS.desktop });
+  const [showReward, setShowReward] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [showAllBoxes, setShowAllBoxes] = useState(false);
+  const [localTags, setLocalTags] = useState<any[] | null>(null);
+
+  const BOX_COLORS = [
+    'rgba(251,191,36,0.85)',   // amber
+    'rgba(99,102,241,0.85)',   // indigo
+    'rgba(16,185,129,0.85)',   // emerald
+    'rgba(244,63,94,0.85)',    // rose
+    'rgba(168,85,247,0.85)',   // purple
+    'rgba(14,165,233,0.85)',   // sky
+    'rgba(249,115,22,0.85)',   // orange
+    'rgba(236,72,153,0.85)',   // pink
+  ];
+
+  const runSemanticScan = async () => {
+    setIsScanning(true);
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-semantic-segment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({ image_url: postcard.illustration_url, postcard_id: postcard.id })
+      });
+      if (!res.ok) throw new Error(`Scan failed: ${await res.text()}`);
+      const data = await res.json();
+      
+      // Update local state immediately — no reload needed
+      setLocalTags(data.layers);
+      setShowAllBoxes(true);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Use localTags (from scan) if available, otherwise fall back to DB data
+  const activeTags = localTags ?? postcard.illustration_tags;
+
+  const tagsWithBbox = useMemo(() =>
+    (activeTags as { label?: string | { en?: string }; box_2d?: number[]; bbox?: number[]; confidence?: number }[] | null)?.filter(
+      (t) => {
+        const coords = t?.box_2d ?? t?.bbox;
+        return coords && Array.isArray(coords) && coords.length === 4;
+      },
+    ) ?? [],
+    [activeTags],
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Header row */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-amber-200/80 text-xs font-semibold tracking-wide uppercase flex items-center gap-1.5">
+           <Sparkles className="w-3.5 h-3.5" /> Interactive Poster
+           {tagsWithBbox.length > 0 && (
+             <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">
+               {tagsWithBbox.length}
+             </span>
+           )}
+        </p>
+        <div className="flex items-center gap-2">
+          {tagsWithBbox.length > 0 && (
+            <button
+              onClick={() => setShowAllBoxes(prev => !prev)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                showAllBoxes
+                  ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                  : 'text-white/40 hover:text-white/60 border border-white/10 hover:bg-white/5'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              {showAllBoxes ? 'Hide Boxes' : 'Show All'}
+            </button>
+          )}
+          <button
+            onClick={runSemanticScan}
+            disabled={isScanning}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
+            style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
+          >
+            {isScanning ? <Loader className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {isScanning ? 'Scanning...' : 'Run Pipeline'}
+          </button>
+        </div>
+      </div>
+
+      {/* Image preview — full width, no column constraint */}
+      {signed ? (
+        <>
+          <div className="relative rounded-xl overflow-hidden border" style={{ borderColor: showAllBoxes ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)' }}>
+            <img src={signed} alt="Illustration" className="w-full block" style={{ maxHeight: '75vh' }} />
+            {tagsWithBbox.map((tag, idx) => {
+              const coords = tag.box_2d ?? tag.bbox;
+              if (!coords) return null;
+              const [ymin, xmin, ymax, xmax] = coords;
+              const label = typeof tag.label === 'string' ? tag.label : tag.label?.en || 'Object';
+              const color = BOX_COLORS[idx % BOX_COLORS.length];
+              const isVisible = showAllBoxes;
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setShowReward(label)}
+                  className="absolute z-30 cursor-pointer transition-all duration-200 pointer-events-auto"
+                  style={{
+                    top: `${(ymin / 1000) * 100}%`, left: `${(xmin / 1000) * 100}%`,
+                    height: `${((ymax - ymin) / 1000) * 100}%`, width: `${((xmax - xmin) / 1000) * 100}%`,
+                    border: isVisible ? `2px solid ${color}` : '2px dashed rgba(251,191,36,0)',
+                    backgroundColor: isVisible ? color.replace('0.85', '0.08') : 'transparent',
+                    boxShadow: isVisible ? `0 0 8px ${color.replace('0.85', '0.3')}` : 'none',
+                  }}
+                  title={`${label}${tag.confidence ? ` (${tag.confidence}/10)` : ''}`}
+                  onMouseEnter={(e) => {
+                    if (!isVisible) {
+                      e.currentTarget.style.border = '2px dashed rgba(251,191,36,0.8)';
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                      e.currentTarget.style.boxShadow = '0 0 15px rgba(251,191,36,0.4)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isVisible) {
+                      e.currentTarget.style.border = '2px dashed rgba(251,191,36,0)';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
+                  }}
+                >
+                  {/* Label badge — only visible in show-all mode */}
+                  {isVisible && (
+                    <span
+                      className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap"
+                      style={{ backgroundColor: color, color: '#000' }}
+                    >
+                      {label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Objects list summary when boxes are shown */}
+          {showAllBoxes && tagsWithBbox.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {tagsWithBbox.map((tag, idx) => {
+                const label = typeof tag.label === 'string' ? tag.label : tag.label?.en || 'Object';
+                const color = BOX_COLORS[idx % BOX_COLORS.length];
+                const coords = tag.box_2d ?? tag.bbox;
+                const area = coords ? (((coords[2]-coords[0]) * (coords[3]-coords[1])) / 1e6 * 100).toFixed(1) : '?';
+                return (
+                  <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 text-[10px]">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-white/70 truncate">{label}</span>
+                    <span className="text-white/30 ml-auto flex-shrink-0">{area}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {showReward && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              className="mt-2 p-5 rounded-2xl text-center border overflow-hidden relative shadow-xl"
+              style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(217,119,6,0.3) 100%)', borderColor: 'rgba(245,158,11,0.4)' }}
+            >
+              <Sparkles className="w-10 h-10 text-amber-400 mx-auto mb-3 animate-pulse drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+              <h3 className="text-amber-100 font-bold text-xl mb-1 tracking-tight">{showReward} Found!</h3>
+              <p className="text-amber-200/80 text-sm mb-4 font-medium">+1 Travel Stamp Earned</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => setShowReward(null)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-all shadow-sm"
+                >
+                  Keep Exploring
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </>
+      ) : (
+        <div className="w-full aspect-[3/4] rounded-xl flex items-center justify-center border border-dashed border-white/10 bg-white/5">
+          <ImageIcon className="w-8 h-8 text-white/15" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Discoveries Section ─────────────────────────────────────────────────
+
 
 type IllTag = { label?: string | { en?: string }; tag_type?: string; type?: string; box_2d?: number[]; bbox?: number[] };
 
@@ -522,7 +724,7 @@ export function PostcardDetailPage() {
           scene_type, time_of_day, weather, human_activity,
           detailed_tags, illustration_tags,
           aesthetic_vibes, architecture_style, color_palette,
-          video_generation_status, imagine_task_id, should_animate
+          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers
         `)
         .eq('id', postcard.id)
         .single();
@@ -558,7 +760,7 @@ export function PostcardDetailPage() {
           scene_type, time_of_day, weather, human_activity,
           detailed_tags, illustration_tags,
           aesthetic_vibes, architecture_style, color_palette,
-          video_generation_status, imagine_task_id, should_animate
+          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers
         `);
 
       const { data, error: err } = await (isUuid
@@ -643,13 +845,18 @@ export function PostcardDetailPage() {
             className="max-w-6xl mx-auto space-y-6"
           >
             {/* Two-column layout */}
+            {/* Interactive Poster — full width for maximum preview */}
+            <Section icon={<Sparkles className="w-3.5 h-3.5" />} title="">
+              <InteractiveIllustrationPanel postcard={postcard} />
+            </Section>
+
+            {/* Two-column layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-              {/* LEFT: Images — sticky so they follow scroll */}
+              {/* LEFT: Original image — sticky */}
               <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-                <Section icon={<ImageIcon className="w-3.5 h-3.5" />} title="Images">
-                  <ImgPanel url={postcard.illustration_url} label="Illustration" />
-                  <ImgPanel url={postcard.original_image_url} label="Original (Street View)" />
+                <Section icon={<ImageIcon className="w-3.5 h-3.5" />} title="Original">
+                  <ImgPanel url={postcard.original_image_url} label="Street View" />
                 </Section>
               </div>
 
@@ -795,6 +1002,8 @@ export function PostcardDetailPage() {
 
                 {/* Discoveries / Objects */}
                 <DiscoveriesSection postcard={postcard} />
+
+                
 
               </div>
             </div>
