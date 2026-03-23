@@ -13,20 +13,26 @@ import { t, useLang } from '../utils/i18n';
 
 interface PostcardGameResultsProps {
   item: FeedItem;
+  gameType?: 'hunt' | 'puzzle';
   totalObjects: number;
   elapsedSeconds: number;
   hintsUsed: number;
+  moves?: number;
 }
 
 export function PostcardGameResults({
   item,
+  gameType = 'hunt',
   totalObjects,
   elapsedSeconds,
   hintsUsed,
+  moves,
 }: PostcardGameResultsProps) {
   useLang();
 
-  const starRating = hintsUsed === 0 ? 3 : hintsUsed <= 2 ? 2 : 1;
+  const starRating = gameType === 'puzzle'
+    ? (moves != null && moves <= 12 ? 3 : moves != null && moves <= 20 ? 2 : 1)
+    : (hintsUsed === 0 ? 3 : hintsUsed <= 2 ? 2 : 1);
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -78,9 +84,11 @@ export function PostcardGameResults({
           transition={{ delay: 0.2 }}
           className="text-center mb-4"
         >
-          <span className="text-2xl md:text-3xl">🏆</span>
+          <span className="text-2xl md:text-3xl">{gameType === 'puzzle' ? '🧩' : '🏆'}</span>
           <h2 className="text-base md:text-lg font-bold text-stone-800 mt-1">
-            {t({ es: '¡Ganaste la Postal!', en: 'You Won the Postcard!' })}
+            {gameType === 'puzzle'
+              ? t({ es: '¡Armaste la Postal!', en: 'You Assembled the Postcard!' })
+              : t({ es: '¡Ganaste la Postal!', en: 'You Won the Postcard!' })}
           </h2>
           <p className="text-[10px] text-stone-400 font-mono uppercase tracking-widest mt-0.5">
             {item.city}, {item.country}
@@ -94,14 +102,16 @@ export function PostcardGameResults({
           transition={{ delay: 0.4 }}
           className="flex items-center justify-center gap-4 md:gap-6 py-3 px-4 rounded-xl bg-stone-100/80 border border-stone-200/60 mb-4"
         >
-          {/* Objects */}
+          {/* Objects / Moves */}
           <div className="flex flex-col items-center gap-0.5">
             <Target className="w-4 h-4 text-emerald-500" />
             <span className="text-sm font-bold text-stone-800 tabular-nums">
-              {totalObjects}/{totalObjects}
+              {gameType === 'puzzle' ? `${moves ?? 0}` : `${totalObjects}/${totalObjects}`}
             </span>
             <span className="text-[9px] text-stone-400 uppercase tracking-wider">
-              {t({ es: 'Objetos', en: 'Objects' })}
+              {gameType === 'puzzle'
+                ? t({ es: 'Movimientos', en: 'Moves' })
+                : t({ es: 'Objetos', en: 'Objects' })}
             </span>
           </div>
 

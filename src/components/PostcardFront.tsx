@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Maximize2,
   Minimize2,
@@ -17,6 +17,8 @@ import { PostcardActionBar } from './PostcardActionBar';
 import { StorytellingPreview } from './ui/StorytellingPreview';
 import { usePostcardGame, GameImageOverlay, GameBottomPanel } from './PostcardGame';
 import { PostcardGameResults } from './PostcardGameResults';
+import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './PostcardPuzzle';
+import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -87,18 +89,38 @@ export function PostcardFront({
   allowPlay = true,
 }: PostcardFrontProps) {
   // ── Inline game mode ──
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [playingMode, setPlayingMode] = useState<GameMode | null>(null);
+  const [showSelector, setShowSelector] = useState(false);
   const [gameFlipped, setGameFlipped] = useState(false);
   const game = usePostcardGame(item);
+  const puzzle = usePostcardPuzzle(item);
+  const isPlaying = playingMode !== null;
 
-  // Flip the card when game completes
+  // Check if hunt mode is available (needs illustration_tags with bboxes)
+  const hasHuntMode = useMemo(() => {
+    const raw = item.illustration_tags as unknown as Array<{ box_2d?: number[]; bbox?: number[] }> | null;
+    if (!raw || !Array.isArray(raw)) return false;
+    return raw.some((t) => {
+      const coords = t.box_2d ?? t.bbox;
+      return coords && Array.isArray(coords) && coords.length === 4;
+    });
+  }, [item.illustration_tags]);
+
+  // Flip the card when hunt game completes
   useEffect(() => {
-    if (game.allFound && isPlaying && !gameFlipped) {
-      // Delay a bit to let the "All Found!" toast show first
+    if (playingMode === 'hunt' && game.allFound && !gameFlipped) {
       const timer = setTimeout(() => setGameFlipped(true), 1200);
       return () => clearTimeout(timer);
     }
-  }, [game.allFound, isPlaying, gameFlipped]);
+  }, [game.allFound, playingMode, gameFlipped]);
+
+  // Flip the card when puzzle completes
+  useEffect(() => {
+    if (playingMode === 'puzzle' && puzzle.isComplete && !gameFlipped) {
+      const timer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [puzzle.isComplete, playingMode, gameFlipped]);
   // Sticker discovery system (used by TripSlide)
   const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   useLang(); // subscribe to language changes
@@ -324,7 +346,8 @@ export function PostcardFront({
                 )}
 
                 {/* Game overlay — renders inside the image area */}
-                {isPlaying && <GameImageOverlay game={game} />}
+                {playingMode === 'hunt' && <GameImageOverlay game={game} />}
+                {playingMode === 'puzzle' && <PuzzleImageOverlay puzzle={puzzle} imageUrl={mainImgUrl} />}
 
                 {/* Expand / Clean toggle — hidden during game */}
                 {!isPlaying && (
@@ -350,12 +373,23 @@ export function PostcardFront({
               </div>
 
               {/* ── BACK FACE: game results ── */}
-              {isPlaying && (
+              {playingMode === 'hunt' && (
                 <PostcardGameResults
                   item={item}
+                  gameType="hunt"
                   totalObjects={game.totalObjects}
                   elapsedSeconds={game.elapsedSeconds}
                   hintsUsed={game.hintsUsed}
+                />
+              )}
+              {playingMode === 'puzzle' && (
+                <PostcardGameResults
+                  item={item}
+                  gameType="puzzle"
+                  totalObjects={puzzle.total}
+                  elapsedSeconds={puzzle.elapsedSeconds}
+                  hintsUsed={puzzle.peeksUsed}
+                  moves={puzzle.moves}
                 />
               )}
             </div>
@@ -386,7 +420,7 @@ export function PostcardFront({
               storytellingTitle={storytelling ? 'short' : undefined}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay ? () => setIsPlaying(true) : undefined}
+              onPlay={allowPlay ? () => setShowSelector(true) : undefined}
             />
 
             {/* Storytelling preview — compact, with flip-to-read-more */}
@@ -400,25 +434,51 @@ export function PostcardFront({
               />
             )}
           </>
-        ) : (
+        ) : playingMode === 'hunt' ? (
           <GameBottomPanel
             item={item}
             game={game}
             onClose={() => {
               if (gameFlipped) {
-                // After game completion: flip back, exit game, navigate to next card
                 setGameFlipped(false);
                 setTimeout(() => {
-                  setIsPlaying(false);
+                  setPlayingMode(null);
                   window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
                 }, 700);
               } else {
-                setIsPlaying(false);
+                setPlayingMode(null);
               }
             }}
           />
-        )}
+        ) : playingMode === 'puzzle' ? (
+          <PuzzleBottomPanel
+            item={item}
+            puzzle={puzzle}
+            onClose={() => {
+              if (gameFlipped) {
+                setGameFlipped(false);
+                setTimeout(() => {
+                  setPlayingMode(null);
+                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
+                }, 700);
+              } else {
+                setPlayingMode(null);
+              }
+            }}
+          />
+        ) : null}
       </div>
+
+      {/* Game mode selector */}
+      <PostcardGameSelector
+        open={showSelector}
+        hasHuntMode={hasHuntMode}
+        onSelect={(mode) => {
+          setShowSelector(false);
+          setPlayingMode(mode);
+        }}
+        onClose={() => setShowSelector(false)}
+      />
     </div>
   );
 }

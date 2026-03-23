@@ -5,7 +5,7 @@
  * Accessible to admins via single click on footer.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,18 +20,21 @@ import {
   CheckCircle,
   Loader,
   Scissors,
+  LayoutGrid,
+  Search,
+  ChevronDown,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { ILLUSTRATION_STYLES, ACTIVE_STYLE_KEY } from '../../../../eb-infra/supabase/functions/_shared/postcard-engine/illustration-styles.ts';
 import type { User } from '@supabase/supabase-js';
 import { useGenerationLog } from '../hooks/useGenerationLog';
 import { useSignedImage } from '../utils/useSignedImage';
-import { WIDTHS } from '../utils/imageUtils';
+import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 import type { GenerationLogEntry } from '../hooks/useGenerationLog';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'generation' | 'postcards' | 'settings';
+type NavSection = 'dashboard' | 'generation' | 'browser' | 'postcards' | 'settings';
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface AdminPageProps {
@@ -86,86 +89,386 @@ function timeAgo(isoStr: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ── Postcards Browser ──────────────────────────────────────────────────
+
+const PAGE_SIZE = 48;
+
+interface BrowserPostcard {
+  id: string;
+  created_at: string;
+  city: string;
+  country: string;
+  illustration_url: string | null;
+  category: { es: string; en: string } | string | null;
+  has_detailed: boolean;
+  has_illus_tags: boolean;
+  has_storytelling: boolean;
+  strategy: string | null;
+}
+
+function BrowserCard({ pc, onClick }: { pc: BrowserPostcard; onClick: (id: string) => void }) {
+  const imgUrl = useSignedImage(pc.illustration_url, { width: WIDTHS.thumb });
+
+  return (
+    <div
+      onClick={() => onClick(pc.id)}
+      className="rounded-xl overflow-hidden cursor-pointer group transition-all hover:ring-1 hover:ring-indigo-400/40 hover:scale-[1.02]"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+    >
+      {/* Thumbnail */}
+      <div className="aspect-[3/4] w-full bg-white/5 overflow-hidden relative">
+        {imgUrl ? (
+          <img
+            src={imgUrl}
+            alt={pc.city}
+            className="w-full h-full object-cover group-hover:brightness-110 transition-all"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white/10">
+            <Image className="w-6 h-6" />
+          </div>
+        )}
+        {/* Status badges - top right */}
+        <div className="absolute top-1 right-1 flex gap-0.5">
+          {pc.has_detailed && (
+            <span className="w-4 h-4 rounded-full bg-emerald-500/80 flex items-center justify-center text-[8px]" title="Enriched">✓</span>
+          )}
+          {pc.has_illus_tags && (
+            <span className="w-4 h-4 rounded-full bg-indigo-500/80 flex items-center justify-center text-[8px]" title="Illus Tags">🏷</span>
+          )}
+          {pc.has_storytelling && (
+            <span className="w-4 h-4 rounded-full bg-amber-500/80 flex items-center justify-center text-[8px]" title="Storytelling">📖</span>
+          )}
+        </div>
+        {/* Strategy badge - bottom left */}
+        {pc.strategy && (
+          <span className={`absolute bottom-1 left-1 text-[8px] px-1.5 py-0.5 rounded-full font-mono font-medium ${strategyColor(pc.strategy)}`}>
+            {strategyShort(pc.strategy)}
+          </span>
+        )}
+      </div>
+      {/* Info */}
+      <div className="p-2">
+        <p className="text-white/80 text-[11px] font-medium truncate leading-tight">
+          {pc.city}{pc.country ? `, ${pc.country}` : ''}
+        </p>
+        <p className="text-white/25 text-[9px] font-mono truncate mt-0.5">
+          {pc.id.slice(0, 8)} · {timeAgo(pc.created_at)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PostcardsBrowser({ onSelectPostcard }: { onSelectPostcard: (id: string) => void }) {
+  const [postcards, setPostcards] = useState<BrowserPostcard[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'missing_meta' | 'missing_tags' | 'has_story'>('all');
+  const offsetRef = useRef(0);
+
+  const fetchPage = useCallback(async (reset = false) => {
+    setLoading(true);
+    const offset = reset ? 0 : offsetRef.current;
+
+    try {
+      // Get total count (only on first load)
+      if (reset || totalCount === null) {
+        const { count } = await supabase
+          .from('postalpeek_postcards')
+          .select('id', { count: 'exact', head: true });
+        setTotalCount(count ?? 0);
+      }
+
+      // Build query
+      let query = supabase
+        .from('postalpeek_postcards')
+        .select('id, created_at, city, country, illustration_url, category, detailed_tags, illustration_tags, generation_metadata')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      // Apply search filter
+      if (searchQuery.trim()) {
+        query = query.or(`city.ilike.%${searchQuery.trim()}%,country.ilike.%${searchQuery.trim()}%`);
+      }
+
+      // Apply status filter
+      if (filter === 'missing_meta') {
+        query = query.is('detailed_tags', null);
+      } else if (filter === 'missing_tags') {
+        query = query.or('illustration_tags.is.null,illustration_tags.eq.[]');
+      } else if (filter === 'has_story') {
+        query = query.not('generation_metadata->storytelling', 'is', null);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const mapped: BrowserPostcard[] = (data || []).map((row) => {
+        const meta = row.generation_metadata as Record<string, unknown> | null;
+        return {
+          id: row.id as string,
+          created_at: row.created_at as string,
+          city: (row.city as string) || '—',
+          country: (row.country as string) || '',
+          illustration_url: row.illustration_url as string | null,
+          category: row.category as BrowserPostcard['category'],
+          has_detailed: Array.isArray(row.detailed_tags) && (row.detailed_tags as unknown[]).length > 0,
+          has_illus_tags: Array.isArray(row.illustration_tags) && (row.illustration_tags as unknown[]).length > 0,
+          has_storytelling: !!(meta?.storytelling),
+          strategy: (meta?.strategy as string) || null,
+        };
+      });
+
+      // Pre-sign image URLs for the batch
+      const urls = mapped.map(p => p.illustration_url).filter(Boolean) as string[];
+      preSignUrls(urls);
+
+      if (reset) {
+        setPostcards(mapped);
+        offsetRef.current = PAGE_SIZE;
+      } else {
+        setPostcards(prev => [...prev, ...mapped]);
+        offsetRef.current = offset + PAGE_SIZE;
+      }
+
+      setHasMore(mapped.length === PAGE_SIZE);
+    } catch (err) {
+      console.error('[PostcardsBrowser]', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, filter, totalCount]);
+
+  // Initial load
+  useEffect(() => {
+    fetchPage(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, filter]); // re-fetch on filter/search change
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Postcards Browser</h2>
+        {totalCount !== null && (
+          <span className="text-white/30 text-xs font-mono">
+            {postcards.length} / {totalCount} total
+          </span>
+        )}
+      </div>
+
+      {/* Search + Filters */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search city or country…"
+            className="w-full pl-9 pr-3 py-2 rounded-xl text-sm"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+          />
+        </div>
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'missing_meta', label: '⚠ No Enrichment' },
+          { key: 'missing_tags', label: '⚠ No Illus Tags' },
+          { key: 'has_story', label: '📖 Has Story' },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key as typeof filter)}
+            className="px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={{
+              background: filter === f.key ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${filter === f.key ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)'}`,
+              color: filter === f.key ? 'rgb(165,180,252)' : 'rgba(255,255,255,0.5)',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+        {postcards.map((pc) => (
+          <BrowserCard key={pc.id} pc={pc} onClick={onSelectPostcard} />
+        ))}
+      </div>
+
+      {/* Loading / Load More */}
+      {loading && (
+        <div className="flex items-center justify-center py-6 text-white/30 text-sm">
+          <Loader className="w-4 h-4 animate-spin mr-2" /> Loading…
+        </div>
+      )}
+
+      {!loading && hasMore && postcards.length > 0 && (
+        <button
+          onClick={() => fetchPage(false)}
+          className="w-full py-3 rounded-xl text-sm font-medium text-white/50 hover:text-white/80 hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+          style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <ChevronDown className="w-4 h-4" />
+          Load more postcards
+        </button>
+      )}
+
+      {!loading && postcards.length === 0 && (
+        <div className="py-12 text-center text-white/20 text-sm">
+          No postcards found
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Generation Log Card ────────────────────────────────────────────────
+
+function MetadataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-1.5 text-[10px] leading-snug">
+      <span className="text-white/25 shrink-0">{label}</span>
+      <span className="text-white/55 break-words">{value}</span>
+    </div>
+  );
+}
 
 function LogCard({ entry }: { entry: GenerationLogEntry }) {
   const imgUrl = useSignedImage(entry.illustration_url, { width: WIDTHS.thumb });
+  const [expanded, setExpanded] = useState(false);
+
+  const meta = entry.generation_metadata;
+  const storytelling = meta?.storytelling as { title?: { es?: string; en?: string } | string; did_you_know?: { es?: string; en?: string } | string } | null;
+  const styleKey = meta?.illustration_style_key as string | null;
+  const vibeInjected = meta?.vibe_injected as string | null;
+  const storyTitle = storytelling?.title
+    ? (typeof storytelling.title === 'string' ? storytelling.title : storytelling.title.es || storytelling.title.en || '')
+    : null;
+  const didYouKnow = storytelling?.did_you_know
+    ? (typeof storytelling.did_you_know === 'string' ? storytelling.did_you_know : storytelling.did_you_know.es || storytelling.did_you_know.en || '')
+    : null;
+  const hasMetadata = !!(storyTitle || didYouKnow || styleKey || vibeInjected);
 
   return (
-    <motion.a
-      href={`/p/${entry.id}`}
-      target="_blank"
-      rel="noopener noreferrer"
+    <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      className="flex gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer no-underline"
-      style={{ textDecoration: 'none' }}
+      className="rounded-xl hover:bg-white/5 transition-colors group"
     >
-      {/* Thumbnail */}
-      <div className="w-14 h-20 rounded-lg overflow-hidden bg-white/5 shrink-0 group-hover:ring-1 group-hover:ring-white/20 transition-all">
-        {imgUrl ? (
-          <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">?</div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-medium ${strategyColor(entry.strategy)}`}>
-            {strategyShort(entry.strategy)}
-          </span>
-          {entry.has_detailed_tags && (
-            <CheckCircle className="w-3 h-3 text-emerald-400/60" />
+      <a
+        href={`/p/${entry.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex gap-3 p-3 cursor-pointer no-underline"
+        style={{ textDecoration: 'none' }}
+      >
+        {/* Thumbnail */}
+        <div className="w-14 h-20 rounded-lg overflow-hidden bg-white/5 shrink-0 group-hover:ring-1 group-hover:ring-white/20 transition-all">
+          {imgUrl ? (
+            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">?</div>
           )}
         </div>
 
-        <p className="text-white/90 text-sm font-medium truncate leading-tight">
-          {entry.city}{entry.country ? `, ${entry.country}` : ''}
-        </p>
-
-        {entry.category && (
-          <p className="text-white/40 text-xs truncate">{categoryLabel(entry.category)}</p>
-        )}
-
-        {entry.lat != null && entry.lng != null && (
-          <div className="flex items-center gap-1 mt-1">
-            <MapPin className="w-3 h-3 text-white/25 shrink-0" />
-            <a
-              href={`https://www.google.com/maps?q=${entry.lat},${entry.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-indigo-400/70 hover:text-indigo-300 text-[10px] font-mono transition-colors"
-              style={{ textDecoration: 'none' }}
-            >
-              {entry.lat.toFixed(4)}, {entry.lng.toFixed(4)}
-            </a>
-            {entry.streetview_pov?.heading != null && (
-              <span className="text-white/20 text-[10px] font-mono">
-                h:{Math.round(entry.streetview_pov.heading)}°
-              </span>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-medium ${strategyColor(entry.strategy)}`}>
+              {strategyShort(entry.strategy)}
+            </span>
+            {entry.has_detailed_tags && (
+              <CheckCircle className="w-3 h-3 text-emerald-400/60" />
             )}
           </div>
-        )}
 
-        <div className="flex items-center gap-1 mt-1">
-          <Clock className="w-3 h-3 text-white/20" />
-          <span className="text-white/30 text-[10px] font-mono">{timeAgo(entry.created_at)}</span>
-          <span className="text-white/10 mx-0.5">·</span>
-          <a
-            href={`/p/${entry.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="text-white/20 hover:text-indigo-300 text-[10px] font-mono transition-colors"
-            style={{ textDecoration: 'none' }}
-          >
-            🔍 {entry.id.slice(0, 8)}
-          </a>
+          <p className="text-white/90 text-sm font-medium truncate leading-tight">
+            {entry.city}{entry.country ? `, ${entry.country}` : ''}
+          </p>
+
+          {entry.category && (
+            <p className="text-white/40 text-xs truncate">{categoryLabel(entry.category)}</p>
+          )}
+
+          {entry.lat != null && entry.lng != null && (
+            <div className="flex items-center gap-1 mt-1">
+              <MapPin className="w-3 h-3 text-white/25 shrink-0" />
+              <a
+                href={`https://www.google.com/maps?q=${entry.lat},${entry.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-indigo-400/70 hover:text-indigo-300 text-[10px] font-mono transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                {entry.lat.toFixed(4)}, {entry.lng.toFixed(4)}
+              </a>
+              {entry.streetview_pov?.heading != null && (
+                <span className="text-white/20 text-[10px] font-mono">
+                  h:{Math.round(entry.streetview_pov.heading)}°
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-1 mt-1">
+            <Clock className="w-3 h-3 text-white/20" />
+            <span className="text-white/30 text-[10px] font-mono">{timeAgo(entry.created_at)}</span>
+            <span className="text-white/10 mx-0.5">·</span>
+            <a
+              href={`/p/${entry.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-white/20 hover:text-indigo-300 text-[10px] font-mono transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              🔍 {entry.id.slice(0, 8)}
+            </a>
+          </div>
         </div>
-      </div>
-    </motion.a>
+      </a>
 
+      {/* Metadata toggle + expandable section */}
+      {hasMetadata && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-semibold text-white/20 hover:text-white/40 transition-colors w-full"
+          >
+            <span>{expanded ? '▾' : '▸'}</span>
+            <span>metadata</span>
+            {styleKey && (
+              <span className="ml-auto text-[9px] font-mono text-purple-400/50 normal-case tracking-normal">
+                {styleKey}
+              </span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-1.5 pl-2 border-l space-y-1" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+                  {storyTitle && <MetadataRow label="📖" value={storyTitle} />}
+                  {didYouKnow && <MetadataRow label="💡" value={didYouKnow} />}
+                  {vibeInjected && <MetadataRow label="✨" value={vibeInjected} />}
+                  {styleKey && <MetadataRow label="🎨" value={styleKey} />}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -631,6 +934,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
   const NAV = [
     { key: 'dashboard'  as NavSection, icon: <BarChart2  className="w-4 h-4" />, label: 'Dashboard'    },
     { key: 'generation' as NavSection, icon: <Zap         className="w-4 h-4" />, label: 'Generation'   },
+    { key: 'browser'    as NavSection, icon: <LayoutGrid  className="w-4 h-4" />, label: 'Browse All'   },
     { key: 'postcards'  as NavSection, icon: <Image       className="w-4 h-4" />, label: 'Postcards'    },
     { key: 'settings'   as NavSection, icon: <Settings    className="w-4 h-4" />, label: 'User Actions' },
   ];
@@ -907,6 +1211,15 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Browser ── */}
+          {activeSection === 'browser' && (
+            <div className="max-w-[1200px]">
+              <PostcardsBrowser
+                onSelectPostcard={(id) => window.open(`/p/${id}`, '_blank')}
+              />
             </div>
           )}
 
