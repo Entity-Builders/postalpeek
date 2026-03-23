@@ -22,6 +22,7 @@ export interface GenerationLogEntry {
   theme: string | null;
   vibe_injected: string | null;
   has_detailed_tags: boolean;
+  generation_metadata: Record<string, unknown> | null;
 }
 
 function extractStrategy(meta: Record<string, unknown> | null): string | null {
@@ -71,6 +72,7 @@ export function useGenerationLog(pollingIntervalMs = 15_000) {
           vibe_injected: (meta?.vibe_injected as string) || null,
           has_detailed_tags:
             Array.isArray(row.detailed_tags) && row.detailed_tags.length > 0,
+          generation_metadata: meta,
         };
       });
 

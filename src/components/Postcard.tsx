@@ -82,6 +82,7 @@ interface PostcardProps {
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
   /** Called on quick tap (replaces flip — parent decides the behavior) */
   onTap?: () => void;
+
 }
 
 const springFlip = {
@@ -330,6 +331,7 @@ export function Postcard({
             hideActions={hideActions}
             isClean={isClean}
             onToggleClean={toggleClean}
+            allowPlay={Array.isArray(item.illustration_tags) && item.illustration_tags.length > 0}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon
@@ -342,6 +344,7 @@ export function Postcard({
               polaroidUrl={polaroidUrl}
               handleImageError={handleImageError}
               onFlipBack={() => flipTo(false)}
+              isActive={isActive}
             />
           )}
         </div>

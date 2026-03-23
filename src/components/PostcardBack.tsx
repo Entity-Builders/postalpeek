@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowUpRight, RotateCcw } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, useLang, type BilingualText } from '../utils/i18n';
@@ -8,6 +8,7 @@ interface PostcardBackProps {
   polaroidUrl: string;
   handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
   onFlipBack?: () => void;
+  isActive?: boolean;
 }
 
 function factTypeEmoji(type: string): string {
@@ -39,6 +40,7 @@ export function PostcardBack({
   polaroidUrl,
   handleImageError,
   onFlipBack,
+  isActive = false,
 }: PostcardBackProps) {
   const storytelling = item.generation_metadata?.storytelling;
   useLang(); // subscribe — triggers re-render on language change
@@ -47,16 +49,20 @@ export function PostcardBack({
   const detailedTags: (BilingualText | string)[] = item.detailed_tags || [];
   const vibeInjected: string = item.generation_metadata?.vibe_injected || '';
 
-  // Debug log — inspect full postal data in browser console
-  console.log('[PostalPeek Debug]', item.id?.slice(0, 8), {
-    description_raw: item.description,
-    description_type: typeof item.description,
-    description_t: t(item.description),
-    visual_tags: item.visual_tags,
-    generation_metadata: item.generation_metadata,
-    streetview_pov: item.streetview_pov,
-    category: item.category,
-  });
+  // Debug log — fires once when this card becomes the active one
+  useEffect(() => {
+    if (!isActive) return;
+    console.log('[PostalPeek Debug]', item.id, {
+      description_raw: item.description,
+      description_type: typeof item.description,
+      description_t: t(item.description),
+      visual_tags: item.visual_tags,
+      generation_metadata: item.generation_metadata,
+      streetview_pov: item.streetview_pov,
+      category: item.category,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, item.id]);
 
   return (
     <div

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Maximize2,
   Minimize2,
@@ -15,6 +15,8 @@ import { useDiscoveries } from '../hooks/useDiscoveries';
 import { AlbumStackEffect } from './ui/AlbumStackEffect';
 import { PostcardActionBar } from './PostcardActionBar';
 import { StorytellingPreview } from './ui/StorytellingPreview';
+import { usePostcardGame, GameImageOverlay, GameBottomPanel } from './PostcardGame';
+import { PostcardGameResults } from './PostcardGameResults';
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -53,6 +55,8 @@ interface PostcardFrontProps {
   isClean?: boolean;
   /** Toggle clean mode callback */
   onToggleClean?: () => void;
+  /** Game mode: allow play (show the Play button) */
+  allowPlay?: boolean;
 }
 
 export function PostcardFront({
@@ -80,8 +84,22 @@ export function PostcardFront({
   isActive = true,
   isClean = false,
   onToggleClean,
+  allowPlay = true,
 }: PostcardFrontProps) {
-  // Sticker discovery system
+  // ── Inline game mode ──
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gameFlipped, setGameFlipped] = useState(false);
+  const game = usePostcardGame(item);
+
+  // Flip the card when game completes
+  useEffect(() => {
+    if (game.allFound && isPlaying && !gameFlipped) {
+      // Delay a bit to let the "All Found!" toast show first
+      const timer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [game.allFound, isPlaying, gameFlipped]);
+  // Sticker discovery system (used by TripSlide)
   const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   useLang(); // subscribe to language changes
 
@@ -201,143 +219,203 @@ export function PostcardFront({
           "flex-1 w-full min-h-0 relative flex flex-col transition-all duration-300",
           isClean ? 'p-0' : 'p-1 pb-0 bg-white overflow-hidden',
         )}>
+          {/* 3D flip container — used when the game completes */}
           <div
-            className={cn(
-              'relative image-protected flex-1 min-h-0 transition-all duration-300',
-              isClean ? 'rounded-none loupe-active' : 'overflow-hidden shadow-inner bg-stone-200 rounded',
-            )}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-
-          {isAlbumGroup ? (
-            <>
-              <div className='absolute top-2 left-2 right-2 z-30 pointer-events-none drop-shadow-md'>
-                <span className='bg-black/60 text-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-medium border border-white/20 shadow-lg'>
-                  🛫{' '}
-                  {item.generation_metadata?.tripContext?.title ||
-                    'Álbum de viaje'}
-                </span>
-              </div>
-
-              <div className='overflow-hidden w-full h-full relative z-10' ref={emblaRef}>
-                <div className='flex w-full h-full'>
-                  {albumItems.map((slideItem) => (
-                    <TripSlide
-                      key={slideItem.id}
-                      slideItem={slideItem}
-                      isPriority={isPriority && slideItem.id === item.id}
-                      handleImageError={handleImageError}
-                      fallbackEnabled={fallbackEnabled}
-                      isHovered={isHovered}
-                      setIsHovered={setIsHovered}
-                      preloadedMainUrl={
-                        slideItem.id === item.id ? mainImgUrl : undefined
-                      }
-                      preloadedPlaceholder={
-                        slideItem.id === item.id ? placeholderUrl : undefined
-                      }
-                      preloadedSrcSet={
-                        slideItem.id === item.id ? srcSetString : undefined
-                      }
-                      onHeroLoad={slideItem.id === item.id ? onHeroLoad : undefined}
-                      isClean={isClean}
-                      onDiscoverTag={discoverTag}
-                      isTagDiscovered={isDiscovered}
-                      isTagGenerating={isGenerating}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Pagination Dots */}
-              {albumItems.length > 1 && (
-                <div className='absolute bottom-4 left-0 right-0 z-30 flex justify-center gap-1.5 pointer-events-none'>
-                  {albumItems.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={cn(
-                        'h-1.5 rounded-full transition-all duration-300 shadow',
-                        idx === currentIndex
-                          ? 'w-4 bg-white'
-                          : 'w-1.5 bg-white/50',
-                      )}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <TripSlide
-              slideItem={item}
-              isPriority={isPriority}
-              handleImageError={handleImageError}
-              fallbackEnabled={fallbackEnabled}
-              isHovered={isHovered}
-              setIsHovered={setIsHovered}
-              preloadedMainUrl={mainImgUrl}
-              preloadedPlaceholder={placeholderUrl}
-              preloadedSrcSet={srcSetString}
-              onHeroLoad={onHeroLoad}
-              isClean={isClean}
-              onDiscoverTag={discoverTag}
-              isTagDiscovered={isDiscovered}
-              isTagGenerating={isGenerating}
-            />
-          )}
-
-          {/* Expand / Clean toggle */}
-          <button
-            className={cn(
-              'absolute z-40 rounded-md transition-all shadow-md ring-1 ring-white/20',
-              isClean
-                ? 'bottom-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white/90 hover:text-white backdrop-blur-sm'
-                : 'bottom-2.5 right-2.5 p-1.5 bg-black/60 hover:bg-black/80 text-white/90 hover:text-white',
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleClean?.();
+            className="relative flex-1 min-h-0 w-full"
+            style={{
+              perspective: '1200px',
             }}
-            title={isClean ? 'Volver' : 'Ver imagen'}
           >
-            {isClean
-              ? <Minimize2 className='w-4 h-4' />
-              : <Maximize2 className='w-3.5 h-3.5' />
-            }
-          </button>        </div>
+            <div
+              className="relative w-full h-full transition-transform duration-700"
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: gameFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            >
+              {/* ── FRONT FACE: the illustration + game overlay ── */}
+              <div
+                className={cn(
+                  'absolute inset-0 w-full h-full',
+                  isClean ? 'rounded-none loupe-active' : 'overflow-hidden shadow-inner bg-stone-200 rounded',
+                )}
+                style={{
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+
+                {isAlbumGroup ? (
+                  <>
+                    <div className='absolute top-2 left-2 right-2 z-30 pointer-events-none drop-shadow-md'>
+                      <span className='bg-black/60 text-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-medium border border-white/20 shadow-lg'>
+                        🛫{' '}
+                        {item.generation_metadata?.tripContext?.title ||
+                          'Álbum de viaje'}
+                      </span>
+                    </div>
+
+                    <div className='overflow-hidden w-full h-full relative z-10' ref={emblaRef}>
+                      <div className='flex w-full h-full'>
+                        {albumItems.map((slideItem) => (
+                          <TripSlide
+                            key={slideItem.id}
+                            slideItem={slideItem}
+                            isPriority={isPriority && slideItem.id === item.id}
+                            handleImageError={handleImageError}
+                            fallbackEnabled={fallbackEnabled}
+                            isHovered={isHovered}
+                            setIsHovered={setIsHovered}
+                            preloadedMainUrl={
+                              slideItem.id === item.id ? mainImgUrl : undefined
+                            }
+                            preloadedPlaceholder={
+                              slideItem.id === item.id ? placeholderUrl : undefined
+                            }
+                            preloadedSrcSet={
+                              slideItem.id === item.id ? srcSetString : undefined
+                            }
+                            onHeroLoad={slideItem.id === item.id ? onHeroLoad : undefined}
+                            isClean={isClean}
+                            onDiscoverTag={discoverTag}
+                            isTagDiscovered={isDiscovered}
+                            isTagGenerating={isGenerating}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Pagination Dots */}
+                    {albumItems.length > 1 && (
+                      <div className='absolute bottom-4 left-0 right-0 z-30 flex justify-center gap-1.5 pointer-events-none'>
+                        {albumItems.map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'h-1.5 rounded-full transition-all duration-300 shadow',
+                              idx === currentIndex
+                                ? 'w-4 bg-white'
+                                : 'w-1.5 bg-white/50',
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <TripSlide
+                    slideItem={item}
+                    isPriority={isPriority}
+                    handleImageError={handleImageError}
+                    fallbackEnabled={fallbackEnabled}
+                    isHovered={isHovered}
+                    setIsHovered={setIsHovered}
+                    preloadedMainUrl={mainImgUrl}
+                    preloadedPlaceholder={placeholderUrl}
+                    preloadedSrcSet={srcSetString}
+                    onHeroLoad={onHeroLoad}
+                    isClean={isClean}
+                    onDiscoverTag={discoverTag}
+                    isTagDiscovered={isDiscovered}
+                    isTagGenerating={isGenerating}
+                  />
+                )}
+
+                {/* Game overlay — renders inside the image area */}
+                {isPlaying && <GameImageOverlay game={game} />}
+
+                {/* Expand / Clean toggle — hidden during game */}
+                {!isPlaying && (
+                  <button
+                    className={cn(
+                      'absolute z-40 rounded-md transition-all shadow-md ring-1 ring-white/20',
+                      isClean
+                        ? 'bottom-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white/90 hover:text-white backdrop-blur-sm'
+                        : 'bottom-2.5 right-2.5 p-1.5 bg-black/60 hover:bg-black/80 text-white/90 hover:text-white',
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleClean?.();
+                    }}
+                    title={isClean ? 'Volver' : 'Ver imagen'}
+                  >
+                    {isClean
+                      ? <Minimize2 className='w-4 h-4' />
+                      : <Maximize2 className='w-3.5 h-3.5' />
+                    }
+                  </button>
+                )}
+              </div>
+
+              {/* ── BACK FACE: game results ── */}
+              {isPlaying && (
+                <PostcardGameResults
+                  item={item}
+                  totalObjects={game.totalObjects}
+                  elapsedSeconds={game.elapsedSeconds}
+                  hintsUsed={game.hintsUsed}
+                />
+              )}
+            </div>
+          </div>
         </div>
         
-        {/* Title + Buttons row — hidden in clean mode */}
-        <PostcardActionBar
-          item={item}
-          activeSlideItem={activeSlideItem}
-          isLiked={isLiked}
-          onToggleFavorite={onToggleFavorite}
-          onAuthRequired={onAuthRequired}
-          onFlipCard={(view: 'info' | 'coupon' = 'info') => {
-            onFlipCard(view);
-          }}
-          isClaimedByMe={isClaimedByMe}
-          isClaimed={isClaimed}
-          onClaimPostcard={onClaimPostcard}
-          isClaimLoading={isClaimLoading}
-          isInAlbum={isInAlbum}
-          showClaimGuide={showClaimGuide}
-          hideActions={hideActions}
-          isClean={isClean}
-          isBusiness={isBusiness}
-          storytellingTitle={storytelling ? 'short' : undefined}
-          albumStops={albumStops}
-          totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-        />
+        {/* Title + Buttons row — hidden in clean mode and game mode */}
+        {!isPlaying ? (
+          <>
+            <PostcardActionBar
+              item={item}
+              activeSlideItem={activeSlideItem}
+              isLiked={isLiked}
+              onToggleFavorite={onToggleFavorite}
+              onAuthRequired={onAuthRequired}
+              onFlipCard={(view: 'info' | 'coupon' = 'info') => {
+                onFlipCard(view);
+              }}
+              isClaimedByMe={isClaimedByMe}
+              isClaimed={isClaimed}
+              onClaimPostcard={onClaimPostcard}
+              isClaimLoading={isClaimLoading}
+              isInAlbum={isInAlbum}
+              showClaimGuide={showClaimGuide}
+              hideActions={hideActions}
+              isClean={isClean}
+              isBusiness={isBusiness}
+              storytellingTitle={storytelling ? 'short' : undefined}
+              albumStops={albumStops}
+              totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
+              onPlay={allowPlay ? () => setIsPlaying(true) : undefined}
+            />
 
-        {/* Storytelling preview — compact, with flip-to-read-more */}
-        {storytelling && (
-          <StorytellingPreview
-            storytelling={storytelling}
-            onFlipCard={() => {
-              onFlipCard('info');
+            {/* Storytelling preview — compact, with flip-to-read-more */}
+            {storytelling && (
+              <StorytellingPreview
+                storytelling={storytelling}
+                onFlipCard={() => {
+                  onFlipCard('info');
+                }}
+                isClean={isClean}
+              />
+            )}
+          </>
+        ) : (
+          <GameBottomPanel
+            item={item}
+            game={game}
+            onClose={() => {
+              if (gameFlipped) {
+                // After game completion: flip back, exit game, navigate to next card
+                setGameFlipped(false);
+                setTimeout(() => {
+                  setIsPlaying(false);
+                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
+                }, 700);
+              } else {
+                setIsPlaying(false);
+              }
             }}
-            isClean={isClean}
           />
         )}
       </div>

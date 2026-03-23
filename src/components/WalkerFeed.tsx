@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../hooks/useWalkerFeed';
 import { useClaimPostcard } from '../hooks/useClaimPostcard';
@@ -15,6 +16,7 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
+
 import { ImageLightbox } from './ImageLightbox';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
@@ -381,6 +383,7 @@ export function WalkerFeed({
         <WalkerCarousel
           items={feedItems}
           displayItems={feedItems}
+
           hasMore={isSpotlightMode && spotlightResults.length > 0 ? hasMoreSpotlight : hasMore}
           isFetchingMore={isSpotlightMode && spotlightResults.length > 0 ? isFetchingMoreSpotlight : isFetchingMore}
           isFetchingRef={isFetchingRef}
@@ -454,6 +457,8 @@ export function WalkerFeed({
         </AnimatePresence>
 
         <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+
+
       </div>
     );
   }
@@ -484,7 +489,15 @@ export function WalkerFeed({
           sessionStorage.removeItem(AUTH_GATE_KEY);
           sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
         }}
-        onCardClick={(index) => setFocusedIndex(index)}
+        onCardClick={(index) => {
+          setFocusedIndex(index);
+          const sourceItems = isSpotlightMode && spotlightResults.length > 0 ? spotlightResults : items;
+          const clickedItem = sourceItems[index];
+          if (clickedItem) {
+            const hash = encodeUuidToHash(clickedItem.id);
+            window.history.replaceState(null, '', `/${hash}`);
+          }
+        }}
         viewedItems={items.slice(0, 5)}
         user={user}
         unlockedCountries={unlockedCountries}

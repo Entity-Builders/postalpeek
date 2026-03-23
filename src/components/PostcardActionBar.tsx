@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Info, Ticket } from 'lucide-react';
+import { Info, Ticket, Joystick } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
@@ -29,6 +29,7 @@ interface PostcardActionBarProps {
   storytellingTitle?: string;
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
+  onPlay?: () => void;
 }
 
 export function PostcardActionBar({
@@ -50,6 +51,7 @@ export function PostcardActionBar({
   storytellingTitle,
   albumStops,
   totalStops,
+  onPlay,
 }: PostcardActionBarProps) {
   const [showIdCopied, setShowIdCopied] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,17 +104,20 @@ export function PostcardActionBar({
           onAuthRequired={onAuthRequired}
         />
 
-        {!hideActions && (
-          <ClaimButton
-            postcardId={item.id}
-            isClaimedByMe={isClaimedByMe}
-            isClaimed={isClaimed}
-            isClaimLoading={isClaimLoading}
-            onClaimPostcard={onClaimPostcard}
-            onAuthRequired={onAuthRequired}
-            showClaimGuide={showClaimGuide}
-            isInAlbum={isInAlbum}
-          />
+        {/* Play game button */}
+        {onPlay && (
+          <button
+            className='flex items-center gap-1.5 px-3 py-1.5 md:px-3.5 md:py-2 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 transition-colors font-medium text-sm'
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+              analytics.track('game_play_tapped', { postcard_id: item.id, country: item.country });
+            }}
+            title={t({ es: 'Jugar', en: 'Play' })}
+          >
+            <Joystick className='w-4 h-4 md:w-5 md:h-5' />
+            {t({ es: 'Jugar', en: 'Play' })}
+          </button>
         )}
 
         {!hideActions && (
@@ -135,51 +140,6 @@ export function PostcardActionBar({
             <Ticket className='w-4 h-4 md:w-5 md:h-5' />
           </button>
         )}
-
-        <div className='relative'>
-          <button
-            className='p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors'
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              didLongPress.current = false;
-              longPressTimer.current = setTimeout(async () => {
-                didLongPress.current = true;
-                try {
-                  await navigator.clipboard.writeText(activeSlideItem.id);
-                  setShowIdCopied(true);
-                  setTimeout(() => setShowIdCopied(false), 1500);
-                } catch {
-                  /* clipboard not available */
-                }
-              }, 600);
-            }}
-            onPointerUp={() => {
-              if (longPressTimer.current) {
-                clearTimeout(longPressTimer.current);
-                longPressTimer.current = null;
-              }
-            }}
-            onPointerLeave={() => {
-              if (longPressTimer.current) {
-                clearTimeout(longPressTimer.current);
-                longPressTimer.current = null;
-              }
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (didLongPress.current) return;
-              onFlipCard('info');
-            }}
-          >
-            <Info className='w-4 h-4 md:w-5 md:h-5' />
-          </button>
-          {showIdCopied && (
-            <div className='absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-stone-800 text-white text-[11px] rounded-lg shadow-lg whitespace-nowrap z-50 animate-fade-in'>
-              ID Copied! 📋
-              <div className='absolute top-full right-4 w-2 h-2 bg-stone-800 rotate-45 -translate-y-1' />
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

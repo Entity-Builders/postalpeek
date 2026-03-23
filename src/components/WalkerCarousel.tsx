@@ -50,6 +50,7 @@ interface WalkerCarouselProps {
   onPackComplete?: () => void;
   /** Expand image to fullscreen lightbox */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
+
 }
 
 export function WalkerCarousel({
@@ -338,6 +339,15 @@ export function WalkerCarousel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scrollWithDebounce]);
 
+  // ── Listen for game-complete → next-card event ──
+  useEffect(() => {
+    const handleNextCard = () => {
+      if (emblaApi) emblaApi.scrollNext();
+    };
+    window.addEventListener('postalpeek:next-card', handleNextCard);
+    return () => window.removeEventListener('postalpeek:next-card', handleNextCard);
+  }, [emblaApi]);
+
   // ── Global ambient background: derive URL from current active slide ──
   const ambientUrl = useMemo(() => {
     const slide = slides[currentSlideIndex];
@@ -475,7 +485,7 @@ export function WalkerCarousel({
                     >
                       <Postcard
                         item={item}
-                        isActive={true}
+                        isActive={slideIndex === currentSlideIndex}
                         isPriority={slideIndex === currentSlideIndex || (slideIndex - currentSlideIndex) === 1 || !!isFirstShared}
                         isAdmin={isAdmin}
                         favoriteIds={favoriteIds}
@@ -486,6 +496,7 @@ export function WalkerCarousel({
                         isClaimLoading={isClaimLoading}
                         isInAlbum={albumPostcardIds.has(item.id)}
                         showClaimGuide={showWelcome && claimedIds.size === 0 && itemIndex === 0}
+
                         onHeroReady={() => {
                           setHeroReadyIds((prev) => {
                             if (prev.has(item.id)) return prev;

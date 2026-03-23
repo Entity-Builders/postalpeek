@@ -1,11 +1,17 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { CityLabel } from './CityLabel';
+
+/* ── Storytelling fact helpers (shared with StorytellingPreview) ── */
+const FACT_EMOJI: Record<string, string> = {
+  historical: '🏛️', architectural: '🏗️', cultural: '🎭',
+  gastronomic: '🍽️', natural: '🌿', artistic: '🎨',
+};
 
 /* ──────────────────────────────────────────────────────────────────
    Layout helpers — computed once and cached
@@ -118,6 +124,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const [loaded, setLoaded] = React.useState(false);
 
   const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category);
+  const storytelling = item.generation_metadata?.storytelling;
 
   const { aspectRatio, showCaption } = layout;
 
@@ -127,9 +134,13 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const sizes = '(min-width:1536px) 20vw, (min-width:1280px) 25vw, (min-width:1024px) 33vw, 50vw';
 
   // ── Scroll-vs-tap detection ───────────────────────────────────────
-  const DRAG_THRESHOLD = 10;
+  // Distance threshold: if the finger moves more than this many px, it's a drag.
+  const DRAG_THRESHOLD = 8;
   const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const wasDragRef = React.useRef(false);
+  // Timestamp until which click events should be suppressed (covers edge cases
+  // where the browser fires a synthetic click AFTER touchend).
+  const preventClickUntilRef = React.useRef(0);
 
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
     const t = e.touches[0];
@@ -147,8 +158,18 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
     }
   }, []);
 
-  const handleClick = React.useCallback(() => {
+  const handleTouchEnd = React.useCallback(() => {
+    if (wasDragRef.current) {
+      // Block any synthetic click the browser might fire for the next 400ms
+      preventClickUntilRef.current = Date.now() + 400;
+    }
+  }, []);
+
+  const handleClick = React.useCallback((e: React.MouseEvent) => {
+    // Block if this click comes from a touch-drag sequence
     if (wasDragRef.current) return;
+    // Block stray synthetic clicks after a detected drag
+    if (Date.now() < preventClickUntilRef.current) return;
     onClick();
   }, [onClick]);
 
@@ -168,6 +189,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
       onClick={handleClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       {...animProps}
     >
       <div
@@ -198,6 +220,41 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
               onLoad={() => setLoaded(true)}
               loading={index < 12 ? 'eager' : 'lazy'}
             />
+          )}
+
+          {/* Storytelling overlay — prominent while loading, fades out on load */}
+          <AnimatePresence>
+            {storytelling && !loaded && (
+              <motion.div
+                key="storytelling-loading"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 z-20 flex flex-col justify-end p-3 pointer-events-none"
+              >
+                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+                  <span className="inline-block text-[9px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">
+                    {FACT_EMOJI[storytelling.fact_type] || '📖'}{' '}
+                    {storytelling.fact_type || 'Dato'}
+                  </span>
+                  <p className="text-[10px] text-white/90 leading-snug line-clamp-2">
+                    💡 {t(storytelling.did_you_know)}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Persistent storytelling badge — small emoji after load */}
+          {storytelling && loaded && (
+            <div className="absolute top-1.5 left-1.5 z-20">
+              <span className="bg-black/40 backdrop-blur-sm text-[10px] px-1.5 py-0.5 rounded-full border border-white/15 shadow-sm"
+                title="Tiene dato curioso"
+              >
+                {FACT_EMOJI[storytelling.fact_type] || '📖'}
+              </span>
+            </div>
           )}
 
           <div className="absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
