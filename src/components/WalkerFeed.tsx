@@ -486,6 +486,8 @@ export function WalkerFeed({
         fetchMoreFeed={fetchMoreFeed}
         availableCountries={availableCountries}
         selectedCountry={selectedCountry}
+        showWelcome={showWelcome}
+        previewCards={items.slice(0, 3)}
         onSelectCountry={(country) => {
           if (country === selectedCountry) return;
           handleSpotlightDismiss();

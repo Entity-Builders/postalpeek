@@ -118,33 +118,34 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           style={{ textShadow: '0 1px 8px rgba(255,255,255,0.5)' }}
           {...anim.title}
         >
-          Kyle Walker
+          PostalPeek
         </motion.h1>
 
         <motion.p
           className="text-stone-600 text-xs sm:text-sm lg:text-base tracking-wide mb-3 sm:mb-4 font-medium text-center"
           {...anim.subtitle}
         >
-          Tu artista digital viajero
+          Postales de acuarela del mundo entero
         </motion.p>
 
         <motion.p
           className="text-stone-700 text-sm sm:text-base lg:text-lg text-center leading-relaxed max-w-[400px] mb-3 sm:mb-4 px-2"
           {...anim.body}
         >
-          Viajo por el mundo y pinto lo que veo.
+          Kyle Walker recorre el mundo y pinta lo que ve.
           <br />
-          Cada calle, cada café, cada rincón
+          Explorá sus postales, jugá con cada ilustración
           <br />
-          se convierte en una postal de acuarela.
+          y armá tu colección.
         </motion.p>
 
         <motion.div className="w-16 h-px bg-stone-400/60 mb-3 sm:mb-4" {...anim.divider} />
 
-        {/* ─── Feature Pill: Coleccioná ─── */}
-        <div className="flex items-center justify-center mb-3 sm:mb-4 px-2">
+        {/* ─── Feature Pills ─── */}
+        <div className="flex flex-col items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4 px-2">
+          {/* Pill 1: Explorá */}
           <motion.div
-            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-sm"
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-sm w-full max-w-[280px]"
             initial={anim.featurePill1.initial}
             animate={{
               ...anim.featurePill1.animate,
@@ -155,10 +156,50 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               y: { delay: 3.4, duration: 3, ease: 'easeInOut', repeat: Infinity },
             }}
           >
-            <span className="text-lg sm:text-xl">🃏</span>
+            <span className="text-lg sm:text-xl">🌍</span>
             <div className="text-left">
-              <p className="text-stone-800 text-xs sm:text-sm font-semibold leading-tight">Coleccioná postales</p>
-              <p className="text-stone-500 text-[9px] sm:text-xs leading-tight">Cada una es un coleccionable único</p>
+              <p className="text-stone-800 text-xs sm:text-sm font-semibold leading-tight">Explorá postales</p>
+              <p className="text-stone-500 text-[9px] sm:text-xs leading-tight">Cada una es única e irrepetible</p>
+            </div>
+          </motion.div>
+
+          {/* Pill 2: Jugá */}
+          <motion.div
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-sm w-full max-w-[280px]"
+            initial={anim.featurePill2.initial}
+            animate={{
+              ...anim.featurePill2.animate,
+              y: [0, -3, 0],
+            }}
+            transition={{
+              ...anim.featurePill2.transition,
+              y: { delay: 3.7, duration: 3, ease: 'easeInOut', repeat: Infinity },
+            }}
+          >
+            <span className="text-lg sm:text-xl">🎯</span>
+            <div className="text-left">
+              <p className="text-stone-800 text-xs sm:text-sm font-semibold leading-tight">Jugá para reclamar</p>
+              <p className="text-stone-500 text-[9px] sm:text-xs leading-tight">Buscá objetos ocultos o armá puzzles</p>
+            </div>
+          </motion.div>
+
+          {/* Pill 3: Coleccioná */}
+          <motion.div
+            className="flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-stone-200/60 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-sm w-full max-w-[280px]"
+            initial={anim.featurePill3.initial}
+            animate={{
+              ...anim.featurePill3.animate,
+              y: [0, -3, 0],
+            }}
+            transition={{
+              ...anim.featurePill3.transition,
+              y: { delay: 4.0, duration: 3, ease: 'easeInOut', repeat: Infinity },
+            }}
+          >
+            <span className="text-lg sm:text-xl">📖</span>
+            <div className="text-left">
+              <p className="text-stone-800 text-xs sm:text-sm font-semibold leading-tight">Completá álbumes</p>
+              <p className="text-stone-500 text-[9px] sm:text-xs leading-tight">Colecciones temáticas del mundo</p>
             </div>
           </motion.div>
         </div>
@@ -173,17 +214,17 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
           }}
           transition={{
             ...anim.tutorialHint.transition,
-            opacity: { delay: 3.2, duration: 3, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1 },
+            opacity: { delay: 3.6, duration: 3, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1 },
           }}
         >
           <motion.span
             className="inline-block"
             animate={{ y: [0, -4, 0] }}
-            transition={{ delay: 4.0, duration: 1.2, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1.5 }}
+            transition={{ delay: 4.4, duration: 1.2, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1.5 }}
           >
             👇
           </motion.span>
-          Deslizá y reclamá tu primera postal
+          Deslizá para explorar
         </motion.p>
       </div>
 
@@ -194,7 +235,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
       >
         <ChevronDown className="w-5 h-5" />
         <span className="text-xs tracking-[0.2em] uppercase font-semibold">
-          Scroll to explore
+          Explorar
         </span>
       </motion.div>
     </div>

@@ -29,6 +29,7 @@ const NON_PLAYABLE = new Set([
 ]);
 
 const NON_PLAYABLE_TYPES = new Set(['style', 'scene_details', 'nature']);
+const MAX_GAME_OBJECTS = 6;
 
 function isPlayableTag(tag: TagWithBox): boolean {
   if (tag.type && NON_PLAYABLE_TYPES.has(tag.type)) return false;
@@ -93,11 +94,14 @@ export function usePostcardGame(item: FeedItem) {
   const existingTags = useMemo(() => {
     const raw = item.illustration_tags as unknown as TagWithBox[] | null;
     if (!raw || !Array.isArray(raw)) return [];
-    return raw.filter(t => {
+    const playable = raw.filter(t => {
       const coords = t.box_2d ?? t.bbox;
       if (!coords || !Array.isArray(coords) || coords.length !== 4) return false;
       return isPlayableTag(t);
     });
+    // Shuffle for variety, then cap at MAX_GAME_OBJECTS
+    const shuffled = [...playable].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, MAX_GAME_OBJECTS);
   }, [item.illustration_tags]);
 
   const tagsWithBbox = liveTags ?? existingTags;

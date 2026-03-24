@@ -6,10 +6,6 @@
   "observability": {
     "enabled": true
   },
-  "assets": {
-    "not_found_handling": "none",
-    "binding": "ASSETS"
-  },
   "compatibility_flags": [
     "nodejs_compat"
   ]
