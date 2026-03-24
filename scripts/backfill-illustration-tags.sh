@@ -71,9 +71,9 @@ LIMIT_CLAUSE=""
 [ "$LIMIT" -gt 0 ] 2>/dev/null && LIMIT_CLAUSE="LIMIT $LIMIT"
 
 POSTCARDS=$(/opt/homebrew/bin/psql "$SUPABASE_DB_URL" -t -A -F'|' -c "
-  SELECT id, illustration_url, city, country
+  SELECT id, original_image_url, city, country
   FROM postalpeek_postcards
-  WHERE illustration_url IS NOT NULL
+  WHERE original_image_url IS NOT NULL
     AND (illustration_tags IS NULL OR illustration_tags = '[]'::jsonb)
   ORDER BY created_at DESC
   $LIMIT_CLAUSE;
@@ -98,18 +98,18 @@ FAILED=0
 # Gemini prompt — identical strategy to analyzeIllustration() in the pipeline
 PROMPT='You are analyzing an AI-generated illustration of a location (postcard art style). Return ONLY a JSON object with key "illustration_tags": an array of 5-15 lowercase English tags describing the VISUAL STYLE and CONTENT of THIS ILLUSTRATION. Include: art style (watercolor, sketch, oil_painting, flat_design, comic_style), mood (vibrant, moody, serene, dramatic, nostalgic), colors (warm_tones, cool_tones, muted_palette, colorful), content (architecture, nature, street_scene, people, vehicles, water, mountains), and prominent visual elements. Focus on what a user would see in this ARTISTIC ILLUSTRATION, not a photo.'
 
-while IFS='|' read -r ID ILLUSTRATION_URL CITY COUNTRY; do
+while IFS='|' read -r ID ORIGINAL_IMAGE_URL CITY COUNTRY; do
   [ -z "$ID" ] && continue
   COUNT=$((COUNT + 1))
 
-  echo "[$COUNT/$TOTAL] 🎨 Postcard: $ID"
+  echo "[$COUNT/$TOTAL] 📸 Postcard: $ID"
   echo "  📍 Location : $CITY, $COUNTRY"
-  echo "  🖼️  URL       : ${ILLUSTRATION_URL:0:70}..."
+  echo "  🖼️  URL       : ${ORIGINAL_IMAGE_URL:0:70}..."
   echo "  🔗 Link      : $APP_URL/?postcard=$ID"
 
-  # Download illustration
-  TMPFILE=$(mktemp /tmp/illus_XXXXXX.jpg)
-  HTTP_CODE=$(curl -s -o "$TMPFILE" -w "%{http_code}" "$ILLUSTRATION_URL")
+  # Download original image
+  TMPFILE=$(mktemp /tmp/illus_img.XXXXXX)
+  HTTP_CODE=$(curl -s -o "$TMPFILE" -w "%{http_code}" "$ORIGINAL_IMAGE_URL")
 
   if [ "$HTTP_CODE" != "200" ]; then
     echo "  ⚠️  Download failed (HTTP $HTTP_CODE) — skipping"
@@ -120,12 +120,12 @@ while IFS='|' read -r ID ILLUSTRATION_URL CITY COUNTRY; do
   fi
 
   # Encode to base64 — write to file to avoid "Argument list too long"
-  B64_FILE=$(mktemp /tmp/illus_b64_XXXXXX.txt)
+  B64_FILE=$(mktemp /tmp/illus_b64.XXXXXX)
   base64 < "$TMPFILE" > "$B64_FILE"
   rm -f "$TMPFILE"
 
   # Build JSON payload via Python reading b64 from file
-  PAYLOAD_FILE=$(mktemp /tmp/illus_payload_XXXXXX.json)
+  PAYLOAD_FILE=$(mktemp /tmp/illus_payload.XXXXXX)
   PROMPT_ESCAPED="$PROMPT"
   python3 - "$B64_FILE" > "$PAYLOAD_FILE" << PYEOF
 import sys, json
@@ -133,23 +133,24 @@ import sys, json
 with open(sys.argv[1]) as f:
     image_b64 = f.read().strip()
 
-prompt = """You are analyzing a stylized illustration (postcard artwork, not a real photograph).
-List up to 25 visual elements that are clearly depicted in this illustration.
+prompt = """Analyze this real photograph and list all prominent objects and visual elements.
 
-Be SPECIFIC and GRANULAR. Include ALL of these categories if visible:
-- Subjects: people, cyclists, dog, cat, street vendor, musician, tourists
-- Vehicles: car, bicycle, motorcycle, bus, colectivo, taxi, truck, tram, scooter
-- Architecture: colonial_building, church, skyscraper, apartment_block, balcony, archway, fountain, statue
-- Random urban objects: air_conditioner, trash_can, fire_hydrant, bench, streetlight, traffic_cone, mailbox, payphone, scaffolding, awning, neon_sign, graffiti
-- Nature: tree, palm_tree, flower_stall, park, garden, river, mountain, lake, grass, ivy
-- Commerce: restaurant, cafe, kiosk, pharmacy, market_stall, bakery, bar, shop_window
-- Scene details: cobblestone, puddle, shadow, mural, flag, pedestrian_crossing, fence, gate
-- Style/mood: watercolor, oil_painting, sketch, flat_design, vibrant, moody, nostalgic, warm_tones, cool_tones, muted_palette
-- Time/weather: golden_hour, night, overcast, sunny, rainy
+Return a JSON array. Each object must have:
+- "label": { "en": "english_name", "es": "spanish_name" }
+- "type": one of "architecture", "vehicle", "nature", "object", "person", "animal", "scene_details", "style"
+- "weight": number 1-10 (visual prominence)
+- "confidence": number 1-10
+- "count": number
+- "position": "foreground" | "midground" | "background"
+- "box_2d": [ymin, xmin, ymax, xmax] — bounding box with coordinates normalized 0-1000 (NOT pixels). Required for all non-style tags.
 
-Only include elements CLEARLY VISIBLE in the illustration — do NOT infer from context.
-Return ONLY a JSON array of lowercase English strings, no explanation.
-Example: ["cathedral", "cobblestone", "bicycle", "flower_stall", "air_conditioner", "watercolor", "warm_tones", "street_vendor", "balcony"]"""
+box_2d rules:
+- Coordinates are normalized: 0 = top/left edge, 1000 = bottom/right edge of the image.
+- [ymin, xmin, ymax, xmax] format: ymin is the top edge, xmin is the left edge, ymax is the bottom edge, xmax is the right edge.
+- The box should tightly wrap the object. Do NOT return full-image boxes like [0,0,1000,1000].
+- For "style" type tags (e.g. "watercolor", "warm_tones"), do NOT include box_2d.
+
+Detect up to 15 elements. Only include clearly visible elements."""
 
 payload = {
     "contents": [{"parts": [
@@ -164,9 +165,9 @@ PYEOF
   rm -f "$B64_FILE"
 
   # Call Gemini — POST the payload file
-  RESPONSE_FILE=$(mktemp /tmp/illus_resp_XXXXXX.json)
-  HTTP_GEMINI=$(curl -s --max-time 30 -w "%{http_code}" \
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+  RESPONSE_FILE=$(mktemp /tmp/illus_resp.XXXXXX)
+  HTTP_GEMINI=$(curl -s --max-time 60 -w "%{http_code}" \
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$GEMINI_API_KEY" \
     -H 'Content-Type: application/json' \
     --data-binary "@$PAYLOAD_FILE" \
     -o "$RESPONSE_FILE")
@@ -188,14 +189,26 @@ import sys, json
 with open(sys.argv[1]) as f:
     data = json.load(f)
 try:
-    text = data['candidates'][0]['content']['parts'][0]['text']
-    parsed = json.loads(text)
-    # Handle both: direct array OR {"illustration_tags": [...]}
+    text = data['candidates'][0]['content']['parts'][0]['text'].strip()
+    if text.startswith('```json'):
+        text = text[7:-3].strip()
+    elif text.startswith('```'):
+        text = text[3:-3].strip()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as je:
+        import sys as s
+        print(f"DEBUG BAD JSON: {text[:500]}...", file=s.stderr)
+        raise je
+    
+    # Handle both: direct array OR {"tags": [...]} OR {"illustration_tags": [...]}
     if isinstance(parsed, list):
         tags = parsed
+    elif 'tags' in parsed:
+        tags = parsed['tags']
     else:
         tags = parsed.get('illustration_tags', [])
-    tags = [t.lower().strip() for t in tags if isinstance(t, str)]
+    tags = [t for t in tags if isinstance(t, dict)]
     print(json.dumps(tags))
 except Exception as e:
     import sys as s
@@ -212,13 +225,17 @@ PYEOF
     continue
   fi
 
-  TAGS_FILE=$(mktemp /tmp/illus_tags_XXXXXX.json)
+  TAGS_FILE=$(mktemp /tmp/illus_tags.XXXXXX)
   echo "$TAGS" > "$TAGS_FILE"
   TAG_INFO=$(python3 - "$TAGS_FILE" << 'PYEOF'
 import sys, json
 with open(sys.argv[1]) as f:
     tags = json.load(f)
-print(f"{len(tags)}|{', '.join(tags)}")
+try:
+    labels = [t.get('label', {}).get('en', '?') for t in tags]
+    print(f"{len(tags)}|{', '.join(labels)}")
+except Exception:
+    print(f"{len(tags)}|Complex Objects")
 PYEOF
 )
   rm -f "$TAGS_FILE"
@@ -230,7 +247,7 @@ PYEOF
     echo "  🧪 DRY RUN — not writing to DB"
   else
     # Write SQL to temp file — avoids apostrophe injection (e.g. "coquito's")
-    SQL_FILE=$(mktemp /tmp/illus_sql_XXXXXX.sql)
+    SQL_FILE=$(mktemp /tmp/illus_sql.XXXXXX)
     python3 - "$SQL_FILE" "$ID" "$TAGS" << 'PYEOF'
 import sys, json
 

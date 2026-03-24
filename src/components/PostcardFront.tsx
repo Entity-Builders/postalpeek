@@ -349,7 +349,7 @@ export function PostcardFront({
                 {playingMode === 'hunt' && <GameImageOverlay game={game} />}
                 {playingMode === 'puzzle' && <PuzzleImageOverlay puzzle={puzzle} imageUrl={mainImgUrl} />}
 
-                {/* Expand / Clean toggle — hidden during game */}
+                {/* Expand to fullscreen / Minimize — hidden during game */}
                 {!isPlaying && (
                   <button
                     className={cn(
@@ -362,7 +362,7 @@ export function PostcardFront({
                       e.stopPropagation();
                       onToggleClean?.();
                     }}
-                    title={isClean ? 'Volver' : 'Ver imagen'}
+                    title={isClean ? 'Volver' : 'Ver en pantalla completa'}
                   >
                     {isClean
                       ? <Minimize2 className='w-4 h-4' />

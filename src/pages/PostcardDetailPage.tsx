@@ -224,6 +224,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
   const [localTags, setLocalTags] = useState<any[] | null>(null);
   const [lastScanInfo, setLastScanInfo] = useState<{ count: number; cost: string } | null>(null);
   const [discoveredLabels, setDiscoveredLabels] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
 
   const BOX_COLORS = [
     'rgba(251,191,36,0.85)',   // amber
@@ -240,17 +241,10 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
     setIsScanning(true);
     setLastScanInfo(null);
     try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-semantic-segment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify({ image_url: postcard.illustration_url, postcard_id: postcard.id })
+      const { data, error } = await supabase.functions.invoke('postalpeek-semantic-segment', {
+        body: { image_url: postcard.illustration_url, postcard_id: postcard.id }
       });
-      if (!res.ok) throw new Error(`Scan failed: ${await res.text()}`);
-      const data = await res.json();
+      if (error) throw error;
       
       // Update local state immediately — no reload needed
       setLocalTags(data.layers);
@@ -267,34 +261,25 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
   const activeTags = localTags ?? postcard.illustration_tags;
 
   // Remove a bad detection — updates local state + DB
-  const removeTag = async (tagIdx: number) => {
+  const removeTag = async (targetTag: any) => {
     const current = (activeTags as any[]) || [];
-    const removed = current[tagIdx];
-    const updated = current.filter((_: any, i: number) => i !== tagIdx);
+    const updated = current.filter((t: any) => t !== targetTag);
     setLocalTags(updated);
-    console.log(`[Admin] Removed "${removed?.label}"`);
+    console.log(`[Admin] Removed tag automatically`);
 
     // Persist to DB
     try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-      await fetch(`${baseUrl}/rest/v1/postalpeek_postcards?id=eq.${postcard.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ illustration_tags: updated }),
-      });
+      const { error } = await supabase.from('postalpeek_postcards')
+        .update({ illustration_tags: updated })
+        .eq('id', postcard.id);
+      if (error) throw error;
     } catch (e) {
       console.error('[Admin] Failed to persist tag removal:', e);
     }
   };
 
   const tagsWithBbox = useMemo(() =>
-    (activeTags as { label?: string | { en?: string }; box_2d?: number[]; bbox?: number[]; confidence?: number }[] | null)?.filter(
+    (activeTags as { label?: string | { en?: string }; type?: string; box_2d?: number[]; bbox?: number[]; confidence?: number }[] | null)?.filter(
       (t) => {
         const coords = t?.box_2d ?? t?.bbox;
         return coords && Array.isArray(coords) && coords.length === 4;
@@ -302,6 +287,26 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
     ) ?? [],
     [activeTags],
   );
+
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    tagsWithBbox.forEach(t => { if (t.type) types.add(t.type); });
+    return Array.from(types).sort();
+  }, [tagsWithBbox]);
+
+  const filteredTags = useMemo(() => {
+    if (selectedTypes.size === 0) return tagsWithBbox;
+    return tagsWithBbox.filter(t => t.type && selectedTypes.has(t.type));
+  }, [tagsWithBbox, selectedTypes]);
+
+  const toggleType = (type: string) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -341,11 +346,43 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
         </div>
       </div>
 
+      {/* Type Filter */}
+      {availableTypes.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setSelectedTypes(new Set())}
+            className={`px-3 py-1 rounded-full text-[10px] font-medium whitespace-nowrap transition-all ${
+              selectedTypes.size === 0
+                ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                : 'bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80'
+            }`}
+          >
+            All Types
+          </button>
+          {availableTypes.map((type) => {
+            const isActive = selectedTypes.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                className={`px-3 py-1 rounded-full text-[10px] font-medium whitespace-nowrap capitalize transition-all ${
+                  isActive
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                    : 'bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80'
+                }`}
+              >
+                {type}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Scan result info */}
         <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 text-[11px]">
           <span className="text-emerald-400">
-            🔍 {discoveredLabels.size}/{tagsWithBbox.length} discovered
-            {discoveredLabels.size === tagsWithBbox.length && tagsWithBbox.length > 0 && ' — 🎉 All found!'}
+            🔍 {discoveredLabels.size}/{filteredTags.length} discovered
+            {discoveredLabels.size === filteredTags.length && filteredTags.length > 0 && ' — 🎉 All found!'}
           </span>
           {lastScanInfo && <span className="text-white/30">Est. cost: {lastScanInfo.cost}</span>}
         </div>
@@ -366,7 +403,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
               const PAD_FACTOR = 0.2;
               const MIN_PAD = 15;
 
-              const matches = tagsWithBbox
+              const matches = filteredTags
                 .map((tag, idx) => {
                   const coords = tag.box_2d ?? tag.bbox;
                   if (!coords) return null;
@@ -396,7 +433,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
             }}
           >
             <img src={signed} alt="Illustration" className="w-full block" style={{ maxHeight: '75vh' }} />
-            {tagsWithBbox.map((tag, idx) => {
+            {filteredTags.map((tag, idx) => {
               const coords = tag.box_2d ?? tag.bbox;
               if (!coords) return null;
               const [ymin, xmin, ymax, xmax] = coords;
@@ -428,7 +465,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
                   {/* Delete button — only in Show All mode */}
                   {isVisible && !isFound && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); removeTag(idx); }}
+                      onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
                       className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] font-bold flex items-center justify-center pointer-events-auto z-40 shadow-md transition-all hover:scale-110"
                       title={`Remove "${label}"`}
                     >
@@ -453,9 +490,9 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
           </div>
 
           {/* Objects list summary when boxes are shown */}
-          {showAllBoxes && tagsWithBbox.length > 0 && (
+          {showAllBoxes && filteredTags.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {tagsWithBbox.map((tag, idx) => {
+              {filteredTags.map((tag, idx) => {
                 const label = typeof tag.label === 'string' ? tag.label : tag.label?.en || 'Object';
                 const color = BOX_COLORS[idx % BOX_COLORS.length];
                 const coords = tag.box_2d ?? tag.bbox;
@@ -568,17 +605,10 @@ function DiscoveriesSection({ postcard }: { postcard: PostcardDetail }) {
   const cropAll = useCallback(async () => {
     setCropStatus('loading');
     try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-crop-tags`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify({ postcard_id: postcard.id }),
+      const { data, error } = await supabase.functions.invoke('postalpeek-crop-tags', {
+        body: { postcard_id: postcard.id }
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      if (error) throw error;
       const urls: Record<string, string> = {};
       for (const crop of data.crops || []) {
         urls[crop.tag_label_en] = crop.crop_url;
@@ -596,26 +626,15 @@ function DiscoveriesSection({ postcard }: { postcard: PostcardDetail }) {
     const label = getTagLabel(tag);
     setGenerating((prev) => new Set(prev).add(label));
     try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${baseUrl}/functions/v1/postalpeek-vectorize-tag`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const { error } = await supabase.functions.invoke('postalpeek-vectorize-tag', {
+        body: {
           postcard_id: postcard.id,
           tag_label_en: label,
           tag_type: tag.tag_type || tag.type || 'object',
           bbox: tag.box_2d ?? tag.bbox,
-        }),
+        }
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
+      if (error) throw error;
       await fetchDiscoveries();
     } catch (err) {
       console.error('[GenSticker]', err);

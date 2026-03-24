@@ -1,4 +1,5 @@
 import React, { useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
@@ -220,9 +221,10 @@ export function TripSlide({
         />
       )}
 
-      {/* Base image — always at normal scale */}
+      {/* Base image — shared element with layoutId for hero transition */}
       {mainImgUrl && (
-        <img
+        <motion.img
+          layoutId={`pp-hero-${slideItem.id}`}
           key={mainImgUrl}
           src={mainImgUrl}
           srcSet={srcSetString}
@@ -237,28 +239,13 @@ export function TripSlide({
           className={cn(
             'absolute inset-0 w-full h-full object-cover z-10 transition-transform duration-500',
             isClean
-              ? 'scale-[1.35]'
+              ? 'scale-[1.35] opacity-0'
               : !slideItem.video_url && 'hover:scale-105',
           )}
         />
       )}
 
-      {/* Loupe lens — cloned image, scaled up, clipped to a circle around the cursor */}
-      {isClean && mainImgUrl && (
-        <img
-          ref={lensRef}
-          src={mainImgUrl}
-          srcSet={srcSetString}
-          sizes='(max-width: 480px) 480px, (max-width: 768px) 768px, 1024px'
-          alt=''
-          draggable={false}
-          className='absolute inset-0 w-full h-full object-cover z-20 pointer-events-none will-change-transform'
-          style={{
-            opacity: 0,
-            transition: 'opacity 0.15s ease-out',
-          }}
-        />
-      )}
+      {/* Loupe lens — disabled for now (TODO: revisit later) */}
 
       {slideItem.video_url &&
         isHovered &&

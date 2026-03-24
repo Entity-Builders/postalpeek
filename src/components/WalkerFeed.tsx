@@ -366,6 +366,16 @@ export function WalkerFeed({
   }, [hasSharedCard, items.length]);
 
   // Feed mode: user tapped a card in the grid → show fullscreen carousel
+  // Track fullscreen overlay state to hide chrome
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      setIsFullscreen((e as CustomEvent<boolean>).detail);
+    };
+    window.addEventListener('postalpeek:fullscreen', handler);
+    return () => window.removeEventListener('postalpeek:fullscreen', handler);
+  }, []);
+
   if (focusedIndex !== null) {
     const feedItems = isSpotlightMode && spotlightResults.length > 0
       ? spotlightResults.slice(focusedIndex)
@@ -373,13 +383,15 @@ export function WalkerFeed({
 
     return (
       <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
-        {/* Back button */}
-        <button
-          onClick={() => { setFocusedIndex(null); navigate('/feed'); }}
-          className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
-        >
-          ← Explorar
-        </button>
+        {/* Back button — hidden during fullscreen overlay */}
+        {!isFullscreen && (
+          <button
+            onClick={() => { setFocusedIndex(null); navigate('/feed'); }}
+            className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
+          >
+            ← Explorar
+          </button>
+        )}
         <WalkerCarousel
           items={feedItems}
           displayItems={feedItems}
@@ -456,7 +468,7 @@ export function WalkerFeed({
           )}
         </AnimatePresence>
 
-        <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+        {!isFullscreen && <LanguageToggle isIdle={isIdle} isOnWelcome={false} />}
 
 
       </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Clock, Target } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, getLang } from '../utils/i18n';
+import { supabase } from '@eb-packages/logic/src/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface TagWithBox {
@@ -27,7 +28,7 @@ const NON_PLAYABLE = new Set([
   'darkness', 'oscuridad', 'fog', 'niebla', 'mist',
 ]);
 
-const NON_PLAYABLE_TYPES = new Set(['style', 'scene_details']);
+const NON_PLAYABLE_TYPES = new Set(['style', 'scene_details', 'nature']);
 
 function isPlayableTag(tag: TagWithBox): boolean {
   if (tag.type && NON_PLAYABLE_TYPES.has(tag.type)) return false;
@@ -121,14 +122,10 @@ export function usePostcardGame(item: FeedItem) {
       setIsScanning(true);
       setScanError(null);
       try {
-        const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-        const res = await fetch(`${baseUrl}/functions/v1/postalpeek-semantic-segment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '' },
-          body: JSON.stringify({ image_url: item.illustration_url, postcard_id: item.id }),
+        const { data, error } = await supabase.functions.invoke('postalpeek-semantic-segment', {
+          body: { image_url: item.illustration_url, postcard_id: item.id }
         });
-        if (!res.ok) throw new Error(`Scan failed (${res.status})`);
-        const data = await res.json();
+        if (error) throw error;
         if (cancelled) return;
         const scanned = (data.layers || []).filter((t: TagWithBox) => {
           const coords = t.box_2d ?? t.bbox;

@@ -1,6 +1,7 @@
 import { type BilingualText } from '../utils/i18n';
 import React, { useState, useRef, useCallback } from 'react';
-import { motion, useMotionValue, useAnimate } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, useMotionValue, useAnimate, AnimatePresence } from 'framer-motion';
 
 import { WIDTHS } from '../utils/imageUtils';
 
@@ -12,6 +13,7 @@ import {
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import { PostcardFront } from './PostcardFront';
+import { FullscreenOverlay } from './FullscreenOverlay';
 import { PostcardBack } from './PostcardBack';
 import { PostcardCoupon } from './PostcardCoupon';
 
@@ -120,10 +122,8 @@ export function Postcard({
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
   const [heroReady, setHeroReady] = useState(false);
-  /** Clean/expand mode — hides chrome, enables loupe zoom */
-  const [isClean, setIsClean] = useState(
-    () => localStorage.getItem('pp_clean_mode') === 'true',
-  );
+  /** Clean/expand mode — hides chrome, enables fullscreen overlay */
+  const [isClean, setIsClean] = useState(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // ── Animation primitives ──
@@ -255,7 +255,6 @@ export function Postcard({
   const toggleClean = useCallback(() => {
     setIsClean((prev) => {
       const next = !prev;
-      localStorage.setItem('pp_clean_mode', String(next));
       analytics.track(
         next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
         {
@@ -267,7 +266,26 @@ export function Postcard({
     });
   }, [item.id, item.country]);
 
+  // Reset clean mode when card becomes inactive (user scrolled away)
+  React.useEffect(() => {
+    if (!isActive && isClean) {
+      setIsClean(false);
+    }
+  }, [isActive, isClean]);
+
+  // Overlay appears after a brief delay so card dissolve starts first
+  const [showOverlay, setShowOverlay] = React.useState(false);
+  React.useEffect(() => {
+    if (isClean) {
+      const timer = setTimeout(() => setShowOverlay(true), 150);
+      return () => clearTimeout(timer);
+    } else {
+      setShowOverlay(false);
+    }
+  }, [isClean]);
+
   return (
+    <>
     <div
       ref={containerRef}
       className={cn(
@@ -282,7 +300,7 @@ export function Postcard({
       <motion.div
         ref={scope}
         className={cn(
-          'w-full h-full relative transition-[background-color,padding,border-radius,box-shadow] duration-200',
+          'w-full h-full relative transition-[background-color,padding,border-radius,box-shadow] duration-300',
           isClean && !isFlipped ? 'bg-transparent' : 'bg-white',
         )}
         style={{
@@ -350,5 +368,20 @@ export function Postcard({
         </div>
       </motion.div>
     </div>
+
+    {/* Fullscreen overlay — portaled to body to escape carousel transforms */}
+    {createPortal(
+      <AnimatePresence>
+        {showOverlay && (
+          <FullscreenOverlay
+            item={activeSlideItem}
+            cachedUrl={mainImgUrl}
+            onClose={toggleClean}
+          />
+        )}
+      </AnimatePresence>,
+      document.body,
+    )}
+    </>
   );
 }

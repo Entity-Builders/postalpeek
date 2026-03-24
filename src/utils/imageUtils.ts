@@ -262,4 +262,8 @@ export const WIDTHS = {
   tablet: 768,
   /** Desktop illustration */
   desktop: 1024,
+  /** Fullscreen mode — high resolution for viewport-filling display */
+  fullscreen: 1600,
+  /** Fullscreen srcSet — responsive sizes for different devices in fullscreen */
+  fullscreenSrcSet: [768, 1024, 1600] as readonly number[],
 } as const;
