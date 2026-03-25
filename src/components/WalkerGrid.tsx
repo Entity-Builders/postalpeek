@@ -6,9 +6,8 @@ import { analytics } from '../lib/analytics';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import { AuthCTASection } from './AuthCTASection';
 import { SkeletonGrid } from './ui/SkeletonCard';
-import { GridCard, computeCardLayout, isMonumentalCard } from './ui/GridCard';
+import { GridCard, computeCardLayout } from './ui/GridCard';
 import type { CardLayout } from './ui/GridCard';
-import { FeatureCard } from './ui/FeatureCard';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { motion } from 'framer-motion';
@@ -192,7 +191,7 @@ export function WalkerGrid({
           </div>
         </div>
 
-        {/* CSS Columns grid — supports column-span: all for feature cards */}
+        {/* CSS Columns grid */}
         <div className="w-full max-w-[1800px] mx-auto px-4 md:px-8 pb-4">
           <style>{`
             .walker-columns {
@@ -203,10 +202,6 @@ export function WalkerGrid({
               break-inside: avoid;
               margin-bottom: 8px;
             }
-            .walker-feature {
-              column-span: all;
-              margin-bottom: 8px;
-            }
             @media (min-width: 768px)  { .walker-columns { column-count: 2; } }
             @media (min-width: 1024px) { .walker-columns { column-count: 3; } }
           `}</style>
@@ -215,33 +210,15 @@ export function WalkerGrid({
             <SkeletonGrid />
           ) : (
             <div className="walker-columns">
-              {(() => {
-                let lastWasFeature = false;
-                return displayItems.map((item, index) => {
-                  if (isMonumentalCard(item) && !lastWasFeature) {
-                    lastWasFeature = true;
-                    return (
-                      <div key={item.id} className="walker-feature">
-                        <FeatureCard
-                          item={item}
-                          index={index}
-                          onClick={() => handleCardClick(index, item)}
-                        />
-                      </div>
-                    );
-                  }
-                  lastWasFeature = false;
-                  return (
-                    <GridCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      layout={layoutMap.get(item.id) || computeCardLayout(item)}
-                      onClick={() => handleCardClick(index, item)}
-                    />
-                  );
-                });
-              })()}
+              {displayItems.map((item, index) => (
+                <GridCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  layout={layoutMap.get(item.id) || computeCardLayout(item)}
+                  onClick={() => handleCardClick(index, item)}
+                />
+              ))}
             </div>
           )}
         </div>
