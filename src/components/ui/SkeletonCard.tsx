@@ -1,5 +1,5 @@
 import Masonry from 'react-masonry-css';
-import type { CardLayout } from './GridCard';
+import type { CardLayout } from './cardLayout';
 
 const SKELETON_LAYOUTS: CardLayout[] = [
   { aspectRatio: '3/4', showCaption: true },
