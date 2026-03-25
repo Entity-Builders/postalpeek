@@ -20,6 +20,7 @@ const FACT_EMOJI: Record<string, string> = {
 export interface CardLayout {
   aspectRatio: string;
   showCaption: boolean;
+  monumental: boolean;
 }
 
 /** Deterministic hash → 0-1 float from a string */
@@ -86,7 +87,7 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
   const id = isItem ? itemOrId.id : itemOrId;
   const h = hashToFloat(id);
   
-  let aspectRatio = ASPECT_RATIOS[Math.floor(h * ASPECT_RATIOS.length)];
+  let aspectRatio: string = ASPECT_RATIOS[Math.floor(h * ASPECT_RATIOS.length)];
   let showCaption = h > 0.45;
 
   if (isItem) {
@@ -106,7 +107,9 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
       categoryNorm.includes('vida');
 
     if (isImportant) {
-      aspectRatio = '1/1';
+      // Monumental → tallest card, always show caption
+      const tallRatios = ['9/16', '2/3', '9/14'];
+      aspectRatio = tallRatios[Math.floor(h * tallRatios.length)];
       showCaption = true;
     } else if (isBasic) {
       const shortRatios = ['1/1', '5/4', '4/5'] as const;
@@ -115,7 +118,7 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
     }
   }
 
-  return { aspectRatio, showCaption };
+  return { aspectRatio, showCaption, monumental: isItem ? isMonumentalCard(itemOrId as FeedItem) : false };
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -142,7 +145,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category);
   const storytelling = item.generation_metadata?.storytelling;
 
-  const { aspectRatio, showCaption } = layout;
+  const { aspectRatio, showCaption, monumental } = layout;
 
   /* Masonry breakpoints → column widths (approx):
      5 cols @ ≥1536 ≈ 20vw,  4 cols @ ≥1280 ≈ 25vw,
@@ -181,7 +184,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
     }
   }, []);
 
-  const handleClick = React.useCallback((e: React.MouseEvent) => {
+  const handleClick = React.useCallback(() => {
     // Block if this click comes from a touch-drag sequence
     if (wasDragRef.current) return;
     // Block stray synthetic clicks after a detected drag
@@ -209,9 +212,12 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
       {...animProps}
     >
       <div
-        className="relative overflow-hidden rounded-xl bg-stone-200
-          shadow-[0_1px_8px_rgba(0,0,0,0.10)]
-          transition-shadow duration-200 group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.22)]"
+        className={`relative overflow-hidden rounded-xl bg-stone-200
+          transition-shadow duration-200 group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.22)]
+          ${monumental
+            ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
+            : 'shadow-[0_1px_8px_rgba(0,0,0,0.10)]'
+          }`}
       >
         <div
           className="relative w-full overflow-hidden"
