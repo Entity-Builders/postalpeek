@@ -5,6 +5,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import type { FeedItem } from './Postcard';
 import { cdnImage } from '../utils/imageUtils';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface DailyPackCompleteProps {
   cards: FeedItem[];
@@ -17,6 +18,7 @@ export function DailyPackComplete({
   albumCardCount,
   onGoToFeed,
 }: DailyPackCompleteProps) {
+  const lang = useLang();
   const [showConfetti, setShowConfetti] = useState(true);
 
   useEffect(() => {
@@ -67,10 +69,10 @@ export function DailyPackComplete({
           🎉
         </motion.div>
         <h2 className='text-2xl font-serif font-bold text-stone-900 mb-1' style={{ textShadow: '0 1px 2px rgba(255,255,255,0.6)' }}>
-          ¡Sobre abierto!
+          {t({ es: '¡Sobre abierto!', en: 'Envelope opened!' }, lang)}
         </h2>
         <p className='text-stone-600 text-sm'>
-          Recibiste {cards.length} postales nuevas
+          {t({ es: `Recibiste ${cards.length} postales nuevas`, en: `You received ${cards.length} new postcards` }, lang)}
         </p>
       </motion.div>
 
@@ -132,9 +134,10 @@ export function DailyPackComplete({
         >
           <Trophy className='w-4 h-4 text-amber-500' />
           <span className='text-sm font-medium text-amber-800'>
-            {albumCardCount === 1
-              ? '¡1 carta pertenece a un álbum!'
-              : `¡${albumCardCount} cartas pertenecen a álbumes!`}
+            {t({ 
+              es: albumCardCount === 1 ? '¡1 carta pertenece a un álbum!' : `¡${albumCardCount} cartas pertenecen a álbumes!`,
+              en: albumCardCount === 1 ? '1 card belongs to an album!' : `${albumCardCount} cards belong to albums!`
+            }, lang)}
           </span>
           <Sparkles className='w-4 h-4 text-amber-400' />
         </motion.div>
@@ -148,7 +151,7 @@ export function DailyPackComplete({
         onClick={onGoToFeed}
         className='px-8 py-3.5 bg-gradient-to-r from-stone-800 to-stone-900 text-white font-semibold text-base rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center gap-2'
       >
-        <span>Seguir explorando</span>
+        <span>{t({ es: 'Seguir explorando', en: 'Keep exploring' }, lang)}</span>
         <ChevronDown className='w-4 h-4' />
       </motion.button>
 
@@ -165,7 +168,7 @@ export function DailyPackComplete({
         >
           <ChevronDown className='w-5 h-5 text-stone-300' />
         </motion.div>
-        <span className='text-stone-400 text-xs'>o desliza hacia abajo</span>
+        <span className='text-stone-400 text-xs'>{t({ es: 'o desliza hacia abajo', en: 'or swipe down' }, lang)}</span>
       </motion.div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Trophy, MapPin } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { Album } from '../hooks/useAlbums';
+import { useLang, t } from '../utils/i18n';
 
 interface AlbumListProps {
   albums: Album[];
@@ -13,12 +14,12 @@ interface AlbumListProps {
 
 const DIFFICULTY_CONFIG: Record<
   Album['difficulty'],
-  { label: string; color: string; icon: string }
+  { label: { es: string; en: string }; color: string; icon: string }
 > = {
-  easy: { label: 'Fácil', color: 'bg-emerald-500/80', icon: '🌿' },
-  medium: { label: 'Media', color: 'bg-yellow-500/80', icon: '⭐' },
-  hard: { label: 'Difícil', color: 'bg-orange-500/80', icon: '🔥' },
-  epic: { label: 'Épica', color: 'bg-purple-500/80', icon: '💎' },
+  easy: { label: { es: 'Fácil', en: 'Easy' }, color: 'bg-emerald-500/80', icon: '🌿' },
+  medium: { label: { es: 'Media', en: 'Medium' }, color: 'bg-yellow-500/80', icon: '⭐' },
+  hard: { label: { es: 'Difícil', en: 'Hard' }, color: 'bg-orange-500/80', icon: '🔥' },
+  epic: { label: { es: 'Épica', en: 'Epic' }, color: 'bg-purple-500/80', icon: '💎' },
 };
 
 function AlbumCard({
@@ -30,6 +31,7 @@ function AlbumCard({
   index: number;
   onClick: () => void;
 }) {
+  const lang = useLang();
   const coverUrl = useSignedImage(album.cover_image_url, {
     width: WIDTHS.mobile,
   });
@@ -72,7 +74,7 @@ function AlbumCard({
         {/* Completed badge */}
         {isComplete && (
           <div className='absolute top-2 right-2 bg-amber-500 text-white text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shadow-sm'>
-            ✓ Completo
+            {t({ es: '✓ Completo', en: '✓ Complete' }, lang)}
           </div>
         )}
 
@@ -83,7 +85,7 @@ function AlbumCard({
               className={`${DIFFICULTY_CONFIG[album.difficulty].color} backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm`}
             >
               <span>{DIFFICULTY_CONFIG[album.difficulty].icon}</span>
-              {DIFFICULTY_CONFIG[album.difficulty].label}
+              {t(DIFFICULTY_CONFIG[album.difficulty].label, lang)}
             </div>
           )}
           {album.country && (
@@ -119,6 +121,7 @@ function AlbumCard({
 }
 
 export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
+  const lang = useLang();
   if (isLoading) {
     return (
       <div className='px-4 pb-3'>
@@ -141,8 +144,10 @@ export function AlbumList({ albums, isLoading, onOpenAlbum }: AlbumListProps) {
       {/* Section header */}
       <div className='flex items-center justify-between px-4 mb-3'>
         <span className='text-[10px] text-white/40'>
-          {albums.filter((a) => a.completed_at).length}/{albums.length}{' '}
-          completos
+          {t({
+            es: `${albums.filter((a) => a.completed_at).length}/${albums.length} completos`,
+            en: `${albums.filter((a) => a.completed_at).length}/${albums.length} complete`
+          }, lang)}
         </span>
       </div>
 

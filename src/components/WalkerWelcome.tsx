@@ -5,6 +5,7 @@ import type { FeedItem } from './Postcard';
 import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { useSignedImage, useRawSignedImage } from '../utils/useSignedImage';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface WalkerWelcomeProps {
   previewCards: FeedItem[];
@@ -23,6 +24,8 @@ const ease = [0.22, 1, 0.36, 1] as const;
  *   - Frame Card 2 -> Sweep in Card 0 and 1 behind it -> Show Text
  */
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
+  const lang = useLang();
+  
   // We use 3 random cards for the intro sequence, waiting until previewCards is actually loaded
   const hasShuffled = React.useRef(false);
   const [cards, setCards] = useState<FeedItem[]>([]);
@@ -215,7 +218,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               exit={{ opacity: 0 }}
               transition={{ delay: 0.2, duration: 0.5, ease }}
             >
-              Entity Builders presents
+              {t({ en: 'Entity Builders presents', es: 'Entity Builders presenta' }, lang)}
             </motion.p>
 
             {/* Bottom Content */}
@@ -251,26 +254,29 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.5, ease }}
             >
-              Todo este mundo está siendo documentado por Kyle Walker, nuestro agente de IA. Él viaja sin parar, tomando fotos y transformándolas en acuarelas. Coleccioná sus postales.
+              {t({
+                es: 'Todo este mundo está siendo documentado por Kyle Walker, nuestro agente de IA. Él viaja sin parar, tomando fotos y transformándolas en acuarelas. Coleccioná sus postales.',
+                en: 'This entire world is being documented by Kyle Walker, our AI agent. He travels non-stop, taking photos and transforming them into watercolors. Collect his postcards.'
+              }, lang)}
             </motion.p>
 
 
             {/* ── Feature Pills ── */}
             <div className="flex flex-col items-center gap-2 mb-6 w-full pointer-events-auto">
               {[
-                { emoji: '🌍', title: 'Explorá postales', delay: 0.8 },
-                { emoji: '🎯', title: 'Jugá para reclamar', delay: 0.9 },
-                { emoji: '📖', title: 'Completá álbumes', delay: 1.0 },
+                { emoji: '🌍', title: { en: 'Explore postcards', es: 'Explorá postales' }, delay: 0.8 },
+                { emoji: '🎯', title: { en: 'Play to claim', es: 'Jugá para reclamar' }, delay: 0.9 },
+                { emoji: '📖', title: { en: 'Complete albums', es: 'Completá álbumes' }, delay: 1.0 },
               ].map((pill) => (
                 <motion.div
-                  key={pill.title}
+                  key={pill.emoji}
                   className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md border border-stone-200/60 rounded-[12px] px-5 py-2 shadow-sm w-full max-w-[240px]"
                   initial={{ opacity: 0, y: 12, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: pill.delay, duration: 0.5, ease }}
                 >
                   <span className="text-base">{pill.emoji}</span>
-                  <p className="text-stone-800 text-[13px] font-semibold leading-tight">{pill.title}</p>
+                  <p className="text-stone-800 text-[13px] font-semibold leading-tight">{t(pill.title, lang)}</p>
                 </motion.div>
               ))}
             </div>
@@ -295,7 +301,7 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
                 >
                   👇
                 </motion.span>
-                Deslizá para explorar
+                {t({ en: 'Swipe to explore', es: 'Deslizá para explorar' }, lang)}
               </motion.p>
               <motion.div
                 animate={{ y: [0, 4, 0] }}

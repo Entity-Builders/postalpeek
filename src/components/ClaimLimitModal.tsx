@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface ClaimLimitModalProps {
   type: 'daily' | 'monthly';
@@ -11,6 +12,7 @@ interface ClaimLimitModalProps {
 }
 
 export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalProps) {
+  const lang = useLang();
   React.useEffect(() => {
     analytics.track('claim_limit_shown', { type, used, limit });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -51,8 +53,8 @@ export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalP
             </span>
             <h3 className="font-serif text-xl text-stone-800 tracking-tight">
               {type === 'daily'
-                ? '¡Límite diario alcanzado!'
-                : '¡Límite mensual alcanzado!'}
+                ? t({ es: '¡Límite diario alcanzado!', en: 'Daily limit reached!' }, lang)
+                : t({ es: '¡Límite mensual alcanzado!', en: 'Monthly limit reached!' }, lang)}
             </h3>
           </div>
 
@@ -62,15 +64,17 @@ export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalP
               {used}/{limit}
             </span>
             <p className="text-xs text-stone-400 mt-1">
-              postales reclamadas {type === 'daily' ? 'hoy' : 'este mes'}
+              {type === 'daily' 
+                ? t({ es: 'postales reclamadas hoy', en: 'postcards claimed today' }, lang) 
+                : t({ es: 'postales reclamadas este mes', en: 'postcards claimed this month' }, lang)}
             </p>
           </div>
 
           {/* Message */}
           <p className="text-sm text-stone-500 text-center leading-relaxed mb-5">
             {type === 'daily'
-              ? 'Volvé mañana para seguir coleccionando. Walker nunca para de caminar — tus próximas postales te esperan. 🚶'
-              : 'Tu cuota mensual se renueva al inicio del próximo mes. ¡Seguí explorando mientras tanto!'}
+              ? t({ es: 'Volvé mañana para seguir coleccionando. Walker nunca para de caminar — tus próximas postales te esperan. 🚶', en: 'Come back tomorrow to keep collecting. Walker never stops walking — your next postcards await. 🚶' }, lang)
+              : t({ es: 'Tu cuota mensual se renueva al inicio del próximo mes. ¡Seguí explorando mientras tanto!', en: 'Your monthly quota resets at the start of next month. Keep exploring in the meantime!' }, lang)}
           </p>
 
           {/* CTA */}
@@ -78,7 +82,7 @@ export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalP
             onClick={onClose}
             className="w-full py-3 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] text-white text-sm font-semibold transition-all shadow-lg shadow-stone-800/20"
           >
-            Entendido
+            {t({ es: 'Entendido', en: 'Got it' }, lang)}
           </button>
 
           {/* Future upgrade path — disabled for now */}

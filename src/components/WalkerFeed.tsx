@@ -23,6 +23,7 @@ import { WelcomeToast } from './WelcomeToast';
 import { SearchX } from 'lucide-react';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 import { FeatureFlags } from '../lib/featureFlags';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -42,6 +43,7 @@ export function WalkerFeed({
   user?: User | null;
   onWelcomeChange?: (isOnWelcome: boolean) => void;
 }) {
+  const lang = useLang();
   const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
 
   const {
@@ -393,7 +395,7 @@ export function WalkerFeed({
             onClick={() => { setFocusedIndex(null); navigate('/feed'); }}
             className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
           >
-            ← Explorar
+            {t({ es: '← Explorar', en: '← Explore' }, lang)}
           </button>
         )}
         <WalkerCarousel
@@ -461,10 +463,10 @@ export function WalkerFeed({
             >
               <span className='text-xl'>🎉</span>
               <div>
-                <p className='text-sm font-semibold leading-tight'>¡Sobre abierto!</p>
+                <p className='text-sm font-semibold leading-tight'>{t({ es: '¡Sobre abierto!', en: 'Envelope opened!' }, lang)}</p>
                 {packDoneAlbumCount > 0 && (
                   <p className='text-xs text-amber-400 mt-0.5'>
-                    {packDoneAlbumCount === 1 ? '1 carta de álbum' : `${packDoneAlbumCount} cartas de álbum`}
+                    {packDoneAlbumCount === 1 ? t({ es: '1 carta de álbum', en: '1 album card' }, lang) : t({ es: `${packDoneAlbumCount} cartas de álbum`, en: `${packDoneAlbumCount} album cards` }, lang)}
                   </p>
                 )}
               </div>
@@ -637,9 +639,9 @@ export function WalkerFeed({
           >
             <SearchX className='w-5 h-5 text-amber-500' strokeWidth={2} />
             <div>
-              <p className='text-sm font-semibold leading-tight'>Sin resultados</p>
+              <p className='text-sm font-semibold leading-tight'>{t({ es: 'Sin resultados', en: 'No results' }, lang)}</p>
               <p className='text-xs text-stone-300 mt-0.5 max-w-[200px] truncate'>
-                Mostrando sugerencias
+                {t({ es: 'Mostrando sugerencias', en: 'Showing suggestions' }, lang)}
               </p>
             </div>
           </motion.div>

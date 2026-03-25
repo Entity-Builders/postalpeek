@@ -6,6 +6,7 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { Postcard } from './Postcard';
 import type { FeedItem } from './Postcard';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface PostcardDetailModalProps {
   item: FeedItem;
@@ -16,6 +17,7 @@ interface PostcardDetailModalProps {
 type ValidationState = 'idle' | 'analyzing' | 'success' | 'error';
 
 export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDetailModalProps) {
+  const lang = useLang();
   const [validationState, setValidationState] = useState<ValidationState>('idle');
   const [validationReason, setValidationReason] = useState<string | null>(null);
 
@@ -24,7 +26,7 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
       // 1. Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        alert('Necesitamos acceso a la cámara para validar tu postal en el mundo real.');
+        alert(t({ es: 'Necesitamos acceso a la cámara para validar tu postal en el mundo real.', en: 'We need camera access to validate your postcard in the real world.' }, lang));
         return;
       }
 
@@ -44,7 +46,7 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
 
       const base64Image = result.assets[0].base64;
       if (!base64Image) {
-        throw new Error('No se pudo procesar la imagen.');
+        throw new Error(t({ es: 'No se pudo procesar la imagen.', en: 'The image could not be processed.' }, lang));
       }
 
       setValidationState('analyzing');
@@ -80,7 +82,7 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
     } catch (err: any) {
       console.error('Validation error:', err);
       setValidationState('error');
-      setValidationReason(err.message || 'Ocurrió un error al analizar la foto.');
+      setValidationReason(err.message || t({ es: 'Ocurrió un error al analizar la foto.', en: 'An error occurred while analyzing the photo.' }, lang));
     }
   };
 
@@ -123,16 +125,16 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
                 <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Camera className="w-6 h-6 text-stone-600" />
                 </div>
-                <h3 className="font-serif text-lg text-stone-800 mb-2">Validación en el Mundo Real</h3>
+                <h3 className="font-serif text-lg text-stone-800 mb-2">{t({ es: 'Validación en el Mundo Real', en: 'Real World Validation' }, lang)}</h3>
                 <p className="text-sm text-stone-500 mb-4 px-2">
-                  ¿Estás en {item.city} o en un lugar que transmite esta vibra? Sacate una foto y ganá estampillas.
+                  {t({ es: `¿Estás en ${item.city} o en un lugar que transmite esta vibra? Sacate una foto y ganá estampillas.`, en: `Are you in ${item.city} or a place that gives off this vibe? Take a photo and earn stamps.` }, lang)}
                 </p>
                 <button
                   onClick={handleValidateIRL}
                   className="w-full py-3.5 bg-stone-800 text-white rounded-full font-medium shadow-md shadow-stone-800/20 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
                 >
                   <Camera className="w-4 h-4" />
-                  Tomar foto
+                  {t({ es: 'Tomar foto', en: 'Take photo' }, lang)}
                 </button>
               </motion.div>
             )}
@@ -146,8 +148,8 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
                 className="bg-white/70 p-6 rounded-2xl shadow-sm border border-stone-200 flex flex-col items-center"
               >
                 <Loader2 className="w-10 h-10 text-stone-400 animate-spin mb-4" />
-                <h3 className="font-serif text-base text-stone-700 mb-1">El Walker está evaluando...</h3>
-                <p className="text-sm text-stone-400 italic">"Analizando luces, ambiente..."</p>
+                <h3 className="font-serif text-base text-stone-700 mb-1">{t({ es: 'El Walker está evaluando...', en: 'Walker is evaluating...' }, lang)}</h3>
+                <p className="text-sm text-stone-400 italic">"{t({ es: 'Analizando luces, ambiente...', en: 'Analyzing lights, ambiance...' }, lang)}"</p>
               </motion.div>
             )}
 
@@ -162,18 +164,18 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
                 <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
                   <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                 </div>
-                <h3 className="font-serif text-lg text-emerald-800 mb-2">¡Validación Exitosa!</h3>
+                <h3 className="font-serif text-lg text-emerald-800 mb-2">{t({ es: '¡Validación Exitosa!', en: 'Successful Validation!' }, lang)}</h3>
                 <p className="text-sm text-emerald-600/80 mb-4">
                   {validationReason}
                 </p>
                 <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-medium text-sm border border-emerald-200 mb-4 animate-bounce">
-                  +1 Estampilla Ganada
+                  {t({ es: '+1 Estampilla Ganada', en: '+1 Stamp Earned' }, lang)}
                 </div>
                 <button
                   onClick={() => setValidationState('idle')}
                   className="text-emerald-700 text-sm font-medium hover:underline"
                 >
-                  Validar otra vez
+                  {t({ es: 'Validar otra vez', en: 'Validate again' }, lang)}
                 </button>
               </motion.div>
             )}
@@ -189,7 +191,7 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
                 <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mb-3">
                   <XCircle className="w-6 h-6 text-rose-500" />
                 </div>
-                <h3 className="font-serif text-lg text-rose-800 mb-2">Mmm, no parece ser el lugar</h3>
+                <h3 className="font-serif text-lg text-rose-800 mb-2">{t({ es: 'Mmm, no parece ser el lugar', en: 'Mmm, doesn\'t look like the place' }, lang)}</h3>
                 <p className="text-sm text-rose-600/80 mb-5">
                   {validationReason}
                 </p>
@@ -197,7 +199,7 @@ export function PostcardDetailModal({ item, onClose, onExpandImage }: PostcardDe
                   onClick={() => setValidationState('idle')}
                   className="px-6 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-full font-medium text-sm"
                 >
-                  Intentar otra foto
+                  {t({ es: 'Intentar otra foto', en: 'Try another photo' }, lang)}
                 </button>
               </motion.div>
             )}

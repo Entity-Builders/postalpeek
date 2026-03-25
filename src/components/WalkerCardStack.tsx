@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion';
 import { analytics } from '../lib/analytics';
-import { t } from '../utils/i18n';
+import { useLang, t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
-import { AlbumCoverLoadingState } from './WalkerFeedStates';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import type { User } from '@supabase/supabase-js';
@@ -196,6 +195,7 @@ function SwipeableCard({
   setPendingFavoriteId,
   items,
 }: SwipeableCardProps) {
+  const lang = useLang();
   const x = useMotionValue(0);
   const controls = useAnimation();
   
@@ -222,18 +222,18 @@ function SwipeableCard({
       // Swipe Right (Like/Claim)
       if (user && !item.owner_id && item.type !== 'welcome') {
         Alert.alert(
-          'Reclamar Postal',
-          'Cuesta 1 Estampilla reclamar esta postal del feed global. ¿Aceptar?',
+          t({ es: 'Reclamar Postal', en: 'Claim Postcard' }, lang),
+          t({ es: 'Cuesta 1 Estampilla reclamar esta postal del feed global. ¿Aceptar?', en: 'It costs 1 Stamp to claim this postcard from the global feed. Accept?' }, lang),
           [
             {
-              text: 'Cancelar',
+              text: t({ es: 'Cancelar', en: 'Cancel' }, lang),
               style: 'cancel',
               onPress: () => {
                 controls.start({ x: 0, transition: { type: 'spring', stiffness: 300, damping: 20 } });
               }
             },
             {
-              text: 'Aceptar',
+              text: t({ es: 'Aceptar', en: 'Accept' }, lang),
               onPress: () => {
                 controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
                 analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
@@ -285,13 +285,13 @@ function SwipeableCard({
               style={{ opacity: saveOpacity }}
               className='absolute top-12 left-8 z-[100] pointer-events-none rotate-[-15deg] border-4 border-emerald-500 rounded-lg px-4 py-2'
             >
-              <span className='text-3xl font-black text-emerald-500 uppercase tracking-widest drop-shadow-md'>RECLAMAR</span>
+              <span className='text-3xl font-black text-emerald-500 uppercase tracking-widest drop-shadow-md'>{t({ es: 'RECLAMAR', en: 'CLAIM' }, lang)}</span>
             </motion.div>
             <motion.div 
               style={{ opacity: discardOpacity }}
               className='absolute top-12 right-8 z-[100] pointer-events-none rotate-[15deg] border-4 border-rose-500 rounded-lg px-4 py-2'
             >
-              <span className='text-3xl font-black text-rose-500 uppercase tracking-widest drop-shadow-md'>DESCARTAR</span>
+              <span className='text-3xl font-black text-rose-500 uppercase tracking-widest drop-shadow-md'>{t({ es: 'DESCARTAR', en: 'DISCARD' }, lang)}</span>
             </motion.div>
           </>
         )}

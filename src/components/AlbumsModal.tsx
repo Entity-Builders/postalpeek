@@ -5,6 +5,7 @@ import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { Album } from '../hooks/useAlbums';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface AlbumsModalProps {
   albums: Album[];
@@ -13,11 +14,11 @@ interface AlbumsModalProps {
   onSelectAlbum: (album: Album) => void;
 }
 
-const DIFFICULTY_CONFIG: Record<Album['difficulty'], { label: string; color: string; icon: string }> = {
-  easy:   { label: 'Fácil',   color: 'bg-emerald-500/80', icon: '🌿' },
-  medium: { label: 'Media',   color: 'bg-yellow-500/80',  icon: '⭐' },
-  hard:   { label: 'Difícil', color: 'bg-orange-500/80',  icon: '🔥' },
-  epic:   { label: 'Épica',   color: 'bg-purple-500/80',  icon: '💎' },
+const DIFFICULTY_CONFIG: Record<Album['difficulty'], { label: { en: string; es: string }; color: string; icon: string }> = {
+  easy:   { label: { es: 'Fácil', en: 'Easy' },   color: 'bg-emerald-500/80', icon: '🌿' },
+  medium: { label: { es: 'Media', en: 'Medium' },   color: 'bg-yellow-500/80',  icon: '⭐' },
+  hard:   { label: { es: 'Difícil', en: 'Hard' }, color: 'bg-orange-500/80',  icon: '🔥' },
+  epic:   { label: { es: 'Épica', en: 'Epic' },   color: 'bg-purple-500/80',  icon: '💎' },
 };
 
 function AlbumGridCard({
@@ -29,6 +30,7 @@ function AlbumGridCard({
   index: number;
   onClick: () => void;
 }) {
+  const lang = useLang();
   const coverUrl = useSignedImage(album.cover_image_url, { width: WIDTHS.mobile });
   const isComplete = album.completed_at !== null;
   const progress = album.total_slots > 0
@@ -67,7 +69,7 @@ function AlbumGridCard({
         {/* Completed badge */}
         {isComplete && (
           <div className='absolute top-2 right-2 bg-amber-500 text-white text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shadow-sm'>
-            ✓ Completo
+            {t({ es: '✓ Completo', en: '✓ Complete' }, lang)}
           </div>
         )}
 
@@ -76,7 +78,7 @@ function AlbumGridCard({
           {album.difficulty && album.difficulty !== 'easy' && (
             <div className={`${DIFFICULTY_CONFIG[album.difficulty].color} backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm`}>
               <span>{DIFFICULTY_CONFIG[album.difficulty].icon}</span>
-              {DIFFICULTY_CONFIG[album.difficulty].label}
+              {t(DIFFICULTY_CONFIG[album.difficulty].label, lang)}
             </div>
           )}
           {album.country && (
@@ -117,6 +119,7 @@ export function AlbumsModal({
   onClose,
   onSelectAlbum,
 }: AlbumsModalProps) {
+  const lang = useLang();
   const completedCount = albums.filter(a => a.completed_at).length;
 
   return (
@@ -138,12 +141,12 @@ export function AlbumsModal({
 
         <h2 className="font-serif text-xl text-stone-800 tracking-tight flex items-center gap-2">
           <Library className="w-5 h-5 text-indigo-600 opacity-80" />
-          Álbumes
+          {t({ es: 'Álbumes', en: 'Albums' }, lang)}
         </h2>
 
         <div className="text-right min-w-[3rem]">
           <span className="text-xs text-stone-500 font-mono font-medium">
-            {completedCount}/{albums.length} <span className="hidden sm:inline">completos</span>
+            {completedCount}/{albums.length} <span className="hidden sm:inline">{t({ es: 'completos', en: 'complete' }, lang)}</span>
           </span>
         </div>
       </div>
@@ -179,10 +182,10 @@ export function AlbumsModal({
           <div className="flex flex-col items-center justify-center h-full text-center pb-20">
             <Library className="w-16 h-16 text-stone-300 mb-4" />
             <h3 className="font-serif text-xl text-stone-700 mb-2">
-              No hay álbumes disponibles
+              {t({ es: 'No hay álbumes disponibles', en: 'No albums available' }, lang)}
             </h3>
             <p className="text-sm text-stone-500 max-w-xs">
-              Sigue coleccionando postales para descubrir nuevos álbumes.
+              {t({ es: 'Sigue coleccionando postales para descubrir nuevos álbumes.', en: 'Keep collecting postcards to discover new albums.' }, lang)}
             </p>
           </div>
         )}

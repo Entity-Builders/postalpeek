@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Globe, Search, X, Sparkles, ChevronDown, Gem } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { useLang, t } from '../utils/i18n';
 
 /* ── Country → flag emoji helper ── */
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -55,6 +56,7 @@ export function WalkerFilterMenu({
   onSpotlightSearch,
   onSpotlightDismiss,
 }: WalkerFilterMenuProps) {
+  const lang = useLang();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -114,7 +116,7 @@ export function WalkerFilterMenu({
               className='absolute inset-0 w-full h-full opacity-0 cursor-pointer'
               aria-label='Select country'
             >
-              <option value=''>🌍 Global</option>
+              <option value=''>{t({ es: '🌍 Global', en: '🌍 Global' }, lang)}</option>
               {availableCountries.map((country) => (
                 <option key={country} value={country}>
                   {getCountryFlag(country)} {country}
@@ -135,7 +137,7 @@ export function WalkerFilterMenu({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder={isFocused ? 'Ej: "gatos en tokio", "lluvia", "noche"' : 'Buscar postales...'}
+            placeholder={isFocused ? t({ es: 'Ej: "gatos en tokio", "lluvia", "noche"', en: 'Ex: "cats in tokyo", "rain", "night"' }, lang) : t({ es: 'Buscar postales...', en: 'Search postcards...' }, lang)}
             className={cn(
               'flex-1 min-w-0 bg-transparent pr-10 py-2.5 text-sm text-stone-100 placeholder:text-stone-400 focus:outline-none transition-all duration-300',
               isFocused ? 'pl-2' : 'pl-2.5',

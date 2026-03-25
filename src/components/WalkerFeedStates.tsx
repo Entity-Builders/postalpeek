@@ -1,5 +1,6 @@
 import React from 'react';
 import { Map, Route, Compass } from 'lucide-react';
+import { useLang, t } from '../utils/i18n';
 
 export function WalkerLoadingState() {
   return (
@@ -116,6 +117,7 @@ export function WalkerEmptyState({
   primaryActionText?: string;
   icon?: React.ElementType;
 }) {
+  const lang = useLang();
   const [timeLeft, setTimeLeft] = React.useState<string>('00:00:00');
 
   React.useEffect(() => {
@@ -157,13 +159,13 @@ export function WalkerEmptyState({
         {lastRefillAt ? (
            <>
              <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-2 drop-shadow-sm'>
-               ¡Sobre vacío!
+               {t({ es: '¡Sobre vacío!', en: 'Empty envelope!' }, lang)}
              </h3>
              <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-6'>
-               Te quedaste sin postales por hoy. Volvé mañana para abrir un nuevo sobre.
+               {t({ es: 'Te quedaste sin postales por hoy. Volvé mañana para abrir un nuevo sobre.', en: 'You ran out of postcards for today. Come back tomorrow to open a new envelope.' }, lang)}
              </p>
              <div className='px-6 py-3 bg-white/50 border border-amber-200/50 rounded-2xl mb-6 shadow-inner'>
-               <p className='text-sm text-stone-500 font-medium mb-1 uppercase tracking-wider text-[10px]'>Nuevas postales en:</p>
+               <p className='text-sm text-stone-500 font-medium mb-1 uppercase tracking-wider text-[10px]'>{t({ es: 'Nuevas postales en:', en: 'New postcards in:' }, lang)}</p>
                <p className='text-3xl font-mono text-amber-600 font-bold tracking-tight'>{timeLeft}</p>
              </div>
              {onUnlockMore && (
@@ -172,17 +174,17 @@ export function WalkerEmptyState({
                  className="group relative w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 rounded-2xl flex items-center justify-center gap-2 overflow-hidden shadow-lg hover:shadow-indigo-500/30 active:scale-95 cursor-pointer mb-3"
                >
                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-                 <span className="text-sm font-semibold text-white tracking-wide">Desbloquear 3 sobres más</span>
+                 <span className="text-sm font-semibold text-white tracking-wide">{t({ es: 'Desbloquear 3 sobres más', en: 'Unlock 3 more envelopes' }, lang)}</span>
                </button>
              )}
            </>
         ) : (
            <>
              <h3 className='font-serif text-2xl md:text-3xl font-medium tracking-tight text-stone-800 mb-3 drop-shadow-sm'>
-               {title || 'Región sin explorar'}
+               {title || t({ es: 'Región sin explorar', en: 'Unexplored region' }, lang)}
              </h3>
              <p className='text-sm md:text-base font-light text-stone-600 leading-relaxed max-w-[280px] mb-8'>
-               {message || 'Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.'}
+               {message || t({ es: 'Todavía no hay postales disponibles en esta zona. Ayudanos a explorar nuevos lugares o volvé al mapa global.', en: 'No postcards available in this zone yet. Help us explore new places or return to the global map.' }, lang)}
              </p>
            </>
         )}
@@ -194,7 +196,7 @@ export function WalkerEmptyState({
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/10 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
             {!primaryActionText && <Map className="w-4 h-4 text-amber-400 group-hover:-translate-y-0.5 transition-transform duration-300" strokeWidth={2.5} />}
-            <span className="text-sm font-semibold text-white tracking-wide">{primaryActionText || 'Volver a todas'}</span>
+            <span className="text-sm font-semibold text-white tracking-wide">{primaryActionText || t({ es: 'Volver a todas', en: 'Back to all' }, lang)}</span>
           </button>
         )}
       </div>
@@ -205,14 +207,15 @@ export function WalkerEmptyState({
 
 
 export function WalkerTripsEmptyState() {
+  const lang = useLang();
   return (
     <div className='w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[600px] h-full gap-3 z-20'>
       <Route className='w-16 h-16 mb-1 text-amber-400/80' />
       <p className='text-lg font-medium tracking-wide text-center text-stone-600'>
-        No trips yet
+        {t({ es: 'Sin viajes aún', en: 'No trips yet' }, lang)}
       </p>
       <p className='text-sm font-light text-center text-stone-400'>
-        The Walker hasn't started any journeys in this region yet.
+        {t({ es: 'Walker no ha comenzado ningún recorrido en esta región todavía.', en: 'The Walker hasn\'t started any journeys in this region yet.' }, lang)}
       </p>
     </div>
   );

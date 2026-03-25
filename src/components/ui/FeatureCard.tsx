@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
-import { t } from '../../utils/i18n';
+import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { CityLabel } from './CityLabel';
 
@@ -26,8 +26,9 @@ export const FeatureCard = React.memo(function FeatureCard({ item, index, onClic
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
 
   const [loaded, setLoaded] = React.useState(false);
+  const lang = useLang();
 
-  const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category);
+  const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category, lang);
 
   /* Responsive sizes — full-width card */
   const sizes = '(min-width:1280px) 80vw, 95vw';

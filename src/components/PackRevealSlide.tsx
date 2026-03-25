@@ -4,6 +4,7 @@ import { BookOpen } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { cdnImage } from '../utils/imageUtils';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface PackRevealSlideProps {
   cards: FeedItem[];
@@ -22,6 +23,7 @@ export function PackRevealSlide({
   albumPostcardIds,
   onAllCollected,
 }: PackRevealSlideProps) {
+  const lang = useLang();
   // Start with all cards: index 0 is the BOTTOM (behind), last is the TOP (front/interactive)
   const [remaining, setRemaining] = useState<FeedItem[]>(() => [...cards]);
   const [flyingId, setFlyingId] = useState<string | null>(null);
@@ -62,8 +64,8 @@ export function PackRevealSlide({
         className='text-sm font-medium text-stone-600'
       >
         {remaining.length > 0
-          ? `Tocá para guardar · ${remaining.length} ${remaining.length === 1 ? 'postal' : 'postales'}`
-          : '¡Listo! Guardadas en tu colección'}
+          ? t({ es: `Tocá para guardar · ${remaining.length} ${remaining.length === 1 ? 'postal' : 'postales'}`, en: `Tap to save · ${remaining.length} ${remaining.length === 1 ? 'postcard' : 'postcards'}` }, lang)
+          : t({ es: '¡Listo! Guardadas en tu colección', en: 'Done! Saved to your collection' }, lang)}
       </motion.p>
 
       {/* Stack */}
@@ -131,7 +133,7 @@ export function PackRevealSlide({
                   {/* Top card indicator */}
                   {isTop && !isFlying && (
                     <div className='absolute top-3 left-3 bg-white/90 backdrop-blur-sm rounded-full px-2.5 py-1 text-[11px] font-semibold text-stone-700 shadow-sm'>
-                      Tocá para guardar
+                      {t({ es: 'Tocá para guardar', en: 'Tap to save' }, lang)}
                     </div>
                   )}
                 </div>
@@ -161,7 +163,9 @@ export function PackRevealSlide({
         transition={{ delay: 0.8 }}
         className='text-xs text-stone-400'
       >
-        {remaining.length > 0 ? 'Deslizá hacia abajo para explorar el feed' : 'Deslizá para seguir explorando'}
+        {remaining.length > 0 
+          ? t({ es: 'Deslizá hacia abajo para explorar el feed', en: 'Swipe down to explore the feed' }, lang) 
+          : t({ es: 'Deslizá para seguir explorando', en: 'Swipe to keep exploring' }, lang)}
       </motion.p>
     </div>
   );

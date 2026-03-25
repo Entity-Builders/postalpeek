@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
-import { t } from '../../utils/i18n';
+import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { CityLabel } from './CityLabel';
 
@@ -35,8 +35,9 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
 
   const [loaded, setLoaded] = React.useState(false);
+  const lang = useLang();
 
-  const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category);
+  const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category, lang);
   const storytelling = item.generation_metadata?.storytelling;
 
   const { aspectRatio, showCaption, monumental } = layout;
@@ -152,10 +153,10 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
                   <span className="inline-block text-[9px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">
                     {FACT_EMOJI[storytelling.fact_type] || '📖'}{' '}
-                    {storytelling.fact_type || 'Dato'}
+                    {storytelling.fact_type || t({ es: 'Dato', en: 'Fact' }, lang)}
                   </span>
                   <p className="text-[10px] text-white/90 leading-snug line-clamp-2">
-                    💡 {t(storytelling.did_you_know)}
+                    💡 {t(storytelling.did_you_know, lang)}
                   </p>
                 </div>
               </motion.div>
@@ -166,7 +167,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
           {storytelling && loaded && (
             <div className="absolute top-1.5 left-1.5 z-20">
               <span className="bg-black/40 backdrop-blur-sm text-[10px] px-1.5 py-0.5 rounded-full border border-white/15 shadow-sm"
-                title="Tiene dato curioso"
+                title={t({ es: 'Tiene dato curioso', en: 'Has fun fact' }, lang)}
               >
                 {FACT_EMOJI[storytelling.fact_type] || '📖'}
               </span>

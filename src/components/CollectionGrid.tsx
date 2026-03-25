@@ -475,12 +475,12 @@ export function CollectionGrid({
         </button>
 
         <h2 className='font-serif text-lg text-stone-800 tracking-tight'>
-          Mi Colección
+          {t({ es: 'Mi Colección', en: 'My Collection' }, lang)}
         </h2>
 
         <div className='text-right'>
           <span className='text-xs text-stone-400 font-mono'>
-            {claimStatus.daily_used}/{claimStatus.daily_limit} hoy
+            {t({ es: `${claimStatus.daily_used}/${claimStatus.daily_limit} hoy`, en: `${claimStatus.daily_used}/${claimStatus.daily_limit} today` }, lang)}
           </span>
         </div>
       </div>
@@ -499,7 +499,7 @@ export function CollectionGrid({
               }`}
             >
               {section.icon}
-              {section.label}
+              {section.key === 'albums' ? t({ es: 'Álbumes', en: 'Albums' }, lang) : t({ es: 'Postales', en: 'Postcards' }, lang)}
             </button>
           ))}
         </div>
@@ -521,7 +521,7 @@ export function CollectionGrid({
           <div className='px-4 pt-2'>
             <h3 className='font-serif text-lg text-stone-800 flex items-center gap-2 mb-4'>
               <Trophy className='w-5 h-5 text-amber-500' />
-              Álbumes Curados
+              {t({ es: 'Álbumes Curados', en: 'Curated Albums' }, lang)}
             </h3>
             {albums.length > 0 || isLoadingAlbums ? (
               <AlbumList
@@ -533,7 +533,7 @@ export function CollectionGrid({
               <div className='flex flex-col items-center py-8 text-center bg-stone-50 rounded-2xl border border-stone-200'>
                 <span className='text-4xl mb-3'>📚</span>
                 <p className='text-sm text-stone-400 max-w-xs'>
-                  Los álbumes curados irán apareciendo aquí.
+                  {t({ es: 'Los álbumes curados irán apareciendo aquí.', en: 'Curated albums will appear here.' }, lang)}
                 </p>
               </div>
             )}
@@ -581,13 +581,13 @@ export function CollectionGrid({
           <div className='flex items-center justify-between mb-3'>
             <h3 className='font-serif text-base text-stone-700 flex items-center gap-2'>
               <Package className='w-4 h-4 text-stone-500' />
-              {showOnlyFavorites ? 'Favoritos' : 'Postales'}
+              {showOnlyFavorites ? t({ es: 'Favoritos', en: 'Favorites' }, lang) : t({ es: 'Postales', en: 'Postcards' }, lang)}
             </h3>
             <span className='text-xs text-stone-400 font-mono'>
               {filteredItems.length}{' '}
               {filteredItems.length !== allItems.length
-                ? `de ${showOnlyFavorites ? favoriteIds.size : allItems.length}`
-                : showOnlyFavorites ? 'favoritos' : 'postales'}
+                ? t({ es: `de ${showOnlyFavorites ? favoriteIds.size : allItems.length}`, en: `of ${showOnlyFavorites ? favoriteIds.size : allItems.length}` }, lang)
+                : showOnlyFavorites ? t({ es: 'favoritos', en: 'favorites' }, lang) : t({ es: 'postales', en: 'postcards' }, lang)}
             </span>
           </div>
 
@@ -600,23 +600,23 @@ export function CollectionGrid({
                 <div className='flex flex-col items-center py-10 text-center'>
                   <span className='text-5xl mb-4'>🔍</span>
                   <h3 className='font-serif text-lg text-stone-700 mb-2'>
-                    No encontramos &ldquo;{searchQuery.trim()}&rdquo;
+                    {t({ es: `No encontramos "${searchQuery.trim()}"`, en: `We couldn't find "${searchQuery.trim()}"` }, lang)}
                   </h3>
                   <p className='text-sm text-stone-400 max-w-xs mb-6'>
-                    Probá con otras palabras o explorá el feed para descubrir nuevas postales.
+                    {t({ es: 'Probá con otras palabras o explorá el feed para descubrir nuevas postales.', en: 'Try other words or explore the feed to discover new postcards.' }, lang)}
                   </p>
                   <div className='flex gap-3'>
                     <button
                       onClick={() => setSearchQuery('')}
                       className='px-5 py-2 rounded-full border border-stone-300 text-stone-600 text-sm font-medium hover:bg-stone-100 transition-colors'
                     >
-                      Limpiar búsqueda
+                      {t({ es: 'Limpiar búsqueda', en: 'Clear search' }, lang)}
                     </button>
                     <button
                       onClick={onClose}
                       className='px-5 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition-colors'
                     >
-                      Ir al feed
+                      {t({ es: 'Ir al feed', en: 'Go to feed' }, lang)}
                     </button>
                   </div>
                 </div>
@@ -624,27 +624,26 @@ export function CollectionGrid({
                 <div className='flex flex-col items-center py-10 text-center'>
                   <span className='text-5xl mb-4'>♥</span>
                   <h3 className='font-serif text-lg text-stone-700 mb-2'>
-                    Sin favoritos todavía
+                    {t({ es: 'Sin favoritos todavía', en: 'No favorites yet' }, lang)}
                   </h3>
                   <p className='text-sm text-stone-400 max-w-xs'>
-                    Tocá el <span className='text-rose-400'>♥</span> en las
-                    postales que te gusten.
+                    {t({ es: 'Tocá el ♥ en las postales que te gusten.', en: 'Tap the ♥ on the postcards you like.' }, lang)}
                   </p>
                 </div>
               ) : (
                 <div className='flex flex-col items-center py-10 text-center'>
                   <span className='text-5xl mb-4'>🃏</span>
                   <h3 className='font-serif text-lg text-stone-700 mb-2'>
-                    Tu colección está vacía
+                    {t({ es: 'Tu colección está vacía', en: 'Your collection is empty' }, lang)}
                   </h3>
                   <p className='text-sm text-stone-400 max-w-xs'>
-                    ¡Empezá a reclamar postales del feed para llenar tu colección!
+                    {t({ es: '¡Empezá a reclamar postales del feed para llenar tu colección!', en: 'Start claiming postcards from the feed to fill your collection!' }, lang)}
                   </p>
                   <button
                     onClick={onClose}
                     className='mt-4 px-5 py-2 rounded-full bg-stone-800 text-white text-sm font-medium hover:bg-stone-900 transition-colors'
                   >
-                    Explorar postales
+                    {t({ es: 'Explorar postales', en: 'Explore postcards' }, lang)}
                   </button>
                 </div>
               )

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Sparkles } from 'lucide-react';
 import { analytics } from '../lib/analytics';
+import { useLang, t } from '../utils/i18n';
 
 interface EnvelopeSlideProps {
   isLoading: boolean;
@@ -9,6 +10,7 @@ interface EnvelopeSlideProps {
 }
 
 export function EnvelopeSlide({ isLoading, onOpen }: EnvelopeSlideProps) {
+  const lang = useLang();
   const handleOpen = () => {
     analytics.track('daily_pack_envelope_tapped');
     onOpen();
@@ -57,7 +59,7 @@ export function EnvelopeSlide({ isLoading, onOpen }: EnvelopeSlideProps) {
             transition={{ delay: 0.15 }}
             className='font-serif text-2xl font-bold text-stone-800 mb-1'
           >
-            ¡Tu sobre diario llegó!
+            {t({ es: '¡Tu sobre diario llegó!', en: 'Your daily envelope has arrived!' }, lang)}
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
@@ -65,7 +67,7 @@ export function EnvelopeSlide({ isLoading, onOpen }: EnvelopeSlideProps) {
             transition={{ delay: 0.25 }}
             className='text-stone-500 text-sm'
           >
-            Tenés postales nuevas esperándote
+            {t({ es: 'Tenés postales nuevas esperándote', en: 'New postcards are waiting for you' }, lang)}
           </motion.p>
         </div>
       </motion.div>
@@ -100,7 +102,7 @@ export function EnvelopeSlide({ isLoading, onOpen }: EnvelopeSlideProps) {
         ) : (
           <Mail className='w-5 h-5' />
         )}
-        <span>{isLoading ? 'Abriendo...' : 'Abrir sobre'}</span>
+        <span>{isLoading ? t({ es: 'Abriendo...', en: 'Opening...' }, lang) : t({ es: 'Abrir sobre', en: 'Open envelope' }, lang)}</span>
       </motion.button>
 
       {/* Swipe hint */}
@@ -110,7 +112,7 @@ export function EnvelopeSlide({ isLoading, onOpen }: EnvelopeSlideProps) {
         transition={{ delay: 0.8 }}
         className='text-xs text-stone-400'
       >
-        o deslizá hacia abajo para explorar el feed
+        {t({ es: 'o deslizá hacia abajo para explorar el feed', en: 'or swipe down to explore the feed' }, lang)}
       </motion.p>
     </div>
   );

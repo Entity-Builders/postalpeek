@@ -6,7 +6,7 @@ import type { FeedItem } from './Postcard';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { sway } from '../utils/useWelcomeAnimation';
-import { t } from '../utils/i18n';
+import { useLang, t } from '../utils/i18n';
 import { analytics } from '../lib/analytics';
 
 interface AuthCTASectionProps {
@@ -15,6 +15,7 @@ interface AuthCTASectionProps {
 }
 
 export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionProps) {
+  const lang = useLang();
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -50,7 +51,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
       analytics.track('cta_email_submitted', { email_domain: email.split('@')[1] || 'unknown' });
       setStep('otp');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : t({ es: 'Algo salió mal', en: 'Something went wrong' }, lang));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
       analytics.track('cta_otp_verified');
       onSuccess();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Código inválido. Intentá de nuevo.');
+      setError(err instanceof Error ? err.message : t({ es: 'Código inválido. Intentá de nuevo.', en: 'Invalid code. Try again.' }, lang));
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
       if (error) throw error;
       setOtpCode('');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'No se pudo reenviar');
+      setError(err instanceof Error ? err.message : t({ es: 'No se pudo reenviar', en: 'Could not resend' }, lang));
     } finally {
       setLoading(false);
     }
@@ -161,15 +162,16 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
 
         {/* Headline */}
         <p className="text-stone-400 text-[10px] font-mono tracking-[0.25em] uppercase mb-1.5 text-center">
-          Walker sigue caminando.
+          {t({ es: 'Walker sigue caminando.', en: 'Walker keeps walking.' }, lang)}
         </p>
-        <h2 className="font-serif text-2xl sm:text-3xl text-stone-800 tracking-tight mb-1 text-center">
-          Miles de postales<br />te esperan.
+        <h2 className="font-serif text-2xl sm:text-3xl text-stone-800 tracking-tight mb-1 text-center leading-tight">
+          {t({ es: 'Miles de postales', en: 'Thousands of postcards' }, lang)}<br />
+          {t({ es: 'te esperan.', en: 'await you.' }, lang)}
         </h2>
         <p className="text-stone-500 text-sm text-center mb-6 font-light leading-relaxed">
           {step === 'email'
-            ? 'Coleccioná, completá álbumes y jugá con Walker gratis.'
-            : 'Revisá tu casilla — te enviamos un código de 6 dígitos.'}
+            ? t({ es: 'Coleccioná, completá álbumes y jugá con Walker gratis.', en: 'Collect, complete albums and play with Walker for free.' }, lang)
+            : t({ es: 'Revisá tu casilla — te enviamos un código de 6 dígitos.', en: 'Check your inbox — we sent you a 6-digit code.' }, lang)}
         </p>
 
         {/* Auth form */}
@@ -186,7 +188,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                 <input
                   type="email"
-                  placeholder="tu@email.com"
+                  placeholder={t({ es: 'tu@email.com', en: 'you@email.com' }, lang)}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -202,10 +204,10 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
                 disabled={loading || !email}
                 className="w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '✉️  Unirme gratis'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : `✉️  ${t({ es: 'Unirme gratis', en: 'Join for free' }, lang)}`}
               </button>
               <p className="text-center text-xs text-stone-400">
-                Sin contraseña — te enviamos un código mágico.
+                {t({ es: 'Sin contraseña — te enviamos un código mágico.', en: 'No password — we send you a magic code.' }, lang)}
               </p>
             </form>
           ) : (
@@ -223,7 +225,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
-                placeholder="Código de 6 dígitos"
+                placeholder={t({ es: 'Código de 6 dígitos', en: '6-digit code' }, lang)}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 required
@@ -235,7 +237,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
                 disabled={loading || otpCode.length < 6}
                 className="w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verificar código'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t({ es: 'Verificar código', en: 'Verify code' }, lang)}
               </button>
               <button
                 type="button"
@@ -243,7 +245,7 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
                 disabled={loading}
                 className="text-sm text-stone-400 hover:text-stone-600 transition-colors text-center"
               >
-                ¿No llegó? Reenviar
+                {t({ es: '¿No llegó? Reenviar', en: 'Didn\'t arrive? Resend' }, lang)}
               </button>
             </form>
           )}
