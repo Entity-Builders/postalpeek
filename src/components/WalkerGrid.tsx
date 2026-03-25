@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
-import Masonry from 'react-masonry-css';
 import { Loader2 } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import type { User } from '@supabase/supabase-js';
@@ -72,6 +71,11 @@ export function WalkerGrid({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isFetchingRef = useRef(false);
 
+  // ── Reset scroll to top when filter/search changes ──
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [selectedCountry, spotlightQuery]);
+
   // ── Precalculated layout map — O(n) only when items change ──
   const layoutMap = useMemo(() => {
     const map = new Map<string, CardLayout>();
@@ -83,44 +87,7 @@ export function WalkerGrid({
     return map;
   }, [displayItems]);
 
-  // ── Split items into normal + monumental for hybrid layout ──
-  const CHUNK_SIZE = 10; // normal items per masonry chunk
-  const hybridChunks = useMemo(() => {
-    const chunks: Array<{ type: 'masonry'; items: { item: FeedItem; originalIndex: number }[] } | { type: 'feature'; item: FeedItem; originalIndex: number }> = [];
-    let currentChunk: { item: FeedItem; originalIndex: number }[] = [];
-    const monumentalQueue: { item: FeedItem; originalIndex: number }[] = [];
 
-    // Separate monumental items and collect them
-    for (let i = 0; i < displayItems.length; i++) {
-      const item = displayItems[i];
-      if (isMonumentalCard(item)) {
-        monumentalQueue.push({ item, originalIndex: i });
-      } else {
-        currentChunk.push({ item, originalIndex: i });
-      }
-
-      // Every CHUNK_SIZE normal items, flush the chunk and insert a monumental
-      if (currentChunk.length >= CHUNK_SIZE) {
-        chunks.push({ type: 'masonry', items: [...currentChunk] });
-        currentChunk = [];
-        if (monumentalQueue.length > 0) {
-          const feat = monumentalQueue.shift()!;
-          chunks.push({ type: 'feature', item: feat.item, originalIndex: feat.originalIndex });
-        }
-      }
-    }
-
-    // Flush remaining normal items
-    if (currentChunk.length > 0) {
-      chunks.push({ type: 'masonry', items: [...currentChunk] });
-    }
-    // Flush remaining monumental items as feature cards
-    for (const feat of monumentalQueue) {
-      chunks.push({ type: 'feature', item: feat.item, originalIndex: feat.originalIndex });
-    }
-
-    return chunks;
-  }, [displayItems]);
 
   // ── Stable click handlers — avoids new closure per card per render ──
   const handleCardClick = useCallback(
@@ -225,47 +192,56 @@ export function WalkerGrid({
           </div>
         </div>
 
-        {/* Pinterest masonry grid */}
+        {/* CSS Columns grid — supports column-span: all for feature cards */}
         <div className="w-full max-w-[1800px] mx-auto px-4 md:px-8 pb-4">
           <style>{`
-            .walker-masonry { display: flex; width: auto; gap: 8px; }
-            .walker-masonry_column { display: flex; flex-direction: column; gap: 8px; }
+            .walker-columns {
+              column-count: 2;
+              column-gap: 8px;
+            }
+            .walker-columns > * {
+              break-inside: avoid;
+              margin-bottom: 8px;
+            }
+            .walker-feature {
+              column-span: all;
+              margin-bottom: 8px;
+            }
+            @media (min-width: 768px)  { .walker-columns { column-count: 2; } }
+            @media (min-width: 1024px) { .walker-columns { column-count: 3; } }
           `}</style>
 
           {isLoading ? (
             <SkeletonGrid />
           ) : (
-            <div className="flex flex-col gap-2">
-              {hybridChunks.map((chunk, chunkIdx) => {
-                if (chunk.type === 'feature') {
+            <div className="walker-columns">
+              {(() => {
+                let lastWasFeature = false;
+                return displayItems.map((item, index) => {
+                  if (isMonumentalCard(item) && !lastWasFeature) {
+                    lastWasFeature = true;
+                    return (
+                      <div key={item.id} className="walker-feature">
+                        <FeatureCard
+                          item={item}
+                          index={index}
+                          onClick={() => handleCardClick(index, item)}
+                        />
+                      </div>
+                    );
+                  }
+                  lastWasFeature = false;
                   return (
-                    <FeatureCard
-                      key={`feat-${chunk.item.id}`}
-                      item={chunk.item}
-                      index={chunk.originalIndex}
-                      onClick={() => handleCardClick(chunk.originalIndex, chunk.item)}
+                    <GridCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      layout={layoutMap.get(item.id) || computeCardLayout(item)}
+                      onClick={() => handleCardClick(index, item)}
                     />
                   );
-                }
-                return (
-                  <Masonry
-                    key={`masonry-${chunkIdx}`}
-                    breakpointCols={{ default: 5, 1536: 5, 1280: 4, 1024: 3, 768: 2, 640: 2 }}
-                    className="walker-masonry"
-                    columnClassName="walker-masonry_column"
-                  >
-                    {chunk.items.map(({ item, originalIndex }) => (
-                      <GridCard
-                        key={item.id}
-                        item={item}
-                        index={originalIndex}
-                        layout={layoutMap.get(item.id) || computeCardLayout(item)}
-                        onClick={() => handleCardClick(originalIndex, item)}
-                      />
-                    ))}
-                  </Masonry>
-                );
-              })}
+                });
+              })()}
             </div>
           )}
         </div>

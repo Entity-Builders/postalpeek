@@ -147,7 +147,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   /* Masonry breakpoints → column widths (approx):
      5 cols @ ≥1536 ≈ 20vw,  4 cols @ ≥1280 ≈ 25vw,
      3 cols @ ≥1024 ≈ 33vw,  2 cols @ ≥640  ≈ 50vw */
-  const sizes = '(min-width:1536px) 20vw, (min-width:1280px) 25vw, (min-width:1024px) 33vw, 50vw';
+  const sizes = '(min-width:1024px) 33vw, 50vw';
 
   // ── Scroll-vs-tap detection ───────────────────────────────────────
   // Distance threshold: if the finger moves more than this many px, it's a drag.
