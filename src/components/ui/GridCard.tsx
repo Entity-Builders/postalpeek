@@ -40,6 +40,46 @@ const ASPECT_RATIOS = [
   '2/3',   // tallest
 ] as const;
 
+/** Normalize a category object/string into a searchable lowercase string */
+function normCategory(catObj: string | { en?: string; es?: string } | undefined): string {
+  let category = '';
+  if (typeof catObj === 'string') {
+    category = catObj.toLowerCase();
+  } else if (catObj) {
+    category = [catObj.en, catObj.es].filter(Boolean).join(' ').toLowerCase();
+  }
+  return category.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Scene types that qualify a postcard as "monumental" (full-width in grid) */
+const MONUMENTAL_SCENE_TYPES = new Set([
+  'historic_center', 'plaza', 'monument', 'landmark',
+  'cathedral', 'church', 'palace', 'temple', 'castle',
+]);
+
+/** Category keywords that qualify a postcard as "monumental" */
+const MONUMENTAL_KEYWORDS = [
+  'monument', 'landmark', 'architecture', 'arquitectura',
+  'historical', 'historico', 'iglesia', 'church',
+  'cathedral', 'catedral', 'palace', 'palacio',
+  'temple', 'templo', 'castle', 'castillo',
+  'basilica', 'basilica', 'centro historico', 'historic center',
+];
+
+/** Returns true if this postcard should display as a full-width feature card */
+export function isMonumentalCard(item: FeedItem): boolean {
+  // Check scene_type
+  const scene = (item.scene_type || '').toLowerCase().trim();
+  if (MONUMENTAL_SCENE_TYPES.has(scene)) return true;
+
+  // Check rarity
+  if (item.rarity === 'legendary' || item.rarity === 'epic') return true;
+
+  // Check category keywords
+  const catNorm = normCategory(item.category);
+  return MONUMENTAL_KEYWORDS.some(kw => catNorm.includes(kw));
+}
+
 /** Precalculate layout for a single item (pure, no side effects) */
 export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
   const isItem = typeof itemOrId !== 'string';
@@ -50,37 +90,13 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
   let showCaption = h > 0.45;
 
   if (isItem) {
-    const rarity = itemOrId.rarity;
-    const catObj = itemOrId.category;
-    // Build a combined string from ALL available languages for matching
-    let category = '';
-    if (typeof catObj === 'string') {
-      category = catObj.toLowerCase();
-    } else if (catObj) {
-      category = [catObj.en, catObj.es].filter(Boolean).join(' ').toLowerCase();
-    }
-    // Normalize accented characters for matching
-    const categoryNorm = category.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const categoryNorm = normCategory(itemOrId.category);
     
     // Important = square card, always show caption
-    const isImportant = 
-      rarity === 'legendary' || 
-      rarity === 'epic' || 
-      categoryNorm.includes('monument') ||
-      categoryNorm.includes('landmark') || 
-      categoryNorm.includes('architecture') ||
-      categoryNorm.includes('arquitectura') ||
-      categoryNorm.includes('historical') ||
-      categoryNorm.includes('historico') ||
-      categoryNorm.includes('iglesia') ||
-      categoryNorm.includes('church') ||
-      categoryNorm.includes('cathedral') ||
-      categoryNorm.includes('catedral') ||
-      categoryNorm.includes('palace') ||
-      categoryNorm.includes('palacio');
+    const isImportant = isMonumentalCard(itemOrId);
 
     const isBasic = 
-      rarity === 'common' || 
+      itemOrId.rarity === 'common' || 
       categoryNorm.includes('street') || 
       categoryNorm.includes('calle') ||
       categoryNorm.includes('object') ||

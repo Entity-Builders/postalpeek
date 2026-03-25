@@ -24,24 +24,14 @@ export function useWalkerFeed() {
   const selectedCountryRef = useRef(selectedCountry);
 
   // Parse Initial URL State
-  // Routes: /feed, /feed/:country, /:shortcode, /:shortcode (share link)
+  // Routes: /feed, /feed/country/:country, /:shortcode
   useEffect(() => {
     const rawSegments = window.location.pathname.split('/').filter(Boolean);
-    const APP_ROUTES = ['feed', 'collection', 'album', 'admin', 'p'];
 
-    // Strip the /feed prefix to get meaningful segments
-    const segments = rawSegments[0] === 'feed' ? rawSegments.slice(1) : rawSegments;
-    const isUnderFeed = rawSegments[0] === 'feed';
-
-    if (isUnderFeed && segments.length === 1) {
-      // /feed/:country — e.g. /feed/Argentina
-      if (APP_ROUTES.includes(segments[0])) return;
-      const decodedCountry = decodeURIComponent(segments[0]).replace(/-/g, ' ');
+    // /feed/country/:country — e.g. /feed/country/Argentina
+    if (rawSegments[0] === 'feed' && rawSegments[1] === 'country' && rawSegments[2]) {
+      const decodedCountry = decodeURIComponent(rawSegments[2]).replace(/-/g, ' ');
       setSelectedCountry(decodedCountry);
-    } else if (!isUnderFeed && segments.length === 1) {
-      // /:shortcode — share link (not an app route)
-      if (APP_ROUTES.includes(segments[0])) return;
-      // Don't set country for share links — handled in fetchInitialFeed
     }
   }, []);
 

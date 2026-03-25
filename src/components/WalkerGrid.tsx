@@ -7,8 +7,9 @@ import { analytics } from '../lib/analytics';
 import { WalkerFilterMenu } from './WalkerFilterMenu';
 import { AuthCTASection } from './AuthCTASection';
 import { SkeletonGrid } from './ui/SkeletonCard';
-import { GridCard, computeCardLayout } from './ui/GridCard';
+import { GridCard, computeCardLayout, isMonumentalCard } from './ui/GridCard';
 import type { CardLayout } from './ui/GridCard';
+import { FeatureCard } from './ui/FeatureCard';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { motion } from 'framer-motion';
@@ -80,6 +81,45 @@ export function WalkerGrid({
       }
     }
     return map;
+  }, [displayItems]);
+
+  // ── Split items into normal + monumental for hybrid layout ──
+  const CHUNK_SIZE = 10; // normal items per masonry chunk
+  const hybridChunks = useMemo(() => {
+    const chunks: Array<{ type: 'masonry'; items: { item: FeedItem; originalIndex: number }[] } | { type: 'feature'; item: FeedItem; originalIndex: number }> = [];
+    let currentChunk: { item: FeedItem; originalIndex: number }[] = [];
+    const monumentalQueue: { item: FeedItem; originalIndex: number }[] = [];
+
+    // Separate monumental items and collect them
+    for (let i = 0; i < displayItems.length; i++) {
+      const item = displayItems[i];
+      if (isMonumentalCard(item)) {
+        monumentalQueue.push({ item, originalIndex: i });
+      } else {
+        currentChunk.push({ item, originalIndex: i });
+      }
+
+      // Every CHUNK_SIZE normal items, flush the chunk and insert a monumental
+      if (currentChunk.length >= CHUNK_SIZE) {
+        chunks.push({ type: 'masonry', items: [...currentChunk] });
+        currentChunk = [];
+        if (monumentalQueue.length > 0) {
+          const feat = monumentalQueue.shift()!;
+          chunks.push({ type: 'feature', item: feat.item, originalIndex: feat.originalIndex });
+        }
+      }
+    }
+
+    // Flush remaining normal items
+    if (currentChunk.length > 0) {
+      chunks.push({ type: 'masonry', items: [...currentChunk] });
+    }
+    // Flush remaining monumental items as feature cards
+    for (const feat of monumentalQueue) {
+      chunks.push({ type: 'feature', item: feat.item, originalIndex: feat.originalIndex });
+    }
+
+    return chunks;
   }, [displayItems]);
 
   // ── Stable click handlers — avoids new closure per card per render ──
@@ -195,21 +235,38 @@ export function WalkerGrid({
           {isLoading ? (
             <SkeletonGrid />
           ) : (
-            <Masonry
-              breakpointCols={{ default: 5, 1536: 5, 1280: 4, 1024: 3, 768: 2, 640: 2 }}
-              className="walker-masonry"
-              columnClassName="walker-masonry_column"
-            >
-              {displayItems.map((item, index) => (
-                <GridCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  layout={layoutMap.get(item.id) || computeCardLayout(item)}
-                  onClick={() => handleCardClick(index, item)}
-                />
-              ))}
-            </Masonry>
+            <div className="flex flex-col gap-2">
+              {hybridChunks.map((chunk, chunkIdx) => {
+                if (chunk.type === 'feature') {
+                  return (
+                    <FeatureCard
+                      key={`feat-${chunk.item.id}`}
+                      item={chunk.item}
+                      index={chunk.originalIndex}
+                      onClick={() => handleCardClick(chunk.originalIndex, chunk.item)}
+                    />
+                  );
+                }
+                return (
+                  <Masonry
+                    key={`masonry-${chunkIdx}`}
+                    breakpointCols={{ default: 5, 1536: 5, 1280: 4, 1024: 3, 768: 2, 640: 2 }}
+                    className="walker-masonry"
+                    columnClassName="walker-masonry_column"
+                  >
+                    {chunk.items.map(({ item, originalIndex }) => (
+                      <GridCard
+                        key={item.id}
+                        item={item}
+                        index={originalIndex}
+                        layout={layoutMap.get(item.id) || computeCardLayout(item)}
+                        onClick={() => handleCardClick(originalIndex, item)}
+                      />
+                    ))}
+                  </Masonry>
+                );
+              })}
+            </div>
           )}
         </div>
 

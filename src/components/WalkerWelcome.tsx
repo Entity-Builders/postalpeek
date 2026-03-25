@@ -120,16 +120,18 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
                 </motion.div>
               </AnimatePresence>
 
-              {/* PostalPeek stamp */}
+              {/* Postmark stamp */}
               <motion.div
-                className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-white shadow-lg border border-stone-200/60 flex items-center justify-center z-10"
+                className="absolute -top-2 -right-2 w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-stone-500/30 flex items-center justify-center rotate-12 pointer-events-none z-20"
                 initial={{ scale: 0, rotate: -20 }}
-                animate={{ scale: 1, rotate: 0 }}
+                animate={{ scale: 1, rotate: 12 }}
                 transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 20 }}
               >
-                <span className="text-[9px] font-mono font-bold text-stone-600 uppercase leading-none text-center">
-                  Postal<br />Peek
-                </span>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-stone-500/40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
+                  <span className="font-mono text-[5px] sm:text-[6px] text-stone-600 uppercase tracking-wider text-center leading-tight">
+                    Postal<br />Peek
+                  </span>
+                </div>
               </motion.div>
             </div>
 
@@ -165,16 +167,18 @@ export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease, delay: 0.2 }}
           >
-            {/* PostalPeek stamp logo */}
+            {/* PostalPeek postmark logo */}
             <motion.div
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white shadow-xl border-2 border-stone-200/60 flex items-center justify-center mb-4"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-[3px] border-stone-500/40 flex items-center justify-center mb-4 rotate-12"
               initial={{ scale: 0, rotate: -30 }}
-              animate={{ scale: 1, rotate: 0 }}
+              animate={{ scale: 1, rotate: 12 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 250, damping: 18 }}
             >
-              <span className="text-[11px] sm:text-[13px] font-mono font-bold text-stone-700 uppercase leading-none text-center tracking-tight">
-                Postal<br />Peek
-              </span>
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-stone-500/50 flex items-center justify-center bg-white/30 backdrop-blur-sm">
+                <span className="font-mono text-[10px] sm:text-[12px] text-stone-700 uppercase tracking-wider text-center leading-tight font-bold">
+                  Postal<br />Peek
+                </span>
+              </div>
             </motion.div>
 
             <motion.p

@@ -136,6 +136,7 @@ function App() {
       <Routes>
         {/* SEO-friendly feed route */}
         <Route path="/feed" element={feedElement} />
+        <Route path="/feed/country/:country" element={feedElement} />
         <Route path="/feed/collection" element={feedElement} />
         <Route path="/feed/album/:albumId" element={feedElement} />
 

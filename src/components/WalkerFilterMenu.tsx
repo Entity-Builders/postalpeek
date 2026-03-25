@@ -20,7 +20,7 @@ interface WalkerFilterMenuProps {
 export function WalkerFilterMenu({
   isIdle,
   availableCountries,
-  unlockedCountries,
+  // unlockedCountries not destructured — restriction temporarily removed for MVP
   selectedCountry,
   onSelectCountry,
   isLoggedIn,
@@ -102,24 +102,14 @@ export function WalkerFilterMenu({
           <select
             value={selectedCountry || ''}
             onChange={(e) => {
-              const val = e.target.value;
-              if (!val) {
-                onSelectCountry(null);
-                return;
-              }
-              if (unlockedCountries.has(val)) {
-                onSelectCountry(val);
-              } else {
-                alert(`¡Completa un álbum de ${val} para desbloquear este destino!`);
-                e.target.value = selectedCountry || '';
-              }
+              onSelectCountry(e.target.value || null);
             }}
             className='h-full bg-black/40 text-stone-100 backdrop-blur-md rounded-full pl-4 pr-8 py-2.5 text-sm border border-white/15 focus:outline-none focus:ring-2 focus:ring-purple-400/60 appearance-none shadow-lg font-medium cursor-pointer'
           >
             <option value=''>Global</option>
             {availableCountries.map((country) => (
               <option key={country} value={country}>
-                {country} {unlockedCountries.has(country) ? '' : '🔒'}
+                {country}
               </option>
             ))}
           </select>

@@ -23,6 +23,7 @@ import { WelcomeToast } from './WelcomeToast';
 import { SearchX } from 'lucide-react';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
+import { FeatureFlags } from '../lib/featureFlags';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SmartSearchResult } from '../hooks/useSmartSearch';
@@ -47,8 +48,8 @@ export function WalkerFeed({
     items,
     availableCountries,
     isLoading,
-    setIsLoading,
     selectedCountry,
+    setSelectedCountry,
     hasSharedCard,
     hasMore,
     isFetchingMore,
@@ -251,14 +252,17 @@ export function WalkerFeed({
   } | null>(null);
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
-  // ── Daily Pack ──
-  const {
-    packCards,
-    isPackAvailable,
-    isLoading: isPackLoading,
-    openPack,
-    clearPack,
-  } = useDailyPack(user?.id);
+  // ── Daily Pack (gated by feature flag) ──
+  const dailyPackFlag = analytics.getFeatureFlag(FeatureFlags.DAILY_PACK);
+  const isDailyPackEnabled = dailyPackFlag === true || dailyPackFlag === 'true';
+
+  const dailyPack = useDailyPack(user?.id);
+  // When the flag is off, suppress all daily-pack state
+  const packCards = isDailyPackEnabled ? dailyPack.packCards : [];
+  const isPackAvailable = isDailyPackEnabled ? dailyPack.isPackAvailable : false;
+  const isPackLoading = dailyPack.isLoading;
+  const openPack = dailyPack.openPack;
+  const clearPack = dailyPack.clearPack;
 
   // PackDone toast — shown after the last card is revealed, stays 5 seconds
   // Focus mode: hide decorative chrome while spotlight search is active
@@ -491,8 +495,8 @@ export function WalkerFeed({
         onSelectCountry={(country) => {
           if (country === selectedCountry) return;
           handleSpotlightDismiss();
-          setIsLoading(true);
-          window.history.pushState({}, '', country ? `/feed/${encodeURIComponent(country).replace(/%20/g, '-')}` : '/feed');
+          setSelectedCountry(country);
+          window.history.pushState({}, '', country ? `/feed/country/${encodeURIComponent(country).replace(/%20/g, '-')}` : '/feed');
         }}
         spotlightResults={spotlightResults}
         spotlightQuery={spotlightQuery}

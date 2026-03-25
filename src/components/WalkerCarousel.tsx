@@ -233,7 +233,7 @@ export function WalkerCarousel({
             /%20/g,
             '-',
           );
-          newUrl = `/${countrySlug}/${hash}`;
+          newUrl = `/feed/country/${countrySlug}#${hash}`;
         }
 
         window.history.replaceState(null, '', newUrl);
