@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Loader2, X } from 'lucide-react';
+import { analytics } from '../lib/analytics';
 
 interface AdminLoginModalProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -19,7 +20,19 @@ export function AdminLoginModal({ onLogin, onClose }: AdminLoginModalProps) {
     try {
       await onLogin(email, password);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      const errorObj = err instanceof Error ? err : new Error(String(err));
+      
+      // Explicitly capture in PostHog since we are handling it locally
+      analytics.captureError(errorObj, { context: 'admin_login' });
+
+      const msg = errorObj.message;
+      if (msg.includes('Load failed') || msg.includes('Failed to fetch')) {
+        setError(
+          "Network Error: Unable to connect. If testing on a device, ensure VITE_SUPABASE_URL points to your Mac's IP, not localhost."
+        );
+      } else {
+        setError(msg || 'Authentication failed');
+      }
     } finally {
       setLoading(false);
     }
