@@ -1,10 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { Info, Ticket, Joystick } from 'lucide-react';
+import React from 'react';
+import { Ticket, Joystick } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
 import { LikeButton } from './ui/LikeButton';
-import { ClaimButton } from './ui/ClaimButton';
 import { ShareButton } from './ui/ShareButton';
 import { CityLabel } from './ui/CityLabel';
 import { AlbumStopIndicator } from './ui/AlbumStopIndicator';
@@ -17,12 +16,6 @@ interface PostcardActionBarProps {
   onToggleFavorite?: (postcardId: string) => void;
   onAuthRequired?: (postcardId: string) => void;
   onFlipCard: (view?: 'info' | 'coupon') => void;
-  isClaimedByMe: boolean;
-  isClaimed: boolean;
-  onClaimPostcard?: (postcardId: string) => void;
-  isClaimLoading: boolean;
-  isInAlbum: boolean;
-  showClaimGuide: boolean;
   hideActions: boolean;
   isClean: boolean;
   isBusiness: boolean;
@@ -39,12 +32,6 @@ export function PostcardActionBar({
   onToggleFavorite,
   onAuthRequired,
   onFlipCard,
-  isClaimedByMe,
-  isClaimed,
-  onClaimPostcard,
-  isClaimLoading,
-  isInAlbum,
-  showClaimGuide,
   hideActions,
   isClean,
   isBusiness,
@@ -53,9 +40,6 @@ export function PostcardActionBar({
   totalStops,
   onPlay,
 }: PostcardActionBarProps) {
-  const [showIdCopied, setShowIdCopied] = useState(false);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didLongPress = useRef(false);
 
   const stopMeta = activeSlideItem.album_sequence != null
     ? albumStops?.[activeSlideItem.album_sequence]
@@ -107,7 +91,7 @@ export function PostcardActionBar({
         {/* Play game button */}
         {onPlay && (
           <button
-            className='flex items-center gap-1.5 px-3 py-1.5 md:px-3.5 md:py-2 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 transition-colors font-medium text-sm'
+            className='flex items-center gap-1.5 px-3 py-1.5 md:px-3.5 md:py-2 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold shadow-sm hover:shadow-md transition-all text-sm animate-pulse-slow'
             onClick={(e) => {
               e.stopPropagation();
               onPlay();

@@ -16,6 +16,8 @@ import { ClaimLimitModal } from './ClaimLimitModal';
 import { CollectionGrid } from './CollectionGrid';
 import { AlbumDetail } from './AlbumDetail';
 import { PostcardDetailModal } from './PostcardDetailModal';
+import { StatusBar } from './StatusBar';
+import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 
 import { ImageLightbox } from './ImageLightbox';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
@@ -45,6 +47,7 @@ export function WalkerFeed({
 }) {
   const lang = useLang();
   const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
+  const [statusBarGameOpen, setStatusBarGameOpen] = useState(false);
 
   const {
     items,
@@ -598,7 +601,7 @@ export function WalkerFeed({
             onClose={() => setIsAlbumsModalOpen(false)}
             onSelectAlbum={(album) => {
               setIsAlbumsModalOpen(false);
-              navigate(`/feed/album/${album.id}`);
+              navigate(`/album/${album.id}`);
             }}
           />
         )}
@@ -611,7 +614,7 @@ export function WalkerFeed({
             onOpenAlbums={() => {
               setShowWelcomeToast(false);
               if (albums.length > 0) {
-                navigate(`/feed/album/${albums[0].id}`);
+                navigate(`/album/${albums[0].id}`);
               } else {
                 navigate('/feed/collection');
                 refetchCollection();
@@ -647,6 +650,45 @@ export function WalkerFeed({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Status Bar (logged-in users, grid mode only) ── */}
+      <AnimatePresence>
+        {user && !isSpotlightMode && !showWelcome && (
+          <StatusBar
+            albums={albums}
+            collectionCount={collection.length}
+            onAlbumTap={(album) => {
+              navigate(`/album/${album.id}`);
+              analytics.track('statusbar_album_tapped', { album_id: album.id });
+            }}
+            onPlayTap={() => {
+              setStatusBarGameOpen(true);
+              analytics.track('statusbar_play_tapped');
+            }}
+            onCollectionTap={() => {
+              navigate('/feed/collection');
+              refetchCollection();
+              analytics.track('statusbar_collection_tapped');
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Game Selector from Status Bar */}
+      <PostcardGameSelector
+        open={statusBarGameOpen}
+        hasHuntMode={false}
+        onSelect={(mode: GameMode) => {
+          setStatusBarGameOpen(false);
+          // Pick a random postcard from collection to play with
+          if (collection.length > 0) {
+            const randomIndex = Math.floor(Math.random() * collection.length);
+            setFocusedIndex(randomIndex);
+            analytics.track('statusbar_game_started', { mode });
+          }
+        }}
+        onClose={() => setStatusBarGameOpen(false)}
+      />
 
       {/* Language Toggle */}
       <LanguageToggle isIdle={isIdle} isOnWelcome={false} />

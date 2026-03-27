@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Puzzle, X } from 'lucide-react';
+import { Search, Puzzle, Stamp, X } from 'lucide-react';
 import { t } from '../utils/i18n';
 
-export type GameMode = 'hunt' | 'puzzle';
+export type GameMode = 'hunt' | 'puzzle' | 'stamp';
 
 interface PostcardGameSelectorProps {
   open: boolean;
@@ -59,38 +59,35 @@ export function PostcardGameSelector({
                 </button>
               </div>
 
-              {/* Options */}
-              <div className="px-4 pb-5 flex gap-3">
+              {/* Options — 3 columns */}
+              <div className="px-4 pb-5 flex gap-2">
                 {/* Hunt mode */}
                 <button
                   onClick={() => onSelect('hunt')}
                   disabled={!hasHuntMode}
-                  className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  className={`flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
                     hasHuntMode
                       ? 'border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 cursor-pointer'
                       : 'border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed'
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    className={`w-9 h-9 rounded-full flex items-center justify-center ${
                       hasHuntMode ? 'bg-amber-200 text-amber-700' : 'bg-stone-200 text-stone-400'
                     }`}
                   >
-                    <Search className="w-5 h-5" />
+                    <Search className="w-4 h-4" />
                   </div>
                   <span
-                    className={`text-xs font-bold ${
+                    className={`text-[11px] font-bold ${
                       hasHuntMode ? 'text-amber-800' : 'text-stone-400'
                     }`}
                   >
-                    {t({ es: 'Buscar Objetos', en: 'Find Objects' })}
+                    {t({ es: 'Buscar', en: 'Find' })}
                   </span>
-                  <span className="text-[10px] text-stone-500 leading-snug text-center">
+                  <span className="text-[9px] text-stone-500 leading-snug text-center">
                     {hasHuntMode
-                      ? t({
-                          es: 'Encuentra los objetos escondidos',
-                          en: 'Find the hidden objects',
-                        })
+                      ? t({ es: 'Objetos escondidos', en: 'Hidden objects' })
                       : t({ es: 'No disponible', en: 'Not available' })}
                   </span>
                 </button>
@@ -98,19 +95,32 @@ export function PostcardGameSelector({
                 {/* Puzzle mode — always available */}
                 <button
                   onClick={() => onSelect('puzzle')}
-                  className="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 cursor-pointer transition-all"
+                  className="flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 cursor-pointer transition-all"
                 >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-200 text-blue-700">
-                    <Puzzle className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center bg-blue-200 text-blue-700">
+                    <Puzzle className="w-4 h-4" />
                   </div>
-                  <span className="text-xs font-bold text-blue-800">
-                    {t({ es: 'Rompecabezas', en: 'Puzzle' })}
+                  <span className="text-[11px] font-bold text-blue-800">
+                    {t({ es: 'Puzzle', en: 'Puzzle' })}
                   </span>
-                  <span className="text-[10px] text-stone-500 leading-snug text-center">
-                    {t({
-                      es: 'Arma la postal pieza por pieza',
-                      en: 'Assemble the postcard piece by piece',
-                    })}
+                  <span className="text-[9px] text-stone-500 leading-snug text-center">
+                    {t({ es: 'Arma la postal', en: 'Assemble it' })}
+                  </span>
+                </button>
+
+                {/* Stamp Hunt — always available */}
+                <button
+                  onClick={() => onSelect('stamp')}
+                  className="flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 cursor-pointer transition-all"
+                >
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center bg-red-200 text-red-700">
+                    <Stamp className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-bold text-red-800">
+                    {t({ es: 'Sello', en: 'Stamp' })}
+                  </span>
+                  <span className="text-[9px] text-stone-500 leading-snug text-center">
+                    {t({ es: '¿Dónde está el sello?', en: 'Find the stamp' })}
                   </span>
                 </button>
               </div>

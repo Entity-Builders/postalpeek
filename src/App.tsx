@@ -9,6 +9,7 @@ import { AdminPage } from './pages/AdminPage';
 import { PostcardDetailPage } from './pages/PostcardDetailPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initAnalytics, analytics } from './lib/analytics';
+import { AlbumPage } from './pages/AlbumPage';
 
 // ── Feed (main app) ────────────────────────────────────────────────────
 
@@ -155,6 +156,9 @@ function App() {
 
         {/* Postcard admin detail — /p/:id only */}
         <Route path="/p/:id" element={<PostcardDetailPage />} />
+
+        {/* Standalone album page — /album/:albumId */}
+        <Route path="/album/:albumId" element={<AlbumPage />} />
 
         {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
         <Route path="/:id" element={feedElement} />

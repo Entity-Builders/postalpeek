@@ -18,6 +18,7 @@ import { StorytellingPreview } from './ui/StorytellingPreview';
 import { usePostcardGame, GameImageOverlay, GameBottomPanel } from './PostcardGame';
 import { PostcardGameResults } from './PostcardGameResults';
 import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './PostcardPuzzle';
+import { useStampHunt, StampHuntOverlay, StampHuntBottomPanel } from './StampHuntGame';
 import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 
 interface PostcardFrontProps {
@@ -75,12 +76,6 @@ export function PostcardFront({
   handleImageError,
   fallbackEnabled,
   onHeroLoad,
-  isClaimedByMe = false,
-  isClaimed = false,
-  onClaimPostcard,
-  isClaimLoading = false,
-  isInAlbum = false,
-  showClaimGuide = false,
   hideActions = false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isActive = true,
@@ -94,6 +89,7 @@ export function PostcardFront({
   const [gameFlipped, setGameFlipped] = useState(false);
   const game = usePostcardGame(item);
   const puzzle = usePostcardPuzzle(item);
+  const stampHunt = useStampHunt(item);
   const isPlaying = playingMode !== null;
 
   // Check if hunt mode is available (needs illustration_tags with bboxes)
@@ -121,6 +117,14 @@ export function PostcardFront({
       return () => clearTimeout(timer);
     }
   }, [puzzle.isComplete, playingMode, gameFlipped]);
+
+  // Flip the card when stamp hunt completes
+  useEffect(() => {
+    if (playingMode === 'stamp' && stampHunt.found && !gameFlipped) {
+      const timer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [stampHunt.found, playingMode, gameFlipped]);
   // Sticker discovery system (used by TripSlide)
   const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   useLang(); // subscribe to language changes
@@ -348,6 +352,7 @@ export function PostcardFront({
                 {/* Game overlay — renders inside the image area */}
                 {playingMode === 'hunt' && <GameImageOverlay game={game} />}
                 {playingMode === 'puzzle' && <PuzzleImageOverlay puzzle={puzzle} imageUrl={mainImgUrl} />}
+                {playingMode === 'stamp' && <StampHuntOverlay hunt={stampHunt} imageUrl={mainImgUrl ?? ''} />}
 
                 {/* Expand to fullscreen / Minimize — hidden during game */}
                 {!isPlaying && (
@@ -392,6 +397,16 @@ export function PostcardFront({
                   moves={puzzle.moves}
                 />
               )}
+              {playingMode === 'stamp' && (
+                <PostcardGameResults
+                  item={item}
+                  gameType="stamp"
+                  totalObjects={1}
+                  elapsedSeconds={stampHunt.elapsedSeconds}
+                  hintsUsed={stampHunt.hintsUsed}
+                  taps={stampHunt.tapsCount}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -399,31 +414,7 @@ export function PostcardFront({
         {/* Title + Buttons row — hidden in clean mode and game mode */}
         {!isPlaying ? (
           <>
-            <PostcardActionBar
-              item={item}
-              activeSlideItem={activeSlideItem}
-              isLiked={isLiked}
-              onToggleFavorite={onToggleFavorite}
-              onAuthRequired={onAuthRequired}
-              onFlipCard={(view: 'info' | 'coupon' = 'info') => {
-                onFlipCard(view);
-              }}
-              isClaimedByMe={isClaimedByMe}
-              isClaimed={isClaimed}
-              onClaimPostcard={onClaimPostcard}
-              isClaimLoading={isClaimLoading}
-              isInAlbum={isInAlbum}
-              showClaimGuide={showClaimGuide}
-              hideActions={hideActions}
-              isClean={isClean}
-              isBusiness={isBusiness}
-              storytellingTitle={storytelling ? 'short' : undefined}
-              albumStops={albumStops}
-              totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay ? () => setShowSelector(true) : undefined}
-            />
-
-            {/* Storytelling preview — compact, with flip-to-read-more */}
+            {/* Storytelling preview — moved above ActionBar for more prominence */}
             {storytelling && (
               <StorytellingPreview
                 storytelling={storytelling}
@@ -433,6 +424,24 @@ export function PostcardFront({
                 isClean={isClean}
               />
             )}
+
+            <PostcardActionBar
+              item={item}
+              activeSlideItem={activeSlideItem}
+              isLiked={isLiked}
+              onToggleFavorite={onToggleFavorite}
+              onAuthRequired={onAuthRequired}
+              onFlipCard={(view: 'info' | 'coupon' = 'info') => {
+                onFlipCard(view);
+              }}
+              hideActions={hideActions}
+              isClean={isClean}
+              isBusiness={isBusiness}
+              storytellingTitle={storytelling ? 'short' : undefined}
+              albumStops={albumStops}
+              totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
+              onPlay={allowPlay ? () => setShowSelector(true) : undefined}
+            />
           </>
         ) : playingMode === 'hunt' ? (
           <GameBottomPanel
@@ -454,6 +463,22 @@ export function PostcardFront({
           <PuzzleBottomPanel
             item={item}
             puzzle={puzzle}
+            onClose={() => {
+              if (gameFlipped) {
+                setGameFlipped(false);
+                setTimeout(() => {
+                  setPlayingMode(null);
+                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
+                }, 700);
+              } else {
+                setPlayingMode(null);
+              }
+            }}
+          />
+        ) : playingMode === 'stamp' ? (
+          <StampHuntBottomPanel
+            item={item}
+            hunt={stampHunt}
             onClose={() => {
               if (gameFlipped) {
                 setGameFlipped(false);
