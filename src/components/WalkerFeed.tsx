@@ -70,12 +70,19 @@ export function WalkerFeed({
           generation_metadata: {
             ...(item.generation_metadata || {}),
             trivia: {
-              question: { en: 'What is the traditional drink in Argentina?', es: '¿Cuál es la bebida tradicional en Argentina?' },
-              options: { en: ['Mate', 'Coffee', 'Tea'], es: ['Mate', 'Café', 'Té'] },
+              question: {
+                en: 'What is the traditional drink in Argentina?',
+                es: '¿Cuál es la bebida tradicional en Argentina?',
+              },
+              options: {
+                en: ['Mate', 'Coffee', 'Tea'],
+                es: ['Mate', 'Café', 'Té'],
+              },
               correct_answer: { en: 'Mate', es: 'Mate' },
-              factLink: 'It is a caffeinated drink widely consumed in South America.'
-            }
-          }
+              factLink:
+                'It is a caffeinated drink widely consumed in South America.',
+            },
+          },
         };
       }
       return item;
@@ -86,115 +93,147 @@ export function WalkerFeed({
   const [spotlightResults, setSpotlightResults] = useState<FeedItem[]>([]);
   const [spotlightQuery, setSpotlightQuery] = useState('');
   const [isSpotlightSearching, setIsSpotlightSearching] = useState(false);
-  const [smartSearchIntent, setSmartSearchIntent] = useState<SmartSearchResult | null>(null);
+  const [smartSearchIntent, setSmartSearchIntent] =
+    useState<SmartSearchResult | null>(null);
   const [isFetchingMoreSpotlight, setIsFetchingMoreSpotlight] = useState(false);
   const [hasMoreSpotlight, setHasMoreSpotlight] = useState(false);
   const [showNoResultsToast, setShowNoResultsToast] = useState(false);
   const spotlightAbortRef = useRef<AbortController | null>(null);
   const SPOTLIGHT_PAGE_SIZE = 30;
 
-  const handleSpotlightSearch = useCallback(async (query: string) => {
-    if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
-    const controller = new AbortController();
-    spotlightAbortRef.current = controller;
+  const handleSpotlightSearch = useCallback(
+    async (query: string) => {
+      if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
+      const controller = new AbortController();
+      spotlightAbortRef.current = controller;
 
-    setSpotlightQuery(query);
-    setIsSpotlightSearching(true);
-    setSpotlightResults([]);
-    setSmartSearchIntent(null);
-    setHasMoreSpotlight(false);
-
-    try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ||
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o';
-
-      const tagSet = new Set<string>();
-      items.forEach((item) => {
-        if (item.detailed_tags?.length) {
-          item.detailed_tags.forEach((dt: { label?: string | Record<string, string> }) => {
-            const lbl = dt.label;
-            const name = typeof lbl === 'object' && lbl !== null ? lbl.en || lbl.es || '' : String(lbl || '');
-            if (name) tagSet.add(name);
-          });
-        }
-        (item.visual_tags || []).forEach((t: string) => tagSet.add(t));
-      });
-
-      const response = await fetch(`${baseUrl}/functions/v1/postalpeek-search-intent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${anonKey}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify({ query, availableTags: Array.from(tagSet).slice(0, 100) }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
-      const smartResult: SmartSearchResult = await response.json();
-
-      const { data, error } = await supabase.rpc('postalpeek_spotlight_search_v2', {
-        p_tags: smartResult.tags,
-        p_time_of_day: smartResult.time_of_day,
-        p_weather: smartResult.weather,
-        p_scene_type: smartResult.scene_type,
-        p_country: smartResult.country,
-        p_city: smartResult.city,
-        p_rarity: smartResult.rarity,
-        p_free_text: smartResult.freeTextSearch,
-        p_limit: SPOTLIGHT_PAGE_SIZE,
-        p_require_illustration_tags: true,
-      });
-
-      if (error) throw error;
-      const results = data || [];
-      setSpotlightResults(results);
-      setSmartSearchIntent(smartResult);
-      if (results.length === SPOTLIGHT_PAGE_SIZE) {
-        setHasMoreSpotlight(true);
-      }
-      
-      if (results.length === 0) {
-        setShowNoResultsToast(true);
-        setTimeout(() => setShowNoResultsToast(false), 4000);
-      }
-      
-      analytics.track('spotlight_pill_searched', { query, results_count: results.length });
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      console.warn('[Spotlight] search failed:', err);
+      setSpotlightQuery(query);
+      setIsSpotlightSearching(true);
       setSpotlightResults([]);
       setSmartSearchIntent(null);
-    } finally {
-      setIsSpotlightSearching(false);
-    }
-  }, [items]);
+      setHasMoreSpotlight(false);
+
+      try {
+        const baseUrl =
+          import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+        const anonKey =
+          import.meta.env.VITE_SUPABASE_ANON_KEY ||
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o';
+
+        const tagSet = new Set<string>();
+        items.forEach((item) => {
+          if (item.detailed_tags?.length) {
+            item.detailed_tags.forEach(
+              (dt: { label?: string | Record<string, string> }) => {
+                const lbl = dt.label;
+                const name =
+                  typeof lbl === 'object' && lbl !== null
+                    ? lbl.en || lbl.es || ''
+                    : String(lbl || '');
+                if (name) tagSet.add(name);
+              },
+            );
+          }
+          (item.visual_tags || []).forEach((t: string) => tagSet.add(t));
+        });
+
+        const response = await fetch(
+          `${baseUrl}/functions/v1/postalpeek-search-intent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${anonKey}`,
+              apikey: anonKey,
+            },
+            body: JSON.stringify({
+              query,
+              availableTags: Array.from(tagSet).slice(0, 100),
+            }),
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+        const smartResult: SmartSearchResult = await response.json();
+
+        const { data, error } = await supabase.rpc(
+          'postalpeek_spotlight_search_v2',
+          {
+            p_tags: smartResult.tags,
+            p_time_of_day: smartResult.time_of_day,
+            p_weather: smartResult.weather,
+            p_scene_type: smartResult.scene_type,
+            p_country: smartResult.country,
+            p_city: smartResult.city,
+            p_rarity: smartResult.rarity,
+            p_free_text: smartResult.freeTextSearch,
+            p_limit: SPOTLIGHT_PAGE_SIZE,
+            p_require_illustration_tags: true,
+          },
+        );
+
+        if (error) throw error;
+        const results = data || [];
+        setSpotlightResults(results);
+        setSmartSearchIntent(smartResult);
+        if (results.length === SPOTLIGHT_PAGE_SIZE) {
+          setHasMoreSpotlight(true);
+        }
+
+        if (results.length === 0) {
+          setShowNoResultsToast(true);
+          setTimeout(() => setShowNoResultsToast(false), 4000);
+        }
+
+        analytics.track('spotlight_pill_searched', {
+          query,
+          results_count: results.length,
+        });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        console.warn('[Spotlight] search failed:', err);
+        setSpotlightResults([]);
+        setSmartSearchIntent(null);
+      } finally {
+        setIsSpotlightSearching(false);
+      }
+    },
+    [items],
+  );
 
   const fetchMoreSpotlight = useCallback(async () => {
-    if (!smartSearchIntent || isFetchingMoreSpotlight || !hasMoreSpotlight || spotlightResults.length === 0) return;
-    
+    if (
+      !smartSearchIntent ||
+      isFetchingMoreSpotlight ||
+      !hasMoreSpotlight ||
+      spotlightResults.length === 0
+    )
+      return;
+
     setIsFetchingMoreSpotlight(true);
-    const excludeIds = spotlightResults.map(i => i.id);
+    const excludeIds = spotlightResults.map((i) => i.id);
 
     try {
-      const { data, error } = await supabase.rpc('postalpeek_spotlight_search_v2', {
-        p_tags: smartSearchIntent.tags,
-        p_time_of_day: smartSearchIntent.time_of_day,
-        p_weather: smartSearchIntent.weather,
-        p_scene_type: smartSearchIntent.scene_type,
-        p_country: smartSearchIntent.country,
-        p_city: smartSearchIntent.city,
-        p_rarity: smartSearchIntent.rarity,
-        p_free_text: smartSearchIntent.freeTextSearch,
-        p_limit: SPOTLIGHT_PAGE_SIZE,
-        p_exclude_ids: excludeIds,
-        p_require_illustration_tags: true,
-      });
+      const { data, error } = await supabase.rpc(
+        'postalpeek_spotlight_search_v2',
+        {
+          p_tags: smartSearchIntent.tags,
+          p_time_of_day: smartSearchIntent.time_of_day,
+          p_weather: smartSearchIntent.weather,
+          p_scene_type: smartSearchIntent.scene_type,
+          p_country: smartSearchIntent.country,
+          p_city: smartSearchIntent.city,
+          p_rarity: smartSearchIntent.rarity,
+          p_free_text: smartSearchIntent.freeTextSearch,
+          p_limit: SPOTLIGHT_PAGE_SIZE,
+          p_exclude_ids: excludeIds,
+          p_require_illustration_tags: true,
+        },
+      );
 
       if (error) throw error;
-      
+
       const newItems = (data as FeedItem[]) || [];
       if (newItems.length === 0) {
         setHasMoreSpotlight(false);
@@ -203,19 +242,28 @@ export function WalkerFeed({
       if (newItems.length < SPOTLIGHT_PAGE_SIZE) {
         setHasMoreSpotlight(false);
       }
-      
-      setSpotlightResults(prev => {
-        const existingIds = new Set(prev.map(p => p.id));
-        const filteredNew = newItems.filter(p => !existingIds.has(p.id));
+
+      setSpotlightResults((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const filteredNew = newItems.filter((p) => !existingIds.has(p.id));
         return [...prev, ...filteredNew];
       });
     } catch (error) {
       console.error('Error loading more spotlight results:', error);
-      analytics.captureError(error, { context: 'fetch_more_spotlight', query: spotlightQuery });
+      analytics.captureError(error, {
+        context: 'fetch_more_spotlight',
+        query: spotlightQuery,
+      });
     } finally {
       setIsFetchingMoreSpotlight(false);
     }
-  }, [smartSearchIntent, isFetchingMoreSpotlight, hasMoreSpotlight, spotlightResults, spotlightQuery]);
+  }, [
+    smartSearchIntent,
+    isFetchingMoreSpotlight,
+    hasMoreSpotlight,
+    spotlightResults,
+    spotlightQuery,
+  ]);
 
   const handleSpotlightDismiss = useCallback(() => {
     if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
@@ -227,12 +275,10 @@ export function WalkerFeed({
     setShowNoResultsToast(false);
   }, []);
 
-
   const isFetchingRef = useRef<boolean>(false);
   useEffect(() => {
     isFetchingRef.current = isFetchingMore || isFetchingMoreSpotlight;
   }, [isFetchingMore, isFetchingMoreSpotlight]);
-
 
   const [showWelcome] = useState(() => !hasSeenWelcome());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -262,7 +308,9 @@ export function WalkerFeed({
   } = useCollection(user?.id);
   // URL-driven navigation
   const navigate = useNavigate();
-  const [selectedPostcard, setSelectedPostcard] = useState<FeedItem | null>(null);
+  const [selectedPostcard, setSelectedPostcard] = useState<FeedItem | null>(
+    null,
+  );
   const [lightboxState, setLightboxState] = useState<{
     items: FeedItem[];
     initialIndex: number;
@@ -270,7 +318,9 @@ export function WalkerFeed({
   } | null>(null);
   const location = useLocation();
   const showCollection = location.pathname === '/feed/collection';
-  const urlAlbumId = location.pathname.startsWith('/feed/album/') ? location.pathname.split('/')[3] : null;
+  const urlAlbumId = location.pathname.startsWith('/feed/album/')
+    ? location.pathname.split('/')[3]
+    : null;
   const [claimLimitInfo, setClaimLimitInfo] = useState<{
     type: 'daily' | 'monthly';
     used: number;
@@ -285,16 +335,20 @@ export function WalkerFeed({
   const dailyPack = useDailyPack(user?.id);
   // When the flag is off, suppress all daily-pack state
   const packCards = isDailyPackEnabled ? dailyPack.packCards : [];
-  const isPackAvailable = isDailyPackEnabled ? dailyPack.isPackAvailable : false;
+  const isPackAvailable = isDailyPackEnabled
+    ? dailyPack.isPackAvailable
+    : false;
   const isPackLoading = dailyPack.isLoading;
   const openPack = dailyPack.openPack;
   const clearPack = dailyPack.clearPack;
 
   // PackDone toast — shown after the last card is revealed, stays 5 seconds
   // Focus mode: hide decorative chrome while spotlight search is active
-  const isSpotlightMode = Boolean(spotlightQuery.trim().length > 0 || isSpotlightSearching || spotlightResults.length > 0);
-
-
+  const isSpotlightMode = Boolean(
+    spotlightQuery.trim().length > 0 ||
+    isSpotlightSearching ||
+    spotlightResults.length > 0,
+  );
 
   const handleOpenPack = useCallback(async () => {
     const result = await openPack();
@@ -302,7 +356,6 @@ export function WalkerFeed({
       // Pack cards are now handled inline by WalkerCarousel
     }
   }, [openPack]);
-
 
   // ── Albums ──
   const {
@@ -336,10 +389,7 @@ export function WalkerFeed({
     supabase
       .rpc('postalpeek_get_album_postcard_ids')
       .then(({ data }: { data: string[] | null }) => {
-        if (data && Array.isArray(data))
-          setAlbumPostcardIds(
-            new Set(data),
-          );
+        if (data && Array.isArray(data)) setAlbumPostcardIds(new Set(data));
       });
   }, [albums]);
 
@@ -407,16 +457,20 @@ export function WalkerFeed({
   }, []);
 
   if (focusedIndex !== null) {
-    const feedItems = isSpotlightMode && spotlightResults.length > 0
-      ? spotlightResults.slice(focusedIndex)
-      : items.slice(focusedIndex);
+    const feedItems =
+      isSpotlightMode && spotlightResults.length > 0
+        ? spotlightResults.slice(focusedIndex)
+        : items.slice(focusedIndex);
 
     return (
       <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
         {/* Back button — hidden during fullscreen overlay */}
         {!isFullscreen && (
           <button
-            onClick={() => { setFocusedIndex(null); navigate('/feed'); }}
+            onClick={() => {
+              setFocusedIndex(null);
+              navigate('/feed');
+            }}
             className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
           >
             {t({ es: '← Explorar', en: '← Explore' }, lang)}
@@ -425,11 +479,22 @@ export function WalkerFeed({
         <WalkerCarousel
           items={feedItems}
           displayItems={feedItems}
-
-          hasMore={isSpotlightMode && spotlightResults.length > 0 ? hasMoreSpotlight : hasMore}
-          isFetchingMore={isSpotlightMode && spotlightResults.length > 0 ? isFetchingMoreSpotlight : isFetchingMore}
+          hasMore={
+            isSpotlightMode && spotlightResults.length > 0
+              ? hasMoreSpotlight
+              : hasMore
+          }
+          isFetchingMore={
+            isSpotlightMode && spotlightResults.length > 0
+              ? isFetchingMoreSpotlight
+              : isFetchingMore
+          }
           isFetchingRef={isFetchingRef}
-          fetchMoreFeed={isSpotlightMode && spotlightResults.length > 0 ? fetchMoreSpotlight : fetchMoreFeed}
+          fetchMoreFeed={
+            isSpotlightMode && spotlightResults.length > 0
+              ? fetchMoreSpotlight
+              : fetchMoreFeed
+          }
           selectedCountry={selectedCountry}
           user={user}
           isAdmin={isAdmin}
@@ -449,17 +514,23 @@ export function WalkerFeed({
           isPackAvailable={user ? isPackAvailable : false}
           isPackLoading={isPackLoading}
           onOpenPack={user ? handleOpenPack : undefined}
-          onPackComplete={user ? () => {
-            const albumCount = packCards.filter(c => albumPostcardIds.has(c.id)).length;
-            setPackDoneAlbumCount(albumCount);
-            setShowPackDoneToast(true);
-            setTimeout(() => {
-              setShowPackDoneToast(false);
-              clearPack();
-              refetchCollection();
-              refetchAlbums();
-            }, 5000);
-          } : undefined}
+          onPackComplete={
+            user
+              ? () => {
+                  const albumCount = packCards.filter((c) =>
+                    albumPostcardIds.has(c.id),
+                  ).length;
+                  setPackDoneAlbumCount(albumCount);
+                  setShowPackDoneToast(true);
+                  setTimeout(() => {
+                    setShowPackDoneToast(false);
+                    clearPack();
+                    refetchCollection();
+                    refetchAlbums();
+                  }, 5000);
+                }
+              : undefined
+          }
         />
 
         {/* Claim Limit Modal */}
@@ -487,10 +558,20 @@ export function WalkerFeed({
             >
               <span className='text-xl'>🎉</span>
               <div>
-                <p className='text-sm font-semibold leading-tight'>{t({ es: '¡Sobre abierto!', en: 'Envelope opened!' }, lang)}</p>
+                <p className='text-sm font-semibold leading-tight'>
+                  {t({ es: '¡Sobre abierto!', en: 'Envelope opened!' }, lang)}
+                </p>
                 {packDoneAlbumCount > 0 && (
                   <p className='text-xs text-amber-400 mt-0.5'>
-                    {packDoneAlbumCount === 1 ? t({ es: '1 carta de álbum', en: '1 album card' }, lang) : t({ es: `${packDoneAlbumCount} cartas de álbum`, en: `${packDoneAlbumCount} album cards` }, lang)}
+                    {packDoneAlbumCount === 1
+                      ? t({ es: '1 carta de álbum', en: '1 album card' }, lang)
+                      : t(
+                          {
+                            es: `${packDoneAlbumCount} cartas de álbum`,
+                            en: `${packDoneAlbumCount} album cards`,
+                          },
+                          lang,
+                        )}
                   </p>
                 )}
               </div>
@@ -498,9 +579,9 @@ export function WalkerFeed({
           )}
         </AnimatePresence>
 
-        {!isFullscreen && <LanguageToggle isIdle={isIdle} isOnWelcome={false} />}
-
-
+        {!isFullscreen && (
+          <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+        )}
       </div>
     );
   }
@@ -522,7 +603,13 @@ export function WalkerFeed({
           if (country === selectedCountry) return;
           handleSpotlightDismiss();
           setSelectedCountry(country);
-          window.history.pushState({}, '', country ? `/feed/country/${encodeURIComponent(country).replace(/%20/g, '-')}` : '/feed');
+          window.history.pushState(
+            {},
+            '',
+            country
+              ? `/feed/country/${encodeURIComponent(country).replace(/%20/g, '-')}`
+              : '/feed',
+          );
         }}
         spotlightResults={spotlightResults}
         spotlightQuery={spotlightQuery}
@@ -535,7 +622,10 @@ export function WalkerFeed({
         }}
         onCardClick={(index) => {
           setFocusedIndex(index);
-          const sourceItems = isSpotlightMode && spotlightResults.length > 0 ? spotlightResults : items;
+          const sourceItems =
+            isSpotlightMode && spotlightResults.length > 0
+              ? spotlightResults
+              : items;
           const clickedItem = sourceItems[index];
           if (clickedItem) {
             const hash = encodeUuidToHash(clickedItem.id);
@@ -584,7 +674,9 @@ export function WalkerFeed({
           <AlbumDetail
             detail={albumDetail}
             isLoading={isAlbumDetailLoading}
-            onClose={() => navigate(showCollection ? '/feed/collection' : '/feed')}
+            onClose={() =>
+              navigate(showCollection ? '/feed/collection' : '/feed')
+            }
           />
         )}
       </AnimatePresence>
@@ -664,9 +756,14 @@ export function WalkerFeed({
           >
             <SearchX className='w-5 h-5 text-amber-500' strokeWidth={2} />
             <div>
-              <p className='text-sm font-semibold leading-tight'>{t({ es: 'Sin resultados', en: 'No results' }, lang)}</p>
+              <p className='text-sm font-semibold leading-tight'>
+                {t({ es: 'Sin resultados', en: 'No results' }, lang)}
+              </p>
               <p className='text-xs text-stone-300 mt-0.5 max-w-[200px] truncate'>
-                {t({ es: 'Mostrando sugerencias', en: 'Showing suggestions' }, lang)}
+                {t(
+                  { es: 'Mostrando sugerencias', en: 'Showing suggestions' },
+                  lang,
+                )}
               </p>
             </div>
           </motion.div>
@@ -700,6 +797,7 @@ export function WalkerFeed({
       <PostcardGameSelector
         open={statusBarGameOpen}
         hasHuntMode={false}
+        hasTriviaMode={false}
         onSelect={(mode: GameMode) => {
           setStatusBarGameOpen(false);
           // Pick a random postcard from collection to play with
@@ -719,4 +817,3 @@ export function WalkerFeed({
 }
 
 import { LanguageToggle } from './ui/LanguageToggle';
-
