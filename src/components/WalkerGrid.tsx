@@ -39,6 +39,7 @@ interface WalkerGridProps {
   onToggleCollection?: () => void;
   showWelcome?: boolean;
   previewCards?: FeedItem[];
+  claimedIds?: Set<string>;
 }
 
 export function WalkerGrid({
@@ -64,6 +65,7 @@ export function WalkerGrid({
   onToggleCollection,
   showWelcome = false,
   previewCards = [],
+  claimedIds = new Set<string>(),
 }: WalkerGridProps) {
   const displayItems = spotlightQuery && spotlightResults.length > 0 ? spotlightResults : items;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -217,6 +219,7 @@ export function WalkerGrid({
                   index={index}
                   layout={layoutMap.get(item.id) || computeCardLayout(item)}
                   onClick={() => handleCardClick(index, item)}
+                  isClaimed={claimedIds.has(item.id)}
                 />
               ))}
             </div>

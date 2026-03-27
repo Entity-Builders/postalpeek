@@ -26,6 +26,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { ILLUSTRATION_STYLES, ACTIVE_STYLE_KEY } from '../../../../eb-infra/supabase/functions/_shared/postcard-engine/illustration-styles.ts';
 import type { User } from '@supabase/supabase-js';
 import { useGenerationLog } from '../hooks/useGenerationLog';
@@ -363,7 +364,7 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
       className="rounded-xl hover:bg-white/5 transition-colors group"
     >
       <a
-        href={`/p/${entry.id}`}
+        href={`/p/${encodeUuidToHash(entry.id)}`}
         target="_blank"
         rel="noopener noreferrer"
         className="flex gap-3 p-3 cursor-pointer no-underline"
@@ -423,7 +424,7 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
             <span className="text-white/30 text-[10px] font-mono">{timeAgo(entry.created_at)}</span>
             <span className="text-white/10 mx-0.5">·</span>
             <a
-              href={`/p/${entry.id}`}
+              href={`/p/${encodeUuidToHash(entry.id)}`}
               onClick={(e) => e.stopPropagation()}
               className="text-white/20 hover:text-indigo-300 text-[10px] font-mono transition-colors"
               style={{ textDecoration: 'none' }}
@@ -754,7 +755,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     }
   }, [postcardId, fetchStats, refetchLog]);
 
-  // ── Step 1: Detect objects ──
+  // ── Step 1A: Detect objects from REAL PHOTO ──
   const runDetection = useCallback(async () => {
     if (!postcardId.trim()) return;
     setDetectStatus({ status: 'loading', message: 'Fetching postcard…' });
@@ -775,7 +776,47 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       const tags: PipelineTag[] = data.tags || [];
       setDetectedTags(tags);
       setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
-      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (${data.raw_count} raw)` });
+
+      // Save to DB
+      setDetectStatus({ status: 'loading', message: `Saving ${tags.length} tags to DB…` });
+      const { error: saveErr } = await supabase
+        .from('postalpeek_postcards')
+        .update({ illustration_tags: tags })
+        .eq('id', postcardId.trim());
+      if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
+
+      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (real photo) & saved` });
+    } catch (err: unknown) {
+      setDetectStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [postcardId]);
+
+  // ── Step 1B: Analyze ILLUSTRATION (semantic-segment) ──
+  const runAnalyzeIllustration = useCallback(async () => {
+    if (!postcardId.trim()) return;
+    setDetectStatus({ status: 'loading', message: 'Fetching postcard…' });
+    setDetectedTags([]);
+    setSegments([]);
+    try {
+      const { data: pc, error } = await supabase
+        .from('postalpeek_postcards')
+        .select('illustration_url')
+        .eq('id', postcardId.trim())
+        .single();
+      if (error || !pc?.illustration_url) throw new Error('No illustration found');
+      setPipelineIllustrationUrl(pc.illustration_url);
+
+      setDetectStatus({ status: 'loading', message: 'Analyzing illustration with Gemini Pro…' });
+      const { data: segData, error: segErr } = await supabase.functions.invoke('postalpeek-semantic-segment', {
+        body: { postcard_id: postcardId.trim() },
+      });
+      if (segErr) throw segErr;
+      const layers = segData?.layers || [];
+      const tags: PipelineTag[] = layers.filter((t: any) => t.box_2d?.length === 4);
+      setDetectedTags(tags);
+      setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
+
+      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (illustration) & saved` });
     } catch (err: unknown) {
       setDetectStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -1274,7 +1315,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
           {activeSection === 'browser' && (
             <div className="max-w-[1200px]">
               <PostcardsBrowser
-                onSelectPostcard={(id) => window.open(`/p/${id}`, '_blank')}
+                onSelectPostcard={(id) => window.open(`/p/${encodeUuidToHash(id)}`, '_blank')}
               />
             </div>
           )}
@@ -1303,6 +1344,30 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                 </ActionBtn>
               </div>
               <StatusMsg status={postcardStatus.status} message={postcardStatus.message} />
+
+              {/* ── Object Analysis (dual mode) ── */}
+              <div className="pt-2">
+                <SectionTitle>🔍 Object Analysis</SectionTitle>
+                <p className="text-white/30 text-[9px] mb-3 -mt-2">Detect objects & save bounding boxes to illustration_tags. Choose source image.</p>
+                <div className="flex gap-2">
+                  <ActionBtn
+                    onClick={runDetection}
+                    disabled={!postcardId.trim() || detectStatus.status === 'loading'}
+                    variant="amber"
+                  >
+                    {detectStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <span>📷</span>}
+                    <span>Real Photo</span>
+                  </ActionBtn>
+                  <ActionBtn
+                    onClick={runAnalyzeIllustration}
+                    disabled={!postcardId.trim() || detectStatus.status === 'loading'}
+                  >
+                    {detectStatus.status === 'loading' ? <Loader className="w-3 h-3 animate-spin" /> : <span>🎨</span>}
+                    <span>Illustration</span>
+                  </ActionBtn>
+                </div>
+                <StatusMsg status={detectStatus.status} message={detectStatus.message} />
+              </div>
 
               {/* ── One-Click Segmentation ── */}
               <div className="pt-2">

@@ -50,7 +50,7 @@ export function WalkerFeed({
   const [statusBarGameOpen, setStatusBarGameOpen] = useState(false);
 
   const {
-    items,
+    items: baseItems,
     availableCountries,
     isLoading,
     selectedCountry,
@@ -60,6 +60,27 @@ export function WalkerFeed({
     isFetchingMore,
     fetchMoreFeed,
   } = useWalkerFeed();
+
+  // DEBUG INJECT MOCK TRIVIA
+  const items = React.useMemo(() => {
+    return baseItems.map((item, i) => {
+      if (i === 0 && !item.generation_metadata?.trivia) {
+        return {
+          ...item,
+          generation_metadata: {
+            ...(item.generation_metadata || {}),
+            trivia: {
+              question: { en: 'What is the traditional drink in Argentina?', es: '¿Cuál es la bebida tradicional en Argentina?' },
+              options: { en: ['Mate', 'Coffee', 'Tea'], es: ['Mate', 'Café', 'Té'] },
+              correct_answer: { en: 'Mate', es: 'Mate' },
+              factLink: 'It is a caffeinated drink widely consumed in South America.'
+            }
+          }
+        };
+      }
+      return item;
+    });
+  }, [baseItems]);
 
   // ── Spotlight search state (needs items from useWalkerFeed) ──
   const [spotlightResults, setSpotlightResults] = useState<FeedItem[]>([]);
@@ -523,6 +544,7 @@ export function WalkerFeed({
         }}
         viewedItems={items.slice(0, 5)}
         user={user}
+        claimedIds={user ? claimedIds : new Set()}
         unlockedCountries={unlockedCountries}
         onOpenAlbumsModal={() => {
           setIsAlbumsModalOpen(true);

@@ -24,12 +24,13 @@ interface GridCardProps {
   index: number;
   layout: CardLayout;
   onClick: () => void;
+  isClaimed?: boolean;
 }
 
 /** Above-fold cards get framer-motion entry animation; below-fold cards render instantly */
 const ANIMATE_THRESHOLD = 12;
 
-export const GridCard = React.memo(function GridCard({ item, index, layout, onClick }: GridCardProps) {
+export const GridCard = React.memo(function GridCard({ item, index, layout, onClick, isClaimed }: GridCardProps) {
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
   const srcSet = useSignedSrcSet(item.illustration_url, WIDTHS.gridSrcSet as unknown as number[]);
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
@@ -39,6 +40,8 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
 
   const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category, lang);
   const storytelling = item.generation_metadata?.storytelling;
+  const trivia = item.generation_metadata?.trivia;
+  const isTriviaLocked = !!trivia && !isClaimed;
 
   const { aspectRatio, showCaption, monumental } = layout;
 
@@ -128,15 +131,24 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
           )}
 
           {imgUrl && (
-            <img
-              src={imgUrl}
-              srcSet={srcSet || undefined}
-              sizes={sizes}
-              alt={categoryLabel}
-              className={`w-full h-full object-cover block transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setLoaded(true)}
-              loading={index < 12 ? 'eager' : 'lazy'}
-            />
+            <>
+              <img
+                src={imgUrl}
+                srcSet={srcSet || undefined}
+                sizes={sizes}
+                alt={categoryLabel}
+                className={`absolute inset-0 w-full h-full object-cover block transition-all duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${isTriviaLocked ? 'blur-md scale-110 saturate-50 brightness-90' : ''}`}
+                onLoad={() => setLoaded(true)}
+                loading={index < 12 ? 'eager' : 'lazy'}
+              />
+              {isTriviaLocked && loaded && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
+                  <div className="bg-stone-900/60 backdrop-blur-md rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-2xl">
+                    <span className="text-xl" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>🗺️</span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Storytelling overlay — prominent while loading, fades out on load */}

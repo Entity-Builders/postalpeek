@@ -30,10 +30,13 @@ interface TripSlideProps {
     postcardId: string;
     tagLabelEn: string;
     tagType: string;
+    tagLayer?: number;
     bbox: number[];
   }) => void;
   isTagDiscovered?: (postcardId: string, tagLabelEn: string) => boolean;
   isTagGenerating?: (postcardId: string, tagLabelEn: string) => boolean;
+  /** Trivia Reveal Game lock state */
+  isTriviaLocked?: boolean;
 }
 
 /** Scale factor applied to the image in clean/loupe mode */
@@ -58,6 +61,7 @@ export function TripSlide({
   onDiscoverTag,
   isTagDiscovered,
   isTagGenerating,
+  isTriviaLocked = false,
 }: TripSlideProps) {
   const pUrl = useSignedImage(
     preloadedMainUrl ? null : slideItem.illustration_url,
@@ -241,6 +245,7 @@ export function TripSlide({
             isClean
               ? 'scale-[1.35] opacity-0'
               : !slideItem.video_url && 'hover:scale-105',
+            isTriviaLocked && 'blur-md scale-110 saturate-50 brightness-90'
           )}
         />
       )}
@@ -409,8 +414,8 @@ export function TripSlide({
         </div>
       )}
 
-      {/* Postage stamp badge — hidden in clean/loupe mode */}
-      {!isClean && <PostageStamp createdAt={slideItem.created_at} />}
+      {/* Postage stamp badge — hidden in clean/loupe mode or if trivia locked */}
+      {!isClean && !isTriviaLocked && <PostageStamp createdAt={slideItem.created_at} />}
     </div>
   );
 }

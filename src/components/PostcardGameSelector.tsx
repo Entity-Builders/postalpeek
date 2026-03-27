@@ -1,14 +1,16 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Puzzle, Stamp, X } from 'lucide-react';
+import { Search, Puzzle, Stamp, MessageCircleQuestion, X } from 'lucide-react';
 import { t } from '../utils/i18n';
 
-export type GameMode = 'hunt' | 'puzzle' | 'stamp';
+export type GameMode = 'hunt' | 'puzzle' | 'stamp' | 'trivia';
 
 interface PostcardGameSelectorProps {
   open: boolean;
   /** Whether the hunt mode is available (has illustration_tags with bboxes) */
   hasHuntMode: boolean;
+  /** Whether the trivia mode is available (has trivia data) */
+  hasTriviaMode: boolean;
   onSelect: (mode: GameMode) => void;
   onClose: () => void;
 }
@@ -16,6 +18,7 @@ interface PostcardGameSelectorProps {
 export function PostcardGameSelector({
   open,
   hasHuntMode,
+  hasTriviaMode,
   onSelect,
   onClose,
 }: PostcardGameSelectorProps) {
@@ -59,13 +62,13 @@ export function PostcardGameSelector({
                 </button>
               </div>
 
-              {/* Options — 3 columns */}
-              <div className="px-4 pb-5 flex gap-2">
+              {/* Options — 2x2 grid */}
+              <div className="px-4 pb-5 grid grid-cols-2 gap-2">
                 {/* Hunt mode */}
                 <button
                   onClick={() => onSelect('hunt')}
                   disabled={!hasHuntMode}
-                  className={`flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center text-center gap-1.5 p-3 rounded-xl border-2 transition-all min-h-[100px] ${
                     hasHuntMode
                       ? 'border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 cursor-pointer'
                       : 'border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed'
@@ -78,50 +81,77 @@ export function PostcardGameSelector({
                   >
                     <Search className="w-4 h-4" />
                   </div>
-                  <span
-                    className={`text-[11px] font-bold ${
-                      hasHuntMode ? 'text-amber-800' : 'text-stone-400'
-                    }`}
-                  >
-                    {t({ es: 'Buscar', en: 'Find' })}
-                  </span>
-                  <span className="text-[9px] text-stone-500 leading-snug text-center">
-                    {hasHuntMode
-                      ? t({ es: 'Objetos escondidos', en: 'Hidden objects' })
-                      : t({ es: 'No disponible', en: 'Not available' })}
-                  </span>
+                  <div>
+                    <span className={`block text-[11px] font-bold ${hasHuntMode ? 'text-amber-800' : 'text-stone-400'}`}>
+                      {t({ es: 'Buscar', en: 'Find' })}
+                    </span>
+                    <span className="block text-[9px] text-stone-500 leading-snug">
+                      {hasHuntMode ? t({ es: 'Objetos escondidos', en: 'Hidden objects' }) : t({ es: 'No disponible', en: 'Not available' })}
+                    </span>
+                  </div>
                 </button>
 
                 {/* Puzzle mode — always available */}
                 <button
                   onClick={() => onSelect('puzzle')}
-                  className="flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 cursor-pointer transition-all"
+                  className="flex flex-col items-center justify-center text-center gap-1.5 p-3 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 cursor-pointer transition-all min-h-[100px]"
                 >
                   <div className="w-9 h-9 rounded-full flex items-center justify-center bg-blue-200 text-blue-700">
                     <Puzzle className="w-4 h-4" />
                   </div>
-                  <span className="text-[11px] font-bold text-blue-800">
-                    {t({ es: 'Puzzle', en: 'Puzzle' })}
-                  </span>
-                  <span className="text-[9px] text-stone-500 leading-snug text-center">
-                    {t({ es: 'Arma la postal', en: 'Assemble it' })}
-                  </span>
+                  <div>
+                    <span className="block text-[11px] font-bold text-blue-800">
+                      {t({ es: 'Puzzle', en: 'Puzzle' })}
+                    </span>
+                    <span className="block text-[9px] text-stone-500 leading-snug">
+                      {t({ es: 'Arma la postal', en: 'Assemble it' })}
+                    </span>
+                  </div>
                 </button>
 
                 {/* Stamp Hunt — always available */}
                 <button
                   onClick={() => onSelect('stamp')}
-                  className="flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 cursor-pointer transition-all"
+                  className="flex flex-col items-center justify-center text-center gap-1.5 p-3 rounded-xl border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 cursor-pointer transition-all min-h-[100px]"
                 >
                   <div className="w-9 h-9 rounded-full flex items-center justify-center bg-red-200 text-red-700">
                     <Stamp className="w-4 h-4" />
                   </div>
-                  <span className="text-[11px] font-bold text-red-800">
-                    {t({ es: 'Sello', en: 'Stamp' })}
-                  </span>
-                  <span className="text-[9px] text-stone-500 leading-snug text-center">
-                    {t({ es: '¿Dónde está el sello?', en: 'Find the stamp' })}
-                  </span>
+                  <div>
+                    <span className="block text-[11px] font-bold text-red-800">
+                      {t({ es: 'Sello', en: 'Stamp' })}
+                    </span>
+                    <span className="block text-[9px] text-stone-500 leading-snug">
+                      {t({ es: '¿Dónde está el sello?', en: 'Find the stamp' })}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Trivia Mode */}
+                <button
+                  onClick={() => onSelect('trivia')}
+                  disabled={!hasTriviaMode}
+                  className={`flex flex-col items-center justify-center text-center gap-1.5 p-3 rounded-xl border-2 transition-all min-h-[100px] ${
+                    hasTriviaMode
+                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 cursor-pointer'
+                      : 'border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                      hasTriviaMode ? 'bg-emerald-200 text-emerald-700' : 'bg-stone-200 text-stone-400'
+                    }`}
+                  >
+                    <MessageCircleQuestion className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className={`block text-[11px] font-bold ${hasTriviaMode ? 'text-emerald-800' : 'text-stone-400'}`}>
+                      {t({ es: 'Trivia', en: 'Trivia' })}
+                    </span>
+                    <span className="block text-[9px] text-stone-500 leading-snug">
+                      {hasTriviaMode ? t({ es: 'Responde la trivia', en: 'Answer the trivia' }) : t({ es: 'No disponible', en: 'Not available' })}
+                    </span>
+                  </div>
                 </button>
               </div>
             </div>

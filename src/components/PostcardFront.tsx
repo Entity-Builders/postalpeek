@@ -20,6 +20,7 @@ import { PostcardGameResults } from './PostcardGameResults';
 import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './PostcardPuzzle';
 import { useStampHunt, StampHuntOverlay, StampHuntBottomPanel } from './StampHuntGame';
 import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
+import { TriviaBottomPanel } from './TriviaRevealGame';
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -82,9 +83,13 @@ export function PostcardFront({
   isClean = false,
   onToggleClean,
   allowPlay = true,
+  isClaimedByMe,
+  isClaimed,
+  isClaimLoading,
+  onClaimPostcard,
 }: PostcardFrontProps) {
   // ── Inline game mode ──
-  const [playingMode, setPlayingMode] = useState<GameMode | null>(null);
+  const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
   const [showSelector, setShowSelector] = useState(false);
   const [gameFlipped, setGameFlipped] = useState(false);
   const game = usePostcardGame(item);
@@ -216,6 +221,19 @@ export function PostcardFront({
 
   const isAlbumGroup = !!item.album_id;
   const storytelling = activeSlideItem.generation_metadata?.storytelling;
+  const trivia = activeSlideItem.generation_metadata?.trivia;
+  const isTriviaLocked = !!trivia && !isClaimedByMe && !isClaimed;
+
+  const prevIsTriviaLocked = React.useRef(isTriviaLocked);
+  
+  React.useEffect(() => {
+    if (isTriviaLocked && playingMode !== 'trivia') {
+      setPlayingMode('trivia');
+    } else if (!isTriviaLocked && prevIsTriviaLocked.current && playingMode === 'trivia') {
+      setPlayingMode(null);
+    }
+    prevIsTriviaLocked.current = isTriviaLocked;
+  }, [isTriviaLocked, playingMode]);
 
   React.useEffect(() => {
     if (onSlideChange) {
@@ -305,6 +323,7 @@ export function PostcardFront({
                             }
                             onHeroLoad={slideItem.id === item.id ? onHeroLoad : undefined}
                             isClean={isClean}
+                            isTriviaLocked={isTriviaLocked}
                             onDiscoverTag={discoverTag}
                             isTagDiscovered={isDiscovered}
                             isTagGenerating={isGenerating}
@@ -343,6 +362,7 @@ export function PostcardFront({
                     preloadedSrcSet={srcSetString}
                     onHeroLoad={onHeroLoad}
                     isClean={isClean}
+                    isTriviaLocked={isTriviaLocked}
                     onDiscoverTag={discoverTag}
                     isTagDiscovered={isDiscovered}
                     isTagGenerating={isGenerating}
@@ -415,7 +435,7 @@ export function PostcardFront({
         {!isPlaying ? (
           <>
             {/* Storytelling preview — moved above ActionBar for more prominence */}
-            {storytelling && (
+            {storytelling && !isTriviaLocked && (
               <StorytellingPreview
                 storytelling={storytelling}
                 onFlipCard={() => {
@@ -440,9 +460,24 @@ export function PostcardFront({
               storytellingTitle={storytelling ? 'short' : undefined}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay ? () => setShowSelector(true) : undefined}
+              onPlay={allowPlay && !isTriviaLocked ? () => setShowSelector(true) : undefined}
             />
           </>
+        ) : playingMode === 'trivia' ? (
+          <TriviaBottomPanel
+            trivia={trivia}
+            isClaimLoading={isClaimLoading}
+            isTriviaLocked={isTriviaLocked}
+            onClose={() => setPlayingMode(null)}
+            onResolve={() => {
+              if (onClaimPostcard && !isClaimLoading) {
+                onClaimPostcard(item.id);
+              } else if (!isTriviaLocked) {
+                // If debugging/replay, just close it
+                setPlayingMode(null);
+              }
+            }}
+          />
         ) : playingMode === 'hunt' ? (
           <GameBottomPanel
             item={item}
@@ -498,6 +533,7 @@ export function PostcardFront({
       <PostcardGameSelector
         open={showSelector}
         hasHuntMode={hasHuntMode}
+        hasTriviaMode={!!trivia}
         onSelect={(mode) => {
           setShowSelector(false);
           setPlayingMode(mode);

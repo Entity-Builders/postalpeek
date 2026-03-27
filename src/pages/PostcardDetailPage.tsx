@@ -31,7 +31,7 @@ import {
   Scissors,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { encodeUuidToHash, decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 
@@ -219,7 +219,8 @@ function DetailedTagsTable({ tags }: { tags: unknown[] }) {
 function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }) {
   const signed = useSignedImage(postcard.illustration_url, { width: WIDTHS.desktop });
   const [showReward, setShowReward] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanningPhoto, setIsScanningPhoto] = useState(false);
+  const [isScanningIllus, setIsScanningIllus] = useState(false);
   const [showAllBoxes, setShowAllBoxes] = useState(false);
   const [localTags, setLocalTags] = useState<any[] | null>(null);
   const [lastScanInfo, setLastScanInfo] = useState<{ count: number; cost: string } | null>(null);
@@ -237,8 +238,40 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
     'rgba(236,72,153,0.85)',   // pink
   ];
 
+  const runPhotoScan = async () => {
+    if (!postcard?.original_image_url) {
+      alert('Original photo URL is missing');
+      return;
+    }
+    setIsScanningPhoto(true);
+    setLastScanInfo(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('postalpeek-detect-objects', {
+        body: { image_url: postcard.original_image_url }
+      });
+      if (error) throw error;
+      
+      const tags: any[] = data.tags || [];
+      
+      // Save directly to illustration_tags in the DB so it persists
+      const { error: saveErr } = await supabase.from('postalpeek_postcards')
+        .update({ illustration_tags: tags })
+        .eq('id', postcard.id);
+      if (saveErr) throw saveErr;
+      
+      // Update local state immediately
+      setLocalTags(tags);
+      setShowAllBoxes(true);
+      setLastScanInfo({ count: tags.length, cost: data.cost_estimate || '~$0.005' });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsScanningPhoto(false);
+    }
+  };
+
   const runSemanticScan = async () => {
-    setIsScanning(true);
+    setIsScanningIllus(true);
     setLastScanInfo(null);
     try {
       const { data, error } = await supabase.functions.invoke('postalpeek-semantic-segment', {
@@ -253,7 +286,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsScanning(false);
+      setIsScanningIllus(false);
     }
   };
 
@@ -334,15 +367,25 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
               {showAllBoxes ? 'Hide Boxes' : 'Show All'}
             </button>
           )}
-          <button
-            onClick={runSemanticScan}
-            disabled={isScanning}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
-            style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
-          >
-            {isScanning ? <Loader className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            {isScanning ? 'Scanning...' : 'Run Pipeline'}
-          </button>
+
+          <div className="flex items-center bg-white/5 rounded-lg overflow-hidden border border-white/10">
+            <button
+              onClick={runPhotoScan}
+              disabled={isScanningPhoto || isScanningIllus}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40 text-amber-300 border-r border-white/10"
+            >
+              {isScanningPhoto ? <Loader className="w-3 h-3 animate-spin" /> : <span>📷</span>}
+              Photo
+            </button>
+            <button
+              onClick={runSemanticScan}
+              disabled={isScanningPhoto || isScanningIllus}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40 text-indigo-300"
+            >
+              {isScanningIllus ? <Loader className="w-3 h-3 animate-spin" /> : <span>🎨</span>}
+              Illus
+            </button>
+          </div>
         </div>
       </div>
 
@@ -801,6 +844,100 @@ function DiscoveriesSection({ postcard }: { postcard: PostcardDetail }) {
   );
 }
 
+function StorytellingTriviaSection({ 
+  metadata,
+  onRegenerate,
+  isGenerating
+}: { 
+  metadata: Record<string, any> | null;
+  onRegenerate?: () => void;
+  isGenerating?: boolean;
+}) {
+  const storytelling = metadata?.storytelling;
+  const trivia = metadata?.trivia;
+
+  return (
+    <Section icon={<Sparkles className="w-3.5 h-3.5" />} title="Storytelling & Trivia">
+      {onRegenerate && (
+        <div className="flex justify-end -mt-8 mb-2 relative z-10">
+          <button
+            onClick={onRegenerate}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40 bg-indigo-500/10"
+            style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(199,210,254,0.9)' }}
+          >
+            <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+            {isGenerating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+        </div>
+      )}
+
+      {storytelling && (
+        <div className="mb-4">
+          <h4 className="text-indigo-300 text-xs font-semibold mb-2 uppercase tracking-wide">Storytelling Fact</h4>
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10 space-y-2">
+            {storytelling.en && <p className="text-sm text-white/80 leading-relaxed"><span className="text-white/40 text-xs mr-2 font-mono">EN</span>{storytelling.en}</p>}
+            {storytelling.es && <p className="text-sm text-white/80 leading-relaxed"><span className="text-white/40 text-xs mr-2 font-mono">ES</span>{storytelling.es}</p>}
+          </div>
+        </div>
+      )}
+
+      {trivia && (
+        <div>
+          <h4 className="text-amber-300 text-xs font-semibold mb-2 uppercase tracking-wide">Trivia Quiz</h4>
+          <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-4">
+            <div>
+              <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1.5">Question</p>
+              <div className="space-y-1.5">
+                {trivia.question?.en && <p className="text-sm text-white/90 font-medium"><span className="text-white/40 text-xs mr-2 font-mono font-normal">EN</span>{trivia.question.en}</p>}
+                {trivia.question?.es && <p className="text-sm text-white/90 font-medium"><span className="text-white/40 text-xs mr-2 font-mono font-normal">ES</span>{trivia.question.es}</p>}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+              <div>
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-2">Options (EN)</p>
+                <ul className="space-y-1.5 text-sm text-white/70">
+                  {(Array.isArray(trivia.options)
+                    ? trivia.options.map((o: any) => ({ text: o.text?.en || '', isCorrect: o.isCorrect }))
+                    : (trivia.options?.en || []).map((text: string) => ({ text, isCorrect: text === trivia.correct_answer?.en }))
+                  ).filter((o: any) => o.text).map((opt: { text: string; isCorrect: boolean }, i: number) => (
+                    <li key={i} className={`flex items-center gap-2 px-2 py-1 rounded-md ${opt.isCorrect ? "bg-emerald-500/10 text-emerald-400 font-medium" : ""}`}>
+                      {opt.isCorrect ? <CheckCircle className="w-3.5 h-3.5" /> : <div className="w-3.5 h-3.5 rounded-full border border-white/20" />}
+                      {opt.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-white/40 text-[10px] uppercase font-bold tracking-wider mb-2">Options (ES)</p>
+                <ul className="space-y-1.5 text-sm text-white/70">
+                  {(Array.isArray(trivia.options)
+                    ? trivia.options.map((o: any) => ({ text: o.text?.es || '', isCorrect: o.isCorrect }))
+                    : (trivia.options?.es || []).map((text: string) => ({ text, isCorrect: text === trivia.correct_answer?.es }))
+                  ).filter((o: any) => o.text).map((opt: { text: string; isCorrect: boolean }, i: number) => (
+                    <li key={i} className={`flex items-center gap-2 px-2 py-1 rounded-md ${opt.isCorrect ? "bg-emerald-500/10 text-emerald-400 font-medium" : ""}`}>
+                      {opt.isCorrect ? <CheckCircle className="w-3.5 h-3.5" /> : <div className="w-3.5 h-3.5 rounded-full border border-white/20" />}
+                      {opt.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!storytelling && !trivia && (
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <p className="text-white/40 text-sm mb-2">No storytelling or trivia data yet.</p>
+          <p className="text-white/20 text-xs">Click Regenerate to ask Gemini to analyze the image and create a fact & quiz.</p>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 export function PostcardDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -810,15 +947,23 @@ export function PostcardDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState<Record<string, boolean>>({});
 
-  const handleRegenerate = async (target: 'detailed' | 'illustration') => {
+  const handleRegenerate = async (target: 'detailed' | 'illustration' | 'enrich') => {
     if (!postcard) return;
     setRegenLoading((prev) => ({ ...prev, [target]: true }));
     try {
-      const { error: fnError } = await supabase.functions.invoke(
-        'postalpeek-regenerate-tags',
-        { body: { postcard_id: postcard.id, targets: [target] } },
-      );
-      if (fnError) throw fnError;
+      if (target === 'enrich') {
+        const { error: fnError } = await supabase.functions.invoke(
+          'postalpeek-enrich-metadata',
+          { body: { postcard_id: postcard.id, force: true } },
+        );
+        if (fnError) throw fnError;
+      } else {
+        const { error: fnError } = await supabase.functions.invoke(
+          'postalpeek-regenerate-tags',
+          { body: { postcard_id: postcard.id, targets: [target] } },
+        );
+        if (fnError) throw fnError;
+      }
 
       // Re-fetch the postcard to get updated data
       const { data: refreshed, error: refreshErr } = await supabase
@@ -857,9 +1002,7 @@ export function PostcardDetailPage() {
 
     const load = async () => {
       setLoading(true);
-      const query = supabase
-        .from('postalpeek_postcards')
-        .select(`
+      const selectFields = `
           id, created_at, city, country, location_name, lat, lng,
           illustration_url, original_image_url,
           category, description,
@@ -869,12 +1012,39 @@ export function PostcardDetailPage() {
           detailed_tags, illustration_tags,
           aesthetic_vibes, architecture_style, color_palette,
           video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers
-        `);
+        `;
 
-      const { data, error: err } = await (isUuid
-        ? query.eq('id', id)
-        : query.eq('short_id', id)
-      ).single();
+      let data: any = null;
+      let err: any = null;
+
+      if (isUuid) {
+        const res = await supabase
+          .from('postalpeek_postcards')
+          .select(selectFields)
+          .eq('id', id)
+          .single();
+        data = res.data;
+        err = res.error;
+      } else {
+        // Decode the hash slug to a UUID prefix and search by range
+        const prefix = decodeHashToUuidPrefix(id);
+        if (prefix) {
+          const minUuid = `${prefix}-0000-0000-0000-000000000000`;
+          const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
+
+          const res = await supabase
+            .from('postalpeek_postcards')
+            .select(selectFields)
+            .gte('id', minUuid)
+            .lte('id', maxUuid)
+            .limit(1)
+            .single();
+          data = res.data;
+          err = res.error;
+        } else {
+          err = { message: 'Invalid postcard slug' };
+        }
+      }
 
       if (cancelled) return;
       if (err || !data) {
@@ -999,6 +1169,13 @@ export function PostcardDetailPage() {
                   <Row label="Category" value={bilingualText(postcard.category)} />
                   <Row label="Description" value={bilingualText(postcard.description)} />
                 </Section>
+
+                {/* Storytelling & Trivia */}
+                <StorytellingTriviaSection 
+                  metadata={postcard.generation_metadata} 
+                  onRegenerate={() => handleRegenerate('enrich')}
+                  isGenerating={regenLoading.enrich}
+                />
 
                 {/* Scene Metadata */}
                 <Section icon={<Eye className="w-3.5 h-3.5" />} title="Scene Analysis">

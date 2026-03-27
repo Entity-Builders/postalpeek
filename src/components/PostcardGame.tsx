@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Clock, Target } from 'lucide-react';
+import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Clock, Target, Lightbulb } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, getLang } from '../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { useRiddles } from '../hooks/useRiddles';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface TagWithBox {
@@ -40,6 +41,7 @@ function isPlayableTag(tag: TagWithBox): boolean {
   return true;
 }
 
+
 // ── Hand-drawn circle SVG ───────────────────────────────────────────────
 function HandDrawnCircle({ cx, cy, rx, ry, seed = 0 }: {
   cx: number; cy: number; rx: number; ry: number; seed?: number;
@@ -51,8 +53,8 @@ function HandDrawnCircle({ cx, cy, rx, ry, seed = 0 }: {
     <motion.ellipse
       cx={cx}
       cy={cy}
-      rx={rx * 1.15}
-      ry={ry * 1.15}
+      rx={rx * 1.4}
+      ry={ry * 1.4}
       fill="none"
       stroke="rgba(239,68,68,0.75)"
       strokeWidth="2.5"
@@ -146,7 +148,7 @@ export function usePostcardGame(item: FeedItem) {
     return () => { cancelled = true; };
   }, [needsScan, item.illustration_url, item.id]);
 
-  // Click handler
+  // Click handler — generous padding because Gemini bboxes on illustrations are approximate
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation(); // ← prevent zoom/clean toggle
     if (totalObjects === 0 || currentTargetIndex === null) return;
@@ -154,8 +156,8 @@ export function usePostcardGame(item: FeedItem) {
     const clickX = ((e.clientX - rect.left) / rect.width) * 1000;
     const clickY = ((e.clientY - rect.top) / rect.height) * 1000;
 
-    const PAD_FACTOR = 0.2;
-    const MIN_PAD = 15;
+    const PAD_FACTOR = 0.5;  // generous — AI boxes on illustrations are imprecise
+    const MIN_PAD = 60;
     const targetTag = tagsWithBbox[currentTargetIndex];
     if (!targetTag) return;
     const coords = targetTag.box_2d ?? targetTag.bbox;
@@ -336,8 +338,32 @@ interface GameBottomPanelProps {
 }
 
 export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
-  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, elapsedSeconds, hintsUsed } = game;
+  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, elapsedSeconds, hintsUsed, tagsWithBbox } = game;
   const progress = totalObjects > 0 ? (discoveredIndices.size / totalObjects) * 100 : 0;
+
+  // ── Riddles integration ──
+  const { riddles, isLoading: riddlesLoading } = useRiddles(item.id);
+  const [revealedForTarget, setRevealedForTarget] = useState<string | null>(null);
+  const riddleRevealed = revealedForTarget === currentTarget;
+  const setRiddleRevealed = (val: boolean) => setRevealedForTarget(val ? currentTarget : null);
+
+  // Get the EN label for the current target to look up the riddle
+  const currentTargetIndex = useMemo(() => {
+    return tagsWithBbox.findIndex((_t, i) => !discoveredIndices.has(i));
+  }, [tagsWithBbox, discoveredIndices]);
+
+  const currentEnLabel = currentTargetIndex >= 0
+    ? (() => {
+        const label = tagsWithBbox[currentTargetIndex].label;
+        if (typeof label === 'object' && label !== null) {
+          const bilingual = label as { en?: string; es?: string };
+          return bilingual.en || '';
+        }
+        return String(label);
+      })()
+    : '';
+
+  const currentRiddle = currentEnLabel ? riddles.get(currentEnLabel)?.text : undefined;
 
   // Star rating based on hints used
   const starRating = hintsUsed === 0 ? 3 : hintsUsed <= 2 ? 2 : 1;
@@ -445,15 +471,40 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
       {/* ─── Progress bar ─── */}
       <div className="mb-2">
         <div className="flex items-center justify-between mb-1">
-          {/* Current target */}
+          {/* Current target — riddle or direct label */}
           {isScanning ? (
             <div className="flex items-center gap-1.5 text-amber-600 text-xs font-medium">
               <Loader className="w-3 h-3 animate-spin" />
               <span>{t({ es: 'Analizando...', en: 'Analyzing...' })}</span>
             </div>
+          ) : riddlesLoading ? (
+            <div className="flex items-center gap-1.5 text-amber-600 text-xs font-medium">
+              <Loader className="w-3 h-3 animate-spin" />
+              <span>🧩 {t({ es: 'Preparando acertijos...', en: 'Preparing riddles...' })}</span>
+            </div>
+          ) : currentRiddle && !riddleRevealed ? (
+            /* Riddle mode: full-width text that wraps, controls on the right */
+            <motion.div
+              key={currentTarget + '-riddle'}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-start gap-1.5 w-full"
+            >
+              <span className="text-amber-500 text-sm flex-shrink-0 mt-0.5">🧩</span>
+              <span className="text-stone-700 text-xs font-medium italic leading-snug flex-1">
+                {currentRiddle}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setRiddleRevealed(true); }}
+                className="flex-shrink-0 p-0.5 rounded-full hover:bg-amber-100 transition-colors"
+                title={t({ es: 'Revelar objeto', en: 'Reveal object' })}
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+            </motion.div>
           ) : currentTarget ? (
             <motion.div
-              key={currentTarget}
+              key={currentTarget + '-label'}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-1.5"
@@ -508,15 +559,17 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
         {scanError && <p className="text-red-500 text-[11px] mt-1">{scanError}</p>}
       </div>
 
-      {/* ─── Facts / Know about this place ─── */}
-      <div className="flex flex-col gap-1 mt-1">
-        {facts.slice(0, 3).map((fact, i) => (
-          <div key={i} className="flex items-start gap-1.5 text-stone-500 text-[11px] leading-snug">
-            <span className="text-stone-400 flex-shrink-0 mt-0.5">{fact.icon}</span>
-            <span className="capitalize" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fact.text}</span>
-          </div>
-        ))}
-      </div>
+      {/* ─── Facts / Know about this place (hidden when riddles are active) ─── */}
+      {riddles.size === 0 && (
+        <div className="flex flex-col gap-1 mt-1">
+          {facts.slice(0, 3).map((fact, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-stone-500 text-[11px] leading-snug">
+              <span className="text-stone-400 flex-shrink-0 mt-0.5">{fact.icon}</span>
+              <span className="capitalize" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fact.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
