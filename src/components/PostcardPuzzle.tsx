@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Star, Puzzle } from 'lucide-react';
+import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t } from '../utils/i18n';
 
 // ── Types ──────────────────────────────────────────────────────────────
-const GRID_SIZE = 3; // 3×3
 
 interface PuzzlePiece {
   /** Current position index (0..(N*N-1)) */
@@ -42,109 +43,108 @@ function createShuffledPieces(size: number): PuzzlePiece[] {
 // Hook: usePostcardPuzzle — encapsulates all puzzle state
 // ═══════════════════════════════════════════════════════════════════════
 export function usePostcardPuzzle(item: FeedItem) {
+  const { user } = useAuth();
+  
+  const engine = useMiniGameEngine({
+    gameType: 'puzzle',
+    userId: user?.id,
+    autoStartTimer: false,
+  });
+
+  const [gridSize, setGridSize] = useState(3);
   const [pieces, setPieces] = useState<PuzzlePiece[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [moves, setMoves] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(true); // start in preview
-  const [peeksUsed, setPeeksUsed] = useState(0);
+  const [isPreviewing, setIsPreviewing] = useState(true);
   const [isPeeking, setIsPeeking] = useState(false);
-  const peeksUsedRef = useRef(0);
 
-  // Timer
-  const startTimeRef = useRef<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initRef = useRef<string | null>(null);
 
-  const total = GRID_SIZE * GRID_SIZE;
+  const total = gridSize * gridSize;
+  const isComplete = engine.status === 'won';
 
-  // Correct count
   const correctCount = useMemo(
     () => pieces.filter((p) => p.currentPos === p.correctPos).length,
     [pieces],
   );
 
-  // Initialize: show preview then shuffle
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPieces(createShuffledPieces(GRID_SIZE));
-      setIsPreviewing(false);
-      startTimeRef.current = Date.now();
-      // Start the live timer
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds(Math.round((Date.now() - startTimeRef.current) / 1000));
-      }, 1000);
-    }, 2500);
-    return () => {
-      clearTimeout(timer);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [item.id]);
+  // Store engine functions in refs so we don't need them in dependency arrays
+  // (which would cause re-renders because `engine` updates every second tick)
+  const engineStartRef = useRef(engine.start);
+  engineStartRef.current = engine.start;
+  const engineWinRef = useRef(engine.win);
+  engineWinRef.current = engine.win;
 
-  // Handle tile tap
+  // Initialize: wait for playerInfo, show preview, then shuffle and start
+  useEffect(() => {
+    if (!engine.playerInfo || initRef.current === item.id) return;
+    initRef.current = item.id;
+    
+    setIsPreviewing(true);
+    setSelectedIndex(null);
+
+    const size = engine.playerInfo.level >= 5 ? 4 : engine.playerInfo.level === 1 ? 2 : 3;
+    setGridSize(size);
+
+    const timer = setTimeout(() => {
+      setPieces(createShuffledPieces(size));
+      setIsPreviewing(false);
+      engineStartRef.current();
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [engine.playerInfo, item.id]);
+
+  // Check completion declaratively
+  useEffect(() => {
+    if (pieces.length === 0 || isPreviewing || isComplete) return;
+    const allCorrect = pieces.every((p) => p.currentPos === p.correctPos);
+    if (allCorrect) {
+      engineWinRef.current();
+    }
+  }, [pieces, isPreviewing, isComplete]);
+
   const handleTileTap = useCallback(
     (tileIndex: number) => {
       if (isComplete || isPreviewing || isPeeking) return;
 
       if (selectedIndex === null) {
-        // First selection
         setSelectedIndex(tileIndex);
       } else if (selectedIndex === tileIndex) {
-        // Deselect
         setSelectedIndex(null);
       } else {
-        // Second selection → SWAP (immutable)
-        setPieces((prev) => {
-          const next = prev.map((p) => {
-            if (p.currentPos === selectedIndex) {
-              return { ...p, currentPos: tileIndex };
-            }
-            if (p.currentPos === tileIndex) {
-              return { ...p, currentPos: selectedIndex };
-            }
+        setPieces((prev) => prev.map((p) => {
+            if (p.currentPos === selectedIndex) return { ...p, currentPos: tileIndex };
+            if (p.currentPos === tileIndex) return { ...p, currentPos: selectedIndex };
             return p;
-          });
-
-          // Check completion
-          const allCorrect = next.every((p) => p.currentPos === p.correctPos);
-          if (allCorrect) {
-            setIsComplete(true);
-            setElapsedSeconds(Math.round((Date.now() - startTimeRef.current) / 1000));
-            setPeeksUsed(peeksUsedRef.current);
-            if (timerRef.current) clearInterval(timerRef.current);
-          }
-
-          return next;
-        });
-        setMoves((m) => m + 1);
+        }));
+        engine.registerClick();
         setSelectedIndex(null);
       }
     },
-    [selectedIndex, isComplete, isPreviewing, isPeeking],
+    [selectedIndex, isComplete, isPreviewing, isPeeking, engine],
   );
 
-  // Peek at original
   const handlePeek = useCallback(() => {
     if (isPeeking || isComplete) return;
     setIsPeeking(true);
-    peeksUsedRef.current += 1;
+    engine.useHint();
     setTimeout(() => setIsPeeking(false), 2000);
-  }, [isPeeking, isComplete]);
+  }, [isPeeking, isComplete, engine]);
 
   return {
     pieces,
     selectedIndex,
-    moves,
+    moves: engine.metrics.clicks,
     isComplete,
     isPreviewing,
     isPeeking,
-    peeksUsed,
+    peeksUsed: engine.metrics.hintsUsed,
     correctCount,
     total,
-    gridSize: GRID_SIZE,
+    gridSize,
     handleTileTap,
     handlePeek,
-    elapsedSeconds,
+    elapsedSeconds: engine.metrics.elapsedSeconds,
   };
 }
 

@@ -17,7 +17,7 @@ const DIFFICULTY_CONFIG: Record<
   { label: { es: string; en: string }; color: string; icon: string }
 > = {
   easy: { label: { es: 'Fácil', en: 'Easy' }, color: 'bg-emerald-500/80', icon: '🌿' },
-  medium: { label: { es: 'Media', en: 'Medium' }, color: 'bg-yellow-500/80', icon: '⭐' },
+  medium: { label: { es: 'Media', en: 'Medium' }, color: 'bg-yellow-500/80', icon: '⚡' },
   hard: { label: { es: 'Difícil', en: 'Hard' }, color: 'bg-orange-500/80', icon: '🔥' },
   epic: { label: { es: 'Épica', en: 'Epic' }, color: 'bg-purple-500/80', icon: '💎' },
 };

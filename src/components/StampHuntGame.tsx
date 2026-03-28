@@ -11,6 +11,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Stamp, Sparkles } from 'lucide-react';
+import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
@@ -83,87 +85,97 @@ function computeStampPlacement(postcardId: string): StampPlacement {
 // Hook: useStampHunt
 // ═══════════════════════════════════════════════════════════════════════
 export function useStampHunt(item: FeedItem) {
-  // Random placement each time the component mounts (different per play session)
-  const [placement] = useState(() => computeStampPlacement(item.id + Math.random().toString()));
+  const { user } = useAuth();
+  
+  const engine = useMiniGameEngine({
+    gameType: 'stamp_hunt',
+    userId: user?.id,
+    autoStartTimer: true,
+  });
 
-  const [found, setFound] = useState(false);
-  const [tapsCount, setTapsCount] = useState(0);
-  const [hintsUsed, setHintsUsed] = useState(0);
-  const [hintActive, setHintActive] = useState(false);
+  const [placement, setPlacement] = useState(() => computeStampPlacement(item.id + Math.random().toString()));
   const [showReward, setShowReward] = useState(false);
+  const [hintActive, setHintActive] = useState(false);
+  
   const missCountRef = useRef(0);
-  const hintsUsedRef = useRef(0);
+  const found = engine.status === 'won';
 
-  // Timer
-  const startTimeRef = useRef<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Start timer on mount
+  // Start engine if idle
   useEffect(() => {
-    startTimeRef.current = Date.now();
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(Math.round((Date.now() - startTimeRef.current) / 1000));
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [item.id]);
+    if (engine.status === 'idle') {
+      engine.start();
+    }
+  }, [engine.status, engine]);
+
+  // Dynamic difficult scaling
+  useEffect(() => {
+    if (engine.playerInfo && engine.playerInfo.level > 1) {
+      setPlacement(prev => {
+        let size = prev.size;
+        let diff = prev.difficulty;
+        if (engine.playerInfo!.level >= 5) {
+          diff = 'hard';
+          size = 0.04; // Very small
+        } else if (engine.playerInfo!.level >= 3) {
+          diff = 'medium';
+          size = 0.06;
+        } else {
+          diff = 'easy';
+          size = 0.09;
+        }
+        return { ...prev, size, difficulty: diff };
+      });
+    }
+  }, [engine.playerInfo?.level]);
 
   // Auto-hint at 60 seconds
   useEffect(() => {
     if (found) return;
-    if (elapsedSeconds >= 60 && !hintActive && hintsUsedRef.current === 0) {
+    if (engine.metrics.elapsedSeconds >= 60 && !hintActive && engine.metrics.hintsUsed === 0) {
       setHintActive(true);
-      hintsUsedRef.current += 1;
+      engine.useHint();
       setTimeout(() => setHintActive(false), 3000);
     }
-  }, [elapsedSeconds, found, hintActive]);
+  }, [engine.metrics.elapsedSeconds, found, hintActive, engine]);
 
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (found) return;
 
+    engine.registerClick();
+
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = (e.clientX - rect.left) / rect.width;
     const clickY = (e.clientY - rect.top) / rect.height;
 
-    setTapsCount(prev => prev + 1);
-
-    // Check if click is within stamp area (with generous tolerance)
-    const tolerance = placement.size * 0.8; // generous hit area
+    const tolerance = placement.size * 0.8;
     const dx = clickX - placement.x;
     const dy = clickY - placement.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist <= tolerance) {
-      // Found it!
-      setFound(true);
+      engine.win();
       setShowReward(true);
-      setElapsedSeconds(Math.round((Date.now() - startTimeRef.current) / 1000));
-      setHintsUsed(hintsUsedRef.current);
-      if (timerRef.current) clearInterval(timerRef.current);
       setTimeout(() => setShowReward(false), 3500);
     } else {
-      // Miss
       missCountRef.current += 1;
       if (missCountRef.current >= 5 && !hintActive) {
         setHintActive(true);
-        hintsUsedRef.current += 1;
+        engine.useHint();
         missCountRef.current = 0;
         setTimeout(() => setHintActive(false), 2000);
       }
     }
-  }, [found, placement, hintActive]);
+  }, [found, placement, engine, hintActive]);
 
   return {
     placement,
     found,
-    tapsCount,
-    hintsUsed,
+    tapsCount: engine.metrics.clicks,
+    hintsUsed: engine.metrics.hintsUsed,
     hintActive,
     showReward,
-    elapsedSeconds,
+    elapsedSeconds: engine.metrics.elapsedSeconds,
     handleImageClick,
   };
 }

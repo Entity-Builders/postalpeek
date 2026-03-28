@@ -10,7 +10,6 @@
 
 import React, { useState } from 'react';
 import {
-  Sparkles,
   Ticket,
   Lock,
   ChevronDown,
@@ -69,7 +68,7 @@ export interface PostcardChinProps {
   /** Play button callback (carousel): starts mini-games to grind stamps */
   onPlay?: () => void;
   /** Sellar button callback (carousel): spends stamps to claim */
-  onClaim?: () => void;
+  onClaim?: (cost?: number) => void;
   /** Trade button callback (carousel): propose trade */
   onTrade?: () => void;
   /** Navigate to album (carousel) */
@@ -126,6 +125,8 @@ export function PostcardChin({
     active.last_played_at && 
     new Date(active.last_played_at).toDateString() === new Date().toDateString()
   );
+
+  const stampCost = active.rarity === 'legendary' ? 35 : active.rarity === 'epic' ? 15 : active.rarity === 'rare' ? 6 : 2;
 
   return (
     <div
@@ -301,15 +302,21 @@ export function PostcardChin({
               className='flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
               onClick={(e) => {
                 e.stopPropagation();
-                handleClaimClick();
                 if (onClaim) {
+                  onClaim(stampCost);
                   analytics.track('buy_intention', { postcard_id: item.id });
+                } else if (onClick) {
+                  onClick(); // fallback
                 }
               }}
-              title={t({ es: 'Sellar (⭐ 2)', en: 'Buy (⭐ 2)' }, lang)}
+              title={t({ es: `Sellar (${stampCost} Sellos)`, en: `Buy (${stampCost} Stamps)` }, lang)}
             >
-              <Sparkles className='w-4 h-4 md:w-5 md:h-5' />
-              {t({ es: 'Sellar (⭐ 2)', en: 'Buy (⭐ 2)' }, lang)}
+              <div className="w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center bg-white/10 shrink-0 rotate-12">
+                 <span className="font-mono text-[5px] text-white uppercase tracking-wider text-center leading-[1.1]">
+                   Postal<br/>Peek
+                 </span>
+              </div>
+              {t({ es: `Sellar (${stampCost})`, en: `Buy (${stampCost})` }, lang)}
             </button>
           )}
 

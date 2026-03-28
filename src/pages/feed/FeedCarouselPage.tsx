@@ -91,15 +91,15 @@ export function FeedCarouselPage() {
   
   const albumPostcardIds = new Set<string>();
 
-  const handleClaimPostcard = useCallback(async (id: string) => {
-     const res = await claim(id);
+  const handleClaimPostcard = useCallback(async (id: string, cost?: number) => {
+     const res = await claim(id, cost);
      if (res.success) {
-         setClaimToast({ type: 'success', message: `¡Postal Sellada! Costo: ${res.stamp_cost ?? 2} ⭐` });
+         setClaimToast({ type: 'success', message: `¡Postal Sellada! Costo: ${res.stamp_cost ?? 2} Sellos` });
          refetchCollection();
          refetchAlbums();
      } else {
          if (res.error === 'INSUFFICIENT_STAMPS') {
-             setClaimToast({ type: 'error', message: `Necesitas ${res.stamp_cost ?? 2} ⭐ (Tienes ${res.balance ?? 0}). ¡A Jugar!` });
+             setClaimToast({ type: 'error', message: `Necesitas ${res.stamp_cost ?? 2} Sellos (Tienes ${res.balance ?? 0}). ¡A Jugar!` });
          } else if (res.error === 'ALREADY_CLAIMED') {
              setClaimToast({ type: 'error', message: 'Ya tienes esta postal.' });
          } else {

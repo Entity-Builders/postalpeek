@@ -22,7 +22,7 @@ interface PostcardActionBarProps {
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
   onPlay?: () => void;
-  onClaim?: () => void;
+  onClaim?: (cost?: number) => void;
   onTrade?: () => void;
   isOwned?: boolean;
   hasOwner?: boolean;

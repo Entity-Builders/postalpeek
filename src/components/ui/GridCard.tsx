@@ -20,6 +20,7 @@ interface GridCardProps {
   onClick: () => void;
   isClaimedByMe?: boolean;
   viewMode?: 'grid' | 'feed';
+  onClaimPostcard?: (id: string, cost?: number) => void;
 }
 
 /** Above-fold cards get framer-motion entry animation; below-fold cards render instantly */
@@ -31,8 +32,9 @@ export const GridCard = React.memo(function GridCard({
   layout,
   onClick,
   isClaimedByMe,
+  onClaimPostcard,
 }: GridCardProps) {
-  const hasOwner = !!item.owner_id;
+  const hasOwner = !!item.owner_id || !!isClaimedByMe;
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
   const srcSet = useSignedSrcSet(
     item.illustration_url,
@@ -168,13 +170,13 @@ export const GridCard = React.memo(function GridCard({
 
           {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>
-        {/* ── PostcardChin — unified chin (storytelling + city + actions) ── */}
         <PostcardChin
           item={item}
           hasOwner={hasOwner}
           isClaimedByMe={isClaimedByMe}
           isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
           onClick={onClick}
+          onClaim={onClaimPostcard ? (cost) => onClaimPostcard(item.id, cost) : undefined}
         />
       </div>
     </Wrapper>

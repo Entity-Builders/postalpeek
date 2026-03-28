@@ -1205,7 +1205,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                         />
                         <div className="flex flex-col">
                           <span style={{ color: isSelected ? 'white' : 'rgba(255,255,255,0.7)' }} className="text-sm font-medium">
-                            {key === ACTIVE_STYLE_KEY ? `⭐ ` : ''}{style.label}
+                            {key === ACTIVE_STYLE_KEY ? `✓ ` : ''}{style.label}
                           </span>
                           <span className="text-[10px] text-white/30 leading-tight mt-0.5">
                             {style.description}

@@ -41,7 +41,7 @@ const DIFFICULTY_CONFIG: Record<
     label: { es: 'Media', en: 'Medium' },
     color: 'text-yellow-700',
     bg: 'bg-yellow-100',
-    icon: '⭐',
+    icon: '⚡',
   },
   hard: {
     label: { es: 'Difícil', en: 'Hard' },

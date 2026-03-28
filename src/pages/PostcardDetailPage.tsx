@@ -568,7 +568,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
             >
               <Sparkles className="w-4 h-4 text-white animate-pulse" />
               <span className="text-white font-bold text-sm tracking-tight">{showReward} Found!</span>
-              <span className="text-white/70 text-xs">+1 ⭐</span>
+              <span className="text-white/70 text-xs">+1 Sello</span>
             </motion.div>
           )}
         </>

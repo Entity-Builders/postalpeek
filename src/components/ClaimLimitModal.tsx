@@ -88,7 +88,7 @@ export function ClaimLimitModal({ type, used, limit, onClose }: ClaimLimitModalP
           {/* Future upgrade path — disabled for now */}
           {/*
           <button className="w-full py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium mt-2 hover:bg-amber-100 transition-colors">
-            ⭐ Desbloquear más reclamos
+            🎟️ Desbloquear más reclamos
           </button>
           */}
         </motion.div>

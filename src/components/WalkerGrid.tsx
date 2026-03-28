@@ -41,6 +41,7 @@ interface WalkerGridProps {
   claimedIds?: Set<string>;
   viewMode: 'grid' | 'feed';
   onToggleViewMode: () => void;
+  onClaimPostcard?: (id: string, cost?: number) => void;
 }
 
 export function WalkerGrid({
@@ -68,6 +69,7 @@ export function WalkerGrid({
   claimedIds = new Set<string>(),
   viewMode,
   onToggleViewMode,
+  onClaimPostcard,
 }: WalkerGridProps) {
   const displayItems = spotlightQuery && spotlightResults.length > 0 ? spotlightResults : items;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -226,6 +228,7 @@ export function WalkerGrid({
                   onClick={() => handleCardClick(index, item)}
                   isClaimedByMe={claimedIds.has(item.id)}
                   viewMode={viewMode}
+                  onClaimPostcard={onClaimPostcard}
                 />
               ))}
             </div>

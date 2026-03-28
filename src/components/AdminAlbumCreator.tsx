@@ -98,7 +98,7 @@ interface PickerPostcard {
 
 const DIFFICULTIES: { value: Difficulty; label: string; icon: string }[] = [
   { value: 'easy', label: 'Easy', icon: '🌿' },
-  { value: 'medium', label: 'Medium', icon: '⭐' },
+  { value: 'medium', label: 'Medium', icon: '⚡' },
   { value: 'hard', label: 'Hard', icon: '🔥' },
   { value: 'epic', label: 'Epic', icon: '💎' },
 ];

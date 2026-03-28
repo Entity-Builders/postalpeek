@@ -50,6 +50,8 @@ interface UseGameProgressReturn {
   hasEarned: boolean;
   /** Loading state for initial fetch */
   isLoading: boolean;
+  /** Raw rows for completed games */
+  completedRows: GameProgressRow[];
 }
 
 export function useGameProgress(
@@ -203,5 +205,6 @@ export function useGameProgress(
     isEarning,
     hasEarned,
     isLoading,
+    completedRows,
   };
 }

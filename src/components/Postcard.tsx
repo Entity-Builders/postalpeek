@@ -72,7 +72,7 @@ interface PostcardProps {
   /** Collectibles */
   isClaimedByMe?: boolean;
   hasOwner?: boolean;
-  onClaimPostcard?: (postcardId: string) => void;
+  onClaimPostcard?: (postcardId: string, cost?: number) => void;
   isClaimLoading?: boolean;
   /** Dev-only: whether this postcard is in an album */
   isInAlbum?: boolean;

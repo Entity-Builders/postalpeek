@@ -55,7 +55,7 @@ interface PostcardFrontProps {
   /** Collectibles: whether this postcard is claimed by anyone */
   hasOwner?: boolean;
   /** Collectibles: callback to claim this postcard */
-  onClaimPostcard?: (postcardId: string) => void;
+  onClaimPostcard?: (postcardId: string, cost?: number) => void;
   /** Collectibles: whether a claim is currently in progress */
   isClaimLoading?: boolean;
   /** Dev-only: postcard belongs to an album */
@@ -590,7 +590,7 @@ export function PostcardFront({
                     : undefined // Default CTAs to /game/:id navigation
                   : undefined
               }
-              onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? () => onClaimPostcard(item.id) : undefined}
+              onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? (cost) => onClaimPostcard(item.id, cost) : undefined}
               onTrade={hasOwner && !isClaimedByMe ? () => console.warn('Trade not implemented yet') : undefined}
               isOwned={isClaimedByMe}
               hasOwner={hasOwner}

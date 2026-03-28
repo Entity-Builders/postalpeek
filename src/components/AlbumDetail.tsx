@@ -13,7 +13,7 @@ interface AlbumDetailProps {
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   easy:   { label: 'Fácil',   color: 'bg-emerald-100 text-emerald-700', icon: '🌿' },
-  medium: { label: 'Media',   color: 'bg-yellow-100 text-yellow-700',   icon: '⭐' },
+  medium: { label: 'Media',   color: 'bg-yellow-100 text-yellow-700',   icon: '⚡' },
   hard:   { label: 'Difícil', color: 'bg-orange-100 text-orange-700',   icon: '🔥' },
   epic:   { label: 'Épica',   color: 'bg-purple-100 text-purple-700',   icon: '💎' },
 };

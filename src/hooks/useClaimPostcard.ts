@@ -77,6 +77,9 @@ export function useClaimPostcard(userId: string | null | undefined) {
 
       setIsClaiming(true);
 
+      // OPTIMISTIC UI: instantly add to claimed set so UI reacts without delay
+      setClaimedIds((prev) => new Set(prev).add(postcardId));
+
       try {
         const { data, error } = await supabase.rpc('postalpeek_claim_postcard', {
           p_postcard_id: postcardId,
@@ -87,8 +90,7 @@ export function useClaimPostcard(userId: string | null | undefined) {
         const result = data as ClaimResult;
 
         if (result.success) {
-          // Optimistic: add to local claimed set
-          setClaimedIds((prev) => new Set(prev).add(postcardId));
+          // Keep it in the optimistic local claimed set
           setInsufficientStamps(false);
           if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
 
@@ -109,6 +111,13 @@ export function useClaimPostcard(userId: string | null | undefined) {
             remaining_stamps: result.remaining_stamps,
           });
         } else {
+          // REVERT OPTIMISTIC UI on error
+          setClaimedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(postcardId);
+            return next;
+          });
+
           if (result.error === 'INSUFFICIENT_STAMPS') {
             setInsufficientStamps(true);
             if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
@@ -121,6 +130,13 @@ export function useClaimPostcard(userId: string | null | undefined) {
 
         return result;
       } catch (err) {
+        // REVERT OPTIMISTIC UI on exception
+        setClaimedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(postcardId);
+          return next;
+        });
+        
         console.error('Failed to claim postcard:', err);
         analytics.captureError(err, { context: 'claim_postcard', postcard_id: postcardId });
         return { success: false, error: 'ALREADY_CLAIMED' };

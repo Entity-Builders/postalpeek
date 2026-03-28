@@ -41,7 +41,7 @@ interface WalkerCarouselProps {
   hasSharedCard: boolean;
   /** Collectibles */
   claimedIds: Set<string>;
-  onClaimPostcard?: (postcardId: string) => void;
+  onClaimPostcard?: (postcardId: string, cost?: number) => void;
   isClaimLoading?: boolean;
   albumPostcardIds?: Set<string>;
   /** Daily Pack inline mode */
@@ -515,7 +515,7 @@ export function WalkerCarousel({
                         favoriteIds={favoriteIds}
                         onToggleFavorite={user ? toggleFavorite : undefined}
                         isClaimedByMe={claimedIds.has(item.id)}
-                        hasOwner={!!item.owner_id}
+                        hasOwner={!!item.owner_id || claimedIds.has(item.id)}
                         onClaimPostcard={user ? onClaimPostcard : undefined}
                         isClaimLoading={isClaimLoading}
                         isInAlbum={albumPostcardIds.has(item.id)}

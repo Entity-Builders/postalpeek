@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Target, Lightbulb } from 'lucide-react';
+import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t, getLang } from '../utils/i18n';
@@ -73,9 +75,14 @@ function HandDrawnCircle({ cx, cy, rx, ry, seed = 0 }: {
 // Hook: usePostcardGame — encapsulates all game state + logic
 // ═══════════════════════════════════════════════════════════════════════
 export function usePostcardGame(item: FeedItem) {
-  // Track discovered objects by their INDEX in tagsWithBbox, not by label string.
-  // This prevents the bug where two tags with the same label (e.g. two "Window")
-  // would collide — discovering one would mark both as found, leaving the game stuck.
+  const { user } = useAuth();
+  
+  const engine = useMiniGameEngine({
+    gameType: 'find_objects',
+    userId: user?.id,
+    autoStartTimer: false,
+  });
+
   const [discoveredIndices, setDiscoveredIndices] = useState<Set<number>>(new Set());
   const [showReward, setShowReward] = useState<string | null>(null);
   const [lastFoundTarget, setLastFoundTarget] = useState<string | null>(null);
@@ -83,14 +90,6 @@ export function usePostcardGame(item: FeedItem) {
   const [allFound, setAllFound] = useState(false);
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const missCountRef = useRef(0);
-
-  // Timer
-  const startTimeRef = useRef<number>(Date.now());
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Hint tracking for star rating
-  const hintsUsedRef = useRef(0);
-  const [hintsUsed, setHintsUsed] = useState(0);
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -123,9 +122,12 @@ export function usePostcardGame(item: FeedItem) {
     ? getLabel(tagsWithBbox[currentTargetIndex].label)
     : null;
 
-  // Auto-scan
+  // Auto-scan and start
   useEffect(() => {
-    if (!needsScan) return;
+    if (!needsScan) {
+      if (engine.status === 'idle') engine.start();
+      return;
+    }
     let cancelled = false;
     async function runScan() {
       setIsScanning(true);
@@ -144,17 +146,24 @@ export function usePostcardGame(item: FeedItem) {
       } catch (err) {
         if (!cancelled) setScanError(err instanceof Error ? err.message : 'Scan failed');
       } finally {
-        if (!cancelled) setIsScanning(false);
+        if (!cancelled) {
+          setIsScanning(false);
+          if (engine.status === 'idle') engine.start();
+        }
       }
     }
     runScan();
     return () => { cancelled = true; };
-  }, [needsScan, item.illustration_url, item.id]);
+  }, [needsScan, item.illustration_url, item.id, engine]);
 
   // Click handler — generous padding because Gemini bboxes on illustrations are approximate
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation(); // ← prevent zoom/clean toggle
+    if (engine.status === 'won') return;
     if (totalObjects === 0 || currentTargetIndex === null) return;
+    
+    engine.registerClick();
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = ((e.clientX - rect.left) / rect.width) * 1000;
     const clickY = ((e.clientY - rect.top) / rect.height) * 1000;
@@ -187,12 +196,9 @@ export function usePostcardGame(item: FeedItem) {
 
       const isComplete = newDiscovered.size >= totalObjects;
       if (isComplete) {
-        // Final discovery: special toast + longer duration
+        engine.win();
         setShowReward('__ALL_FOUND__');
         setTimeout(() => setShowReward(null), 3500);
-        // Freeze timer
-        setElapsedSeconds(Math.round((Date.now() - startTimeRef.current) / 1000));
-        setHintsUsed(hintsUsedRef.current);
         setTimeout(() => setAllFound(true), 600);
       } else {
         setShowReward(targetLabel);
@@ -202,18 +208,18 @@ export function usePostcardGame(item: FeedItem) {
       missCountRef.current += 1;
       if (missCountRef.current >= 4 && hintIndex === null) {
         setHintIndex(currentTargetIndex);
-        hintsUsedRef.current += 1;
+        engine.useHint();
         missCountRef.current = 0;
         setTimeout(() => setHintIndex(null), 1500);
       }
     }
-  }, [tagsWithBbox, discoveredIndices, totalObjects, currentTargetIndex, hintIndex]);
+  }, [tagsWithBbox, discoveredIndices, totalObjects, currentTargetIndex, hintIndex, engine]);
 
   return {
     discoveredIndices, showReward, allFound, hintIndex,
     lastFoundTarget, lastFoundTargetEn,
     isScanning, scanError, tagsWithBbox, totalObjects, currentTarget,
-    handleImageClick, elapsedSeconds, hintsUsed,
+    handleImageClick, elapsedSeconds: engine.metrics.elapsedSeconds, hintsUsed: engine.metrics.hintsUsed,
   };
 }
 
@@ -327,7 +333,7 @@ export function GameImageOverlay({ game }: GameImageOverlayProps) {
               <>
                 <Sparkles className="w-4 h-4 text-white animate-pulse" />
                 <span className="text-white font-bold text-sm tracking-tight">{game.showReward}</span>
-                <span className="text-white/70 text-xs">+1 ⭐</span>
+                <span className="text-white/70 text-xs">+1 Sello</span>
               </>
             )}
           </motion.div>
