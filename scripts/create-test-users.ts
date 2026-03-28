@@ -7,8 +7,8 @@ dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 // Fallback to local keys if not present in env
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-// Uses the default local supabase service role key (or check eb-infra/.env)
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZmF1bHQiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjUyOTcwOTExLCJleHAiOjE5Njg1NDY5MTF9.M-Z-aUvN6_3yW7tG3wH1z0JpK8oB8O9A5rX9J_m_gG4';
+// Uses the default local supabase service role key (or check eb-infra/.env.local)
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
 
 if (!SUPABASE_SERVICE_ROLE_KEY || SUPABASE_SERVICE_ROLE_KEY.length < 50) {
     console.error('❌ Missing or invalid SUPABASE_SERVICE_ROLE_KEY. Check your .env.local');
@@ -66,20 +66,9 @@ async function main() {
         
         createdUsers.push({ id: userId, ...tu });
 
-        // Wait a bit for profile trigger to run just in case
+        // Wait a bit for auth to propagate
         await new Promise(r => setTimeout(r, 1000));
 
-        // 2. Update their profile
-        const { error: profileErr } = await supabase
-            .from('postalpeek_profiles')
-            .update({ username: tu.username })
-            .eq('id', userId);
-
-        if (profileErr) {
-            console.warn(`   ⚠️ Could not update profile username: ${profileErr.message}`);
-        } else {
-            console.log(`   ✅ Profile updated to ${tu.username}`);
-        }
     }
 
     console.log(`\n🎁 Assigning unclaimed postcards to rivals so you can compete...`);

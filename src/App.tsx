@@ -17,6 +17,7 @@ import { FeedLayout } from './pages/feed/FeedLayout';
 import { FeedGridPage } from './pages/feed/FeedGridPage';
 import { FeedCarouselPage } from './pages/feed/FeedCarouselPage';
 import { CollectionPage } from './pages/feed/CollectionPage';
+import { GamePage } from './pages/GamePage';
 
 // ── Feed (main app) ────────────────────────────────────────────────────
 
@@ -165,6 +166,9 @@ function App() {
 
             {/* Root redirects to /feed */}
             <Route path='/' element={<Navigate to='/feed' replace />} />
+
+            {/* Dedicated Game Route */}
+            <Route path='/game/:shortcode' element={<GamePage />} />
 
             {/* Full-page admin (protected) */}
             <Route

@@ -119,7 +119,6 @@ export function PostcardChin({
   const showStorytelling = !!storytelling && !isTriviaLocked;
 
   // Unified click handlers: prefer explicit callback (carousel), fall back to onClick (grid)
-  const handlePlayClick = onPlay ?? onClick;
   const handleClaimClick = onClaim ?? onClick;
   const handleTradeClick = onTrade ?? onClick;
 
@@ -265,12 +264,16 @@ export function PostcardChin({
           )}
 
           {/* 🎲 Jugar — ONLY on cards owned by the current user */}
-          {isClaimedByMe && handlePlayClick && !isPlayedToday && (
+          {isClaimedByMe && !isPlayedToday && (
             <button
               className='flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-800 hover:bg-black text-white font-bold shadow-md transition-all text-xs border border-stone-600'
               onClick={(e) => {
                 e.stopPropagation();
-                handlePlayClick();
+                if (onPlay) {
+                  onPlay();
+                } else {
+                  navigate(`/game/${item.id}`);
+                }
               }}
               title={t({ es: 'Jugar (1 vez al día)', en: 'Play (1/day)' }, lang)}
             >
@@ -280,7 +283,7 @@ export function PostcardChin({
           )}
 
           {/* ⏳ Jugada — Disable if played today */}
-          {isClaimedByMe && handlePlayClick && isPlayedToday && (
+          {isClaimedByMe && isPlayedToday && (
             <button
               className='flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-200 text-stone-400 font-bold shadow-none text-xs border border-stone-300 cursor-not-allowed opacity-90'
               onClick={(e) => e.stopPropagation()}

@@ -8,6 +8,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Puzzle, Stamp, Trophy, Check, X } from 'lucide-react';
+import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import { t } from '../utils/i18n';
 import type { DbGameType } from '../hooks/useGameProgress';
 
@@ -106,21 +107,21 @@ export function PostcardGameSelector({
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-bold text-stone-800 text-center">
+            <h3 className="text-xl font-black text-stone-800 text-center tracking-tight">
               {allDone
                 ? t({ es: '¡Es tuya!', en: "It's yours!" })
                 : t({ es: 'Completá los desafíos', en: 'Complete the challenges' })
               }
             </h3>
-            <p className="text-xs text-stone-500 mt-1 text-center">
+            <p className="text-sm text-stone-500 mt-2 text-center max-w-[260px] leading-snug">
               {allDone
-                ? t({ es: 'Completaste todos los juegos', en: 'All games completed' })
-                : t({ es: 'para ganar esta postal', en: 'to win this postcard' })
+                ? t({ es: 'Ya ganaste todos los sellos de esta postal. ¡A otra cosa!', en: 'You got all the stamps from this postcard. Moving on!' })
+                : t({ es: `¡Ganás 1 sello por cada desafío! Usalos para intercambiar postales.`, en: `Earn 1 stamp per challenge! Use them to trade postcards.` })
               }
             </p>
 
             {/* Game list */}
-            <div className="w-full mt-5 space-y-2">
+            <div className="w-full mt-6 space-y-2.5">
               {availableGames.map((game) => {
                 const Icon = game.icon;
                 const isDone = completedGames?.has(game.type) ?? false;
@@ -128,34 +129,39 @@ export function PostcardGameSelector({
                 return (
                   <div
                     key={game.type}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all ${
                       isDone
                         ? 'border-emerald-200 bg-emerald-50/70'
-                        : 'border-stone-200 bg-white'
+                        : 'border-stone-200 bg-white shadow-sm'
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                       isDone
                         ? 'bg-emerald-500 text-white'
                         : 'bg-stone-100 text-stone-500'
                     }`}>
                       {isDone ? (
-                        <Check className="w-4 h-4" strokeWidth={3} />
+                        <Check className="w-5 h-5" strokeWidth={3} />
                       ) : (
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-5 h-5" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className={`block text-xs font-semibold ${isDone ? 'text-emerald-700' : 'text-stone-800'}`}>
+                      <span className={`block text-sm font-bold ${isDone ? 'text-emerald-700' : 'text-stone-800'}`}>
                         {t(game.label)}
                       </span>
-                      <span className="block text-[10px] text-stone-400 leading-snug">
+                      <span className="block text-[11px] text-stone-400 mt-0.5 leading-snug">
                         {isDone
                           ? t({ es: '✅ Completado', en: '✅ Done' })
                           : t(game.desc)
                         }
                       </span>
                     </div>
+                    {!isDone && (
+                      <div className="flex items-center gap-1.5 bg-amber-100/80 text-amber-700 px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-200/50">
+                        +1 <PostalPeekStampSVG className="w-3.5 h-3.5 border-amber-500/30 text-amber-800" />
+                      </div>
+                    )}
                   </div>
                 );
               })}

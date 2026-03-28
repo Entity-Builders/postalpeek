@@ -78,6 +78,8 @@ interface PostcardFrontProps {
   onOpenAlbum?: (albumId: string) => void;
   /** Navigate directly to the collection */
   onOpenCollection?: () => void;
+  /** Automatically start the game on mount */
+  autoStartGame?: boolean;
 }
 
 export function PostcardFront({
@@ -105,6 +107,7 @@ export function PostcardFront({
   userId,
   onOpenAlbum,
   onOpenCollection,
+  autoStartGame = false,
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
   const { addLocalStamps } = useStampContext();
@@ -302,6 +305,14 @@ export function PostcardFront({
     }
     prevIsTriviaLocked.current = isTriviaLocked;
   }, [isTriviaLocked, playingMode]);
+
+  const hasAutoStarted = React.useRef(false);
+  useEffect(() => {
+    if (autoStartGame && allowPlay && !isTriviaLocked && hasOwner && !isPlaying && !hasAutoStarted.current) {
+      setShowSelector(true);
+      hasAutoStarted.current = true;
+    }
+  }, [autoStartGame, allowPlay, isTriviaLocked, hasOwner, isPlaying]);
 
   React.useEffect(() => {
     if (onSlideChange) {
@@ -572,7 +583,13 @@ export function PostcardFront({
               isTriviaLocked={isTriviaLocked}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay && !isTriviaLocked && hasOwner ? () => setShowSelector(true) : undefined}
+              onPlay={
+                allowPlay && !isTriviaLocked && hasOwner
+                  ? autoStartGame
+                    ? () => setShowSelector(true) // In GamePage, just open the selector
+                    : undefined // Default CTAs to /game/:id navigation
+                  : undefined
+              }
               onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? () => onClaimPostcard(item.id) : undefined}
               onTrade={hasOwner && !isClaimedByMe ? () => console.warn('Trade not implemented yet') : undefined}
               isOwned={isClaimedByMe}

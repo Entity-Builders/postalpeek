@@ -92,6 +92,8 @@ interface PostcardProps {
   onOpenAlbum?: (albumId: string) => void;
   /** Navigate directly to the collection */
   onOpenCollection?: () => void;
+  /** Automatically start the game on mount */
+  autoStartGame?: boolean;
 }
 
 const springFlip = {
@@ -127,6 +129,7 @@ export function Postcard({
   userId,
   onOpenAlbum,
   onOpenCollection,
+  autoStartGame = false,
 }: PostcardProps) {
   const { isGameActive } = useGameMode();
   const [isFlipped, setIsFlipped] = useState(false);
@@ -351,6 +354,7 @@ export function Postcard({
             userId={userId}
             onOpenAlbum={onOpenAlbum}
             onOpenCollection={onOpenCollection}
+            autoStartGame={autoStartGame}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

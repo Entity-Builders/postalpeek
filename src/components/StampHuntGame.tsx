@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Stamp, Sparkles } from 'lucide-react';
+import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t } from '../utils/i18n';
@@ -76,21 +77,7 @@ function computeStampPlacement(postcardId: string): StampPlacement {
   return { x, y, size, rotation, difficulty };
 }
 
-// ── The PostalPeek Postmark (matches WalkerWelcome intro) ───────────
-function PostalPeekStampSVG({ className }: { className?: string }) {
-  return (
-    <div
-      className={`rounded-full border-2 border-stone-600/60 flex items-center justify-center ${className ?? ''}`}
-      style={{ aspectRatio: '1' }}
-    >
-      <div className="w-[80%] h-[80%] rounded-full border border-dashed border-stone-600/50 flex items-center justify-center bg-stone-800/10">
-        <span className="font-mono text-[0.35em] text-stone-700 uppercase tracking-wider text-center leading-tight font-bold">
-          Postal<br />Peek
-        </span>
-      </div>
-    </div>
-  );
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // Hook: useStampHunt

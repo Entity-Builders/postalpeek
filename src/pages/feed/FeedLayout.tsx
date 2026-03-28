@@ -348,7 +348,7 @@ export function FeedLayout({
           // In the new layout, we navigate to the carousel route with a random index.
           if (collection.length > 0) {
             const randomIndex = Math.floor(Math.random() * collection.length);
-            navigate(`/feed/carousel?index=${randomIndex}`);
+            navigate(`/game/${collection[randomIndex].id}`);
             analytics.track('statusbar_game_started', { mode: 'random' });
           }
         }}
