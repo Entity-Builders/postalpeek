@@ -12,6 +12,11 @@ import { initAnalytics, analytics } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
 import { GameModeProvider } from './contexts/GameModeContext';
 
+import { FeedLayout } from './pages/feed/FeedLayout';
+import { FeedGridPage } from './pages/feed/FeedGridPage';
+import { FeedCarouselPage } from './pages/feed/FeedCarouselPage';
+import { CollectionPage } from './pages/feed/CollectionPage';
+
 // ── Feed (main app) ────────────────────────────────────────────────────
 
 function FeedApp({
@@ -61,7 +66,7 @@ function FeedApp({
     <div className='w-screen h-[100dvh] relative overflow-hidden flex flex-col'>
       {/* Walker Feed Fullscreen */}
       <div className='flex-1 w-full h-full relative'>
-        <WalkerFeed
+        <FeedLayout
           isIdle={isIdle}
           isAdmin={isAdmin}
           user={user}
@@ -143,10 +148,13 @@ function App() {
       <GameModeProvider>
         <Routes>
           {/* SEO-friendly feed route */}
-          <Route path='/feed' element={feedElement} />
-          <Route path='/feed/country/:country' element={feedElement} />
-          <Route path='/feed/collection' element={feedElement} />
-          <Route path='/feed/album/:albumId' element={feedElement} />
+          <Route path='/feed' element={feedElement}>
+            <Route index element={<FeedGridPage />} />
+            <Route path='country/:country' element={<FeedGridPage />} />
+            <Route path='carousel' element={<FeedCarouselPage />} />
+            <Route path='collection' element={<CollectionPage />} />
+            <Route path='album/:albumId' element={<AlbumPage />} />
+          </Route>
 
           {/* Root redirects to /feed */}
           <Route path='/' element={<Navigate to='/feed' replace />} />
@@ -165,12 +173,12 @@ function App() {
 
           {/* Postcard admin detail — /p/:id only */}
           <Route path='/p/:id' element={<PostcardDetailPage />} />
-
-          {/* Standalone album page — /album/:albumId */}
-          <Route path='/album/:albumId' element={<AlbumPage />} />
+          
+          {/* Public Postcard View — /postcard/:id */}
+          <Route path='/postcard/:id' element={<FeedCarouselPage />} />
 
           {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-          <Route path='/:id' element={feedElement} />
+          <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
         </Routes>
       </GameModeProvider>
     </ErrorBoundary>
