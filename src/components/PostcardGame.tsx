@@ -8,6 +8,7 @@ import { NextGameCountdown } from './NextGameCountdown';
 import { t, getLang } from '../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { useRiddles } from '../hooks/useRiddles';
+import { GameTimerBar } from './GameTimerBar';
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface TagWithBox {
@@ -80,7 +81,7 @@ export function usePostcardGame(item: FeedItem) {
   const engine = useMiniGameEngine({
     gameType: 'find_objects',
     userId: user?.id,
-    autoStartTimer: false,
+    loseCondition: (m) => m.elapsedSeconds >= 15,
   });
 
   const [discoveredIndices, setDiscoveredIndices] = useState<Set<number>>(new Set());
@@ -219,6 +220,7 @@ export function usePostcardGame(item: FeedItem) {
     discoveredIndices, showReward, allFound, hintIndex,
     lastFoundTarget, lastFoundTargetEn,
     isScanning, scanError, tagsWithBbox, totalObjects, currentTarget,
+    status: engine.status,
     handleImageClick, elapsedSeconds: engine.metrics.elapsedSeconds, hintsUsed: engine.metrics.hintsUsed,
   };
 }
@@ -353,7 +355,7 @@ interface GameBottomPanelProps {
 }
 
 export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
-  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, hintsUsed, tagsWithBbox } = game;
+  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, hintsUsed, tagsWithBbox, elapsedSeconds, status } = game;
   const progress = totalObjects > 0 ? (discoveredIndices.size / totalObjects) * 100 : 0;
 
   // ── Riddles integration ──
@@ -400,13 +402,14 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
   }
 
   // ── All Found: Minimal bar with Listo button below green line ──
-  if (allFound) {
+  if (allFound || status === 'won') {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-emerald-500/30"
       >
+        <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status="won" />
         {/* Green completed progress bar */}
         <div className="mb-2">
           <div className="w-full h-1.5 rounded-full bg-stone-200 overflow-hidden">
@@ -446,6 +449,36 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
           {/* Auto-advance countdown */}
           <div className="flex-1" />
           <NextGameCountdown seconds={3} onAdvance={onClose} />
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // ── Lost: Minimal bar with Continuar button ──
+  if (status === 'lost') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-red-500/50"
+      >
+        <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status="lost" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-between mt-2"
+        >
+          <div className="flex items-center gap-1.5 text-red-600 px-2">
+            <span className="text-xl">👎</span>
+            <span className="text-sm font-bold">{t({ es: '¡Intenta más rápido!', en: 'Try faster!' })}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white font-bold text-sm"
+          >
+            {t({ es: 'Continuar', en: 'Continue' })}
+          </button>
         </motion.div>
       </motion.div>
     );
@@ -510,16 +543,8 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
         </div>
 
         {/* Visual progress bar */}
-        {totalObjects > 0 && !isScanning && (
-          <div className="w-full h-1.5 rounded-full bg-stone-200 overflow-hidden">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706)' }}
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            />
-          </div>
+        {!isScanning && (
+          <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status={status} />
         )}
 
         {/* Scanning progress placeholder */}
