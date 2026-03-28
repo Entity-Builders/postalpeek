@@ -23,7 +23,10 @@ import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 import { ImageLightbox } from './ImageLightbox';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { WelcomeToast } from './WelcomeToast';
-import { SearchX } from 'lucide-react';
+import {
+  X,
+  SearchX,
+} from 'lucide-react';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../lib/analytics';
 import { useLang, t } from '../utils/i18n';
@@ -440,6 +443,7 @@ export function WalkerFeed({
   // PackDone toast state — declared after albumPostcardIds so inline callbacks compile
   const [showPackDoneToast, setShowPackDoneToast] = useState(false);
   const [packDoneAlbumCount, setPackDoneAlbumCount] = useState(0);
+  const [stampError, setStampError] = useState<{ show: boolean; cost?: number }>({ show: false });
 
   // Auto-open album detail when URL is /album/:id
   useEffect(() => {
@@ -457,11 +461,18 @@ export function WalkerFeed({
         refetchCollection();
         refetchAlbums(); // album progress may have changed
 
+        // Refresh stamp balance (we spent stamps)
+        if (typeof window !== 'undefined' && (window as any)._refreshStamps) {
+          (window as any)._refreshStamps();
+        }
+
         // Show album toast whenever an album postcard is claimed
         if (albumPostcardIds.has(postcardId)) {
           setShowWelcomeToast(true);
           setTimeout(() => setShowWelcomeToast(false), 8000);
         }
+      } else if (result.error === 'INSUFFICIENT_STAMPS') {
+        setStampError({ show: true, cost: result.stamp_cost });
       } else if (result.error === 'DAILY_LIMIT_REACHED') {
         setClaimLimitInfo({
           type: 'daily',
@@ -583,6 +594,37 @@ export function WalkerFeed({
             limit={claimLimitInfo.limit}
             onClose={() => setClaimLimitInfo(null)}
           />
+        )}
+
+        {/* INSUFFICIENT STAMPS TOAST */}
+        {stampError.show && (
+          <motion.div
+            key="stamp-error-toast"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: -20, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="absolute bottom-20 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4"
+          >
+            <div className="bg-red-500 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 pointer-events-auto">
+              <span className="text-xl">😿</span>
+              <div>
+                <p className="font-semibold text-sm">
+                  {t({ es: 'No tenés sellos suficientes', en: 'Not enough stamps' }, lang)}
+                </p>
+                {stampError.cost && (
+                  <p className="text-xs opacity-90 text-red-100">
+                    {t({ es: `Esta postal cuesta ${stampError.cost} sellos.`, en: `This postcard costs ${stampError.cost} stamps.` }, lang)}
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={() => setStampError({ show: false })}
+                className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
         )}
 
         {/* Pack Done Toast — lightweight, non-blocking */}

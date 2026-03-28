@@ -9,15 +9,20 @@ interface ClaimStatus {
   monthly_limit: number;
 }
 
-type ClaimError = 'DAILY_LIMIT_REACHED' | 'MONTHLY_LIMIT_REACHED' | 'ALREADY_CLAIMED' | 'AUTH_REQUIRED';
+type ClaimError = 'DAILY_LIMIT_REACHED' | 'MONTHLY_LIMIT_REACHED' | 'ALREADY_CLAIMED' | 'AUTH_REQUIRED' | 'INSUFFICIENT_STAMPS';
 
 interface ClaimResult {
   success: boolean;
   error?: ClaimError;
+  // Legacy daily/monthly limit fields (kept for backward compat)
   daily_used?: number;
   daily_limit?: number;
   monthly_used?: number;
   monthly_limit?: number;
+  // Stamp economy fields
+  stamp_cost?: number;
+  remaining_stamps?: number;
+  balance?: number; // returned on INSUFFICIENT_STAMPS
 }
 
 export function useClaimPostcard(userId: string | null | undefined) {
@@ -30,6 +35,10 @@ export function useClaimPostcard(userId: string | null | undefined) {
   });
   /** Set of postcard IDs claimed by the current user (for optimistic UI) */
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
+  /** Last stamp cost encountered — useful for showing UI feedback */
+  const [lastStampCost, setLastStampCost] = useState<number | null>(null);
+  /** True when last claim failed due to insufficient stamps */
+  const [insufficientStamps, setInsufficientStamps] = useState(false);
 
   // Fetch claim status on mount / when user changes
   useEffect(() => {
@@ -80,8 +89,10 @@ export function useClaimPostcard(userId: string | null | undefined) {
         if (result.success) {
           // Optimistic: add to local claimed set
           setClaimedIds((prev) => new Set(prev).add(postcardId));
+          setInsufficientStamps(false);
+          if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
 
-          // Update counters
+          // Update legacy counters if present
           if (result.daily_used != null && result.daily_limit != null) {
             setClaimStatus((prev) => ({
               ...prev,
@@ -94,10 +105,14 @@ export function useClaimPostcard(userId: string | null | undefined) {
 
           analytics.track('postcard_claimed', {
             postcard_id: postcardId,
-            daily_used: result.daily_used,
-            daily_limit: result.daily_limit,
+            stamp_cost: result.stamp_cost,
+            remaining_stamps: result.remaining_stamps,
           });
         } else {
+          if (result.error === 'INSUFFICIENT_STAMPS') {
+            setInsufficientStamps(true);
+            if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
+          }
           analytics.track('postcard_claim_failed', {
             postcard_id: postcardId,
             error: result.error,
@@ -116,10 +131,12 @@ export function useClaimPostcard(userId: string | null | undefined) {
     [userId, isClaiming],
   );
 
-  return {
+    return {
     claim,
     isClaiming,
     claimStatus,
     claimedIds,
+    insufficientStamps,
+    lastStampCost,
   };
 }
