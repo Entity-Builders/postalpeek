@@ -64,14 +64,19 @@ export function useWalkerFeed() {
 
       if (!isUnderFeed && segments.length === 1) {
         // /:shortcode — direct share link
-        const APP_ROUTES = ['feed', 'collection', 'album', 'admin', 'p'];
+        const APP_ROUTES = ['feed', 'collection', 'album', 'admin', 'p', 'postcard'];
         if (!APP_ROUTES.includes(segments[0])) {
           sharedCardPrefix = decodeHashToUuidPrefix(segments[0]);
         }
       }
 
       let sharedCard: FeedItem | null = null;
-      if (sharedCardPrefix) {
+      
+      if (!isUnderFeed && segments[0] === 'postcard' && segments[1]) {
+        // /postcard/:id — direct public postcard view
+        const { data: pData } = await supabase.from('postalpeek_postcards').select('*').eq('id', segments[1]).maybeSingle();
+        if (pData) { sharedCard = pData; setHasSharedCard(true); } else setHasSharedCard(false);
+      } else if (sharedCardPrefix) {
         const minUuid = `${sharedCardPrefix}-0000-0000-0000-000000000000`;
         const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
 

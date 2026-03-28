@@ -149,13 +149,18 @@ function App() {
       <GameModeProvider>
         <StampProvider userId={user?.id}>
           <Routes>
-            {/* SEO-friendly feed route */}
-            <Route path='/feed' element={feedElement}>
-              <Route index element={<FeedGridPage />} />
-              <Route path='country/:country' element={<FeedGridPage />} />
-              <Route path='carousel' element={<FeedCarouselPage />} />
-              <Route path='collection' element={<CollectionPage />} />
-              <Route path='album/:albumId' element={<AlbumPage />} />
+            {/* SEO-friendly feed route AND Postcard view use the same layout */}
+            <Route element={feedElement}>
+              <Route path='/feed'>
+                <Route index element={<FeedGridPage />} />
+                <Route path='country/:country' element={<FeedGridPage />} />
+                <Route path='carousel' element={<FeedCarouselPage />} />
+                <Route path='collection' element={<CollectionPage />} />
+                <Route path='album/:albumId' element={<AlbumPage />} />
+              </Route>
+              
+              {/* Public Postcard View — needs the FeedLayout context */}
+              <Route path='/postcard/:id' element={<FeedCarouselPage />} />
             </Route>
 
             {/* Root redirects to /feed */}
@@ -175,9 +180,6 @@ function App() {
 
             {/* Postcard admin detail — /p/:id only */}
             <Route path='/p/:id' element={<PostcardDetailPage />} />
-            
-            {/* Public Postcard View — /postcard/:id */}
-            <Route path='/postcard/:id' element={<FeedCarouselPage />} />
 
             {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
             <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
