@@ -4,18 +4,18 @@
  * Renders consistently in ALL views: grid, list/feed, and carousel.
  *  - Storytelling fact (expandable amber card)
  *  - Album stop indicator  OR  city name
- *  - Action buttons: Ganarla pill | BookImage (owned) | ShareButton | Ticket (business)
+ *  - Action buttons: "Certificar Propiedad" pill | BookImage (owned) | ShareButton | Ticket (business)
  *  - Claimed-by-other badge
  */
 
 import React, { useState } from 'react';
 import {
   Sparkles,
-  BookImage,
   Ticket,
   Lock,
   ChevronDown,
   ChevronUp,
+  Stamp,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
@@ -37,12 +37,12 @@ const FACT_EMOJI: Record<string, string> = {
 };
 
 const FACT_LABEL: Record<string, { es: string; en: string }> = {
-  historical:    { es: 'Dato Histórico',  en: 'Historical Fact' },
-  architectural: { es: 'Arquitectura',    en: 'Architecture'    },
-  cultural:      { es: 'Cultura',         en: 'Culture'         },
-  gastronomic:   { es: 'Gastronomía',     en: 'Gastronomy'      },
-  natural:       { es: 'Naturaleza',      en: 'Nature'          },
-  artistic:      { es: 'Arte',            en: 'Art'             },
+  historical: { es: 'Dato Histórico', en: 'Historical Fact' },
+  architectural: { es: 'Arquitectura', en: 'Architecture' },
+  cultural: { es: 'Cultura', en: 'Culture' },
+  gastronomic: { es: 'Gastronomía', en: 'Gastronomy' },
+  natural: { es: 'Naturaleza', en: 'Nature' },
+  artistic: { es: 'Arte', en: 'Art' },
 };
 
 // ── Props ────────────────────────────────────────────────────────────
@@ -99,8 +99,7 @@ export function PostcardChin({
   const storytelling = active.generation_metadata?.storytelling;
   const albumId = active.album_id || item.album_id;
 
-  const hasAlbumStop =
-    !!active.album_id && active.album_sequence != null;
+  const hasAlbumStop = !!active.album_id && active.album_sequence != null;
   const stopMeta =
     active.album_sequence != null
       ? albumStops?.[active.album_sequence]
@@ -124,7 +123,7 @@ export function PostcardChin({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="w-full mt-2 px-3 py-2.5 rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50 to-orange-50/80 shadow-[0_2px_10px_rgba(251,191,36,0.12)] flex items-start justify-between gap-3 text-left"
+          className='w-full mt-2 px-3 py-2.5 rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50 to-orange-50/80 shadow-[0_2px_10px_rgba(251,191,36,0.12)] flex items-start justify-between gap-3 text-left'
           onClick={(e) => {
             e.stopPropagation();
             if (!storyExpanded) {
@@ -136,12 +135,12 @@ export function PostcardChin({
             }
           }}
         >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] bg-amber-200/60 rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+          <div className='flex-1 min-w-0'>
+            <div className='flex items-center gap-1.5 mb-1'>
+              <span className='text-[10px] bg-amber-200/60 rounded-full w-5 h-5 flex items-center justify-center shrink-0'>
                 {FACT_EMOJI[storytelling.fact_type] || '📖'}
               </span>
-              <span className="text-[10px] font-bold text-amber-800/80 uppercase tracking-widest">
+              <span className='text-[10px] font-bold text-amber-800/80 uppercase tracking-widest'>
                 {t(
                   FACT_LABEL[storytelling.fact_type] ?? {
                     es: 'Dato Curioso',
@@ -160,12 +159,12 @@ export function PostcardChin({
               {t(storytelling.did_you_know, lang)}
             </p>
           </div>
-          <div className="text-amber-600 shrink-0 mt-0.5">
-            <div className="w-6 h-6 bg-amber-200/40 rounded-full flex items-center justify-center">
+          <div className='text-amber-600 shrink-0 mt-0.5'>
+            <div className='w-6 h-6 bg-amber-200/40 rounded-full flex items-center justify-center'>
               {storyExpanded ? (
-                <ChevronUp className="w-3.5 h-3.5" />
+                <ChevronUp className='w-3.5 h-3.5' />
               ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown className='w-3.5 h-3.5' />
               )}
             </div>
           </div>
@@ -173,9 +172,9 @@ export function PostcardChin({
       )}
 
       {/* ── Bottom row: context + actions ───────────────────────── */}
-      <div className="flex justify-between items-end px-1 pb-1 mt-2">
+      <div className='flex justify-between items-end px-1 pb-1 mt-2'>
         {/* Left: album stop indicator or city */}
-        <div className="flex-1 min-w-0 mr-2">
+        <div className='flex-1 min-w-0 mr-2'>
           {hasAlbumStop ? (
             <AlbumStopIndicator
               sequence={active.album_sequence!}
@@ -184,26 +183,27 @@ export function PostcardChin({
               stopDescription={stopMeta?.stop_description}
             />
           ) : (
-            <p className="text-[10px] md:text-xs text-stone-500 font-medium truncate">
+            <p className='text-[10px] md:text-xs text-stone-500 font-medium truncate'>
               {active.city || item.city}
             </p>
           )}
         </div>
 
         {/* Right: action buttons */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className='flex items-center gap-1.5 shrink-0'>
           {/* Claimed by another user */}
           {item.claimed_at && !isClaimed && (
-            <span className="flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-stone-200">
-              <Lock className="w-2.5 h-2.5" />
+            <span className='flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-stone-200'>
+              <Lock className='w-2.5 h-2.5' />
               {t({ es: 'Reclamada', en: 'Claimed' }, lang)}
             </span>
           )}
 
-          {/* Owned → go to album */}
+          {/* Owned → Certification Seal */}
           {isClaimed && (
             <button
-              className="p-2 md:p-2.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 transition-colors shadow-sm"
+              className='flex items-center gap-1 px-2 py-1 rounded-sm border-2 border-emerald-600/60 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 transition-colors shadow-sm rotate-[-1deg] hover:rotate-0'
+              style={{ fontFamily: 'monospace' }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (onOpenAlbum && albumId) {
@@ -214,16 +214,19 @@ export function PostcardChin({
                   navigate(`/album/${albumId}`);
                 }
               }}
-              title={t({ es: 'Ver álbum', en: 'View album' }, lang)}
+              title={t({ es: 'Ver en álbum', en: 'View in album' }, lang)}
             >
-              <BookImage className="w-4 h-4 md:w-5 md:h-5" />
+              <Stamp className='w-3 h-3' />
+              <span className='text-[9px] font-bold uppercase tracking-wider'>
+                {t({ es: 'Sellada ✓', en: 'Sealed ✓' }, lang)}
+              </span>
             </button>
           )}
 
-          {/* ✨ Ganarla — unclaimed cards only */}
+          {/* ✨ Certificar Propiedad — unclaimed cards only */}
           {!isClaimed && handleWinClick && (
             <button
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]"
+              className='flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
               onClick={(e) => {
                 e.stopPropagation();
                 handleWinClick();
@@ -233,10 +236,10 @@ export function PostcardChin({
                   source: onPlay ? 'carousel' : 'grid',
                 });
               }}
-              title={t({ es: 'Ganarla', en: 'Win it' }, lang)}
+              title={t({ es: '¡Sello!', en: 'Stamp!' }, lang)}
             >
-              <Sparkles className="w-4 h-4 md:w-5 md:h-5" />
-              {t({ es: 'Ganarla', en: 'Win it' }, lang)}
+              <Sparkles className='w-4 h-4 md:w-5 md:h-5' />
+              {t({ es: '¡Sello!', en: 'Stamp!' }, lang)}
             </button>
           )}
 
@@ -248,15 +251,15 @@ export function PostcardChin({
           {/* Business coupon */}
           {isBusiness && onFlipCard && (
             <button
-              className="p-2 md:p-2.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-500 hover:text-rose-600 transition-colors"
+              className='p-2 md:p-2.5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-500 hover:text-rose-600 transition-colors'
               onClick={(e) => {
                 e.stopPropagation();
                 onFlipCard('coupon');
                 analytics.track('coupon_viewed', { postcard_id: item.id });
               }}
-              title="Special Offer"
+              title='Special Offer'
             >
-              <Ticket className="w-4 h-4 md:w-5 md:h-5" />
+              <Ticket className='w-4 h-4 md:w-5 md:h-5' />
             </button>
           )}
         </div>

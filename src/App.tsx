@@ -125,45 +125,52 @@ function App() {
   // (prevents /admin from redirecting to /feed during initial session check)
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#0a0a12' }}>
-        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
+      <div
+        className='h-screen w-screen flex items-center justify-center'
+        style={{ background: '#0a0a12' }}
+      >
+        <div className='w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin' />
       </div>
     );
   }
 
-  const feedElement = <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />;
+  const feedElement = (
+    <FeedApp user={user} isAdmin={isAdmin} signOut={signOut} />
+  );
 
   return (
     <ErrorBoundary>
       <GameModeProvider>
         <Routes>
           {/* SEO-friendly feed route */}
-          <Route path="/feed" element={feedElement} />
-          <Route path="/feed/country/:country" element={feedElement} />
-          <Route path="/feed/collection" element={feedElement} />
-          <Route path="/feed/album/:albumId" element={feedElement} />
+          <Route path='/feed' element={feedElement} />
+          <Route path='/feed/country/:country' element={feedElement} />
+          <Route path='/feed/collection' element={feedElement} />
+          <Route path='/feed/album/:albumId' element={feedElement} />
 
           {/* Root redirects to /feed */}
-          <Route path="/" element={<Navigate to="/feed" replace />} />
+          <Route path='/' element={<Navigate to='/feed' replace />} />
 
           {/* Full-page admin (protected) */}
           <Route
-            path="/admin"
+            path='/admin'
             element={
-              isAdmin
-                ? <AdminPage user={user} onPostcardGenerated={() => {}} />
-                : <Navigate to="/feed" replace />
+              isAdmin ? (
+                <AdminPage user={user} onPostcardGenerated={() => {}} />
+              ) : (
+                <Navigate to='/feed' replace />
+              )
             }
           />
 
           {/* Postcard admin detail — /p/:id only */}
-          <Route path="/p/:id" element={<PostcardDetailPage />} />
+          <Route path='/p/:id' element={<PostcardDetailPage />} />
 
           {/* Standalone album page — /album/:albumId */}
-          <Route path="/album/:albumId" element={<AlbumPage />} />
+          <Route path='/album/:albumId' element={<AlbumPage />} />
 
           {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-          <Route path="/:id" element={feedElement} />
+          <Route path='/:id' element={feedElement} />
         </Routes>
       </GameModeProvider>
     </ErrorBoundary>
@@ -171,4 +178,3 @@ function App() {
 }
 
 export default App;
-

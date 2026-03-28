@@ -25,15 +25,28 @@ interface GridCardProps {
 /** Above-fold cards get framer-motion entry animation; below-fold cards render instantly */
 const ANIMATE_THRESHOLD = 12;
 
-export const GridCard = React.memo(function GridCard({ item, index, layout, onClick, isClaimed }: GridCardProps) {
+export const GridCard = React.memo(function GridCard({
+  item,
+  index,
+  layout,
+  onClick,
+  isClaimed,
+}: GridCardProps) {
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
-  const srcSet = useSignedSrcSet(item.illustration_url, WIDTHS.gridSrcSet as unknown as number[]);
-  const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
+  const srcSet = useSignedSrcSet(
+    item.illustration_url,
+    WIDTHS.gridSrcSet as unknown as number[],
+  );
+  const placeholderUrl = useSignedImage(item.illustration_url, {
+    width: WIDTHS.blur,
+    quality: 15,
+  });
 
   const [loaded, setLoaded] = React.useState(false);
   const lang = useLang();
 
-  const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category, lang);
+  const categoryLabel =
+    typeof item.category === 'string' ? item.category : t(item.category, lang);
 
   const { aspectRatio, monumental } = layout;
 
@@ -77,17 +90,22 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   }, [onClick]);
 
   const Wrapper = index < ANIMATE_THRESHOLD ? motion.div : 'div';
-  const animProps = index < ANIMATE_THRESHOLD
-    ? {
-        initial: { opacity: 0, y: 16 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.35, delay: Math.min(index * 0.04, 0.6), ease: 'easeOut' as const },
-      }
-    : {};
+  const animProps =
+    index < ANIMATE_THRESHOLD
+      ? {
+          initial: { opacity: 0, y: 16 },
+          animate: { opacity: 1, y: 0 },
+          transition: {
+            duration: 0.35,
+            delay: Math.min(index * 0.04, 0.6),
+            ease: 'easeOut' as const,
+          },
+        }
+      : {};
 
   return (
     <Wrapper
-      className="relative cursor-pointer group"
+      className='relative cursor-pointer group'
       style={{ display: 'inline-block', width: '100%' }}
       onClick={handleClick}
       onTouchStart={handleTouchStart}
@@ -99,9 +117,10 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
       <div
         className={`relative overflow-hidden rounded-lg bg-white
           transition-shadow duration-200 group-hover:shadow-[0_6px_24px_rgba(0,0,0,0.18)]
-          ${monumental
-            ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
-            : 'shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
+          ${
+            monumental
+              ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
+              : 'shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
           }`}
         style={{
           padding: '5px 5px 0 5px',
@@ -109,15 +128,15 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
       >
         {/* ── Image area ── */}
         <div
-          className="relative w-full overflow-hidden rounded-sm bg-stone-200"
+          className='relative w-full overflow-hidden rounded-sm bg-stone-200'
           style={{ aspectRatio }}
         >
           {placeholderUrl && !loaded && (
             <img
               src={placeholderUrl}
-              alt=""
+              alt=''
               aria-hidden
-              className="absolute inset-0 w-full h-full object-cover blur-md scale-105"
+              className='absolute inset-0 w-full h-full object-cover blur-md scale-105'
             />
           )}
 
@@ -127,14 +146,24 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
               srcSet={srcSet || undefined}
               sizes={sizes}
               alt={categoryLabel}
-              className={`absolute inset-0 w-full h-full object-cover block transition-all duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 w-full h-full object-cover block transition-all duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+              style={!isClaimed ? { filter: 'grayscale(100%) blur(4px)', transform: 'scale(1.04)' } : undefined}
               onLoad={() => setLoaded(true)}
               loading={index < 12 ? 'eager' : 'lazy'}
             />
           )}
 
-          <div className="absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
-            bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none" />
+          <div
+            className='absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
+            bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none'
+          />
+
+          {/* Scarcity lock badge — unclaimed only */}
+          {!isClaimed && (
+            <div className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[9px] font-semibold px-1.5 py-0.5 rounded-full pointer-events-none'>
+              🔒 {t({ es: 'Sin sellar', en: 'Unsealed' }, lang)}
+            </div>
+          )}
 
           {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>

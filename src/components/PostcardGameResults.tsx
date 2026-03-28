@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, BookImage, Share2 } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, useLang } from '../utils/i18n';
 import { useRiddles } from '../hooks/useRiddles';
@@ -22,6 +22,8 @@ interface PostcardGameResultsProps {
   albumSequence?: number;
   albumTotal?: number;
   onOpenAlbum?: (albumId: string) => void;
+  /** For share certificate */
+  postcardId?: string;
 }
 
 export function PostcardGameResults({
@@ -34,6 +36,16 @@ export function PostcardGameResults({
   albumTotal,
   onOpenAlbum,
 }: PostcardGameResultsProps) {
+  const handleShareCertificate = async () => {
+    const text = `🎖️ Acabo de certificar la propiedad de "${item.city}, ${item.country}" en PostalPeek!`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'PostalPeek — Certificado de Propiedad', text });
+      } catch { /* cancelled */ }
+    } else {
+      try { await navigator.clipboard.writeText(text); } catch { /* silent */ }
+    }
+  };
   useLang();
 
   // ── Extract generation metadata ──
@@ -156,6 +168,33 @@ export function PostcardGameResults({
               "{t(item.description)}"
             </p>
           )}
+        </motion.div>
+
+        {/* ── Post-Win Action CTAs ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="flex gap-2 mt-3 pt-3 border-t border-stone-200/60"
+        >
+          {/* Ver en Álbum */}
+          {item.album_id && onOpenAlbum && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenAlbum(item.album_id!); }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors shadow-sm"
+            >
+              <BookImage className="w-3.5 h-3.5" />
+              {t({ es: 'Ver en Álbum', en: 'View in Album' })}
+            </button>
+          )}
+          {/* Compartir Certificado */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleShareCertificate(); }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            {t({ es: 'Compartir Certificado', en: 'Share Certificate' })}
+          </button>
         </motion.div>
       </div>
     </div>
