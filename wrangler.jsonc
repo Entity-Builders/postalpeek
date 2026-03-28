@@ -11,4 +11,18 @@
     "binding": "ASSETS",
   },
   "compatibility_flags": ["nodejs_compat"],
+  "env": {
+    "staging": {
+      "name": "postal-peek-staging",
+      "routes": [
+        { "pattern": "staging.postalpeek.app", "custom_domain": true }
+      ]
+    },
+    "production": {
+      "name": "postal-peek",
+      "routes": [
+        { "pattern": "postalpeek.app", "custom_domain": true }
+      ]
+    }
+  }
 }

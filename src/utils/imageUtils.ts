@@ -16,8 +16,8 @@
 /** The old R2 public dev URL (no CDN caching, generic TLS) */
 const LEGACY_R2_HOST = 'pub-2fd871195f814f7083d91fe7dbbdb4b2.r2.dev';
 
-/** The new custom domain connected to the same R2 bucket */
-const CDN_HOST = 'img.postalpeek.app';
+/** The new custom domain connected to the same R2 bucket, driven by environment */
+const CDN_HOST = import.meta.env.VITE_IMAGE_CDN_HOST || 'img.postalpeek.app';
 const CDN_ORIGIN = `https://${CDN_HOST}`;
 
 /**

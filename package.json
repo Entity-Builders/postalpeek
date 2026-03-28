@@ -15,7 +15,8 @@
     "enrich:collection": "npx tsx scripts/enrich-collection.ts",
     "sync:prod": "npx tsx scripts/sync-to-prod.ts",
     "seed:users": "npx tsx scripts/create-test-users.ts",
-    "deploy": "npm run build && wrangler deploy --config dist/postal_peek/wrangler.json"
+    "deploy:staging": "npm run build -- --mode staging && wrangler deploy --env staging --config dist/postal_peek/wrangler.json",
+    "deploy:prod": "npm run build -- --mode production && wrangler deploy --env production --config dist/postal_peek/wrangler.json"
   },
   "dependencies": {
     "@eb-packages/analytics": "*",

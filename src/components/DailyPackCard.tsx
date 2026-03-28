@@ -182,7 +182,7 @@ export function DailyPackCard({
               favoriteIds={favoriteIds}
               onToggleFavorite={user ? toggleFavorite : undefined}
               isClaimedByMe={claimedIds.has(item.id)}
-              isClaimed={!!item.owner_id}
+              hasOwner={!!item.owner_id}
               onClaimPostcard={undefined}
               isClaimLoading={isClaimLoading}
               isInAlbum={albumPostcardIds.has(item.id)}
