@@ -74,8 +74,6 @@ interface PostcardFrontProps {
   allowPlay?: boolean;
   /** Current user ID for game progress tracking */
   userId?: string;
-  /** Callback when postcard is earned through game completion */
-  onPostcardEarned?: (postcardId: string) => void;
   /** Navigate directly to an album */
   onOpenAlbum?: (albumId: string) => void;
   /** Navigate directly to the collection */
@@ -105,7 +103,6 @@ export function PostcardFront({
   isClaimLoading,
   onClaimPostcard,
   userId,
-  onPostcardEarned,
   onOpenAlbum,
   onOpenCollection,
 }: PostcardFrontProps) {
@@ -186,9 +183,7 @@ export function PostcardFront({
     }
 
     if (isLastGame) {
-      // All games complete → earn the postcard, show victory
-      const result = await gameProgress.earnPostcard();
-      if (result.success) onPostcardEarned?.(item.id);
+      // All games complete → show victory (user just earned stamps)
       setPlayingMode(null);
       setGameFlipped(false);
       setShowVictory(true);
@@ -197,7 +192,7 @@ export function PostcardFront({
       const nextGame = getNextGame(newCompletedGames);
       setPlayingMode(nextGame);
     }
-  }, [userId, gameProgress, item.id, onPostcardEarned, getNextGame, addLocalStamps]);
+  }, [userId, gameProgress, getNextGame, addLocalStamps]);
 
   // Victory celebration state
   const [showVictory, setShowVictory] = useState(false);

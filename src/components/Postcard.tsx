@@ -87,8 +87,6 @@ interface PostcardProps {
   onTap?: () => void;
   /** Current user ID for game progress tracking */
   userId?: string;
-  /** Callback when postcard is earned through game completion */
-  onPostcardEarned?: (postcardId: string) => void;
   /** Navigate directly to an album */
   onOpenAlbum?: (albumId: string) => void;
   /** Navigate directly to the collection */
@@ -126,7 +124,6 @@ export function Postcard({
   onHeroReady,
   onTap,
   userId,
-  onPostcardEarned,
   onOpenAlbum,
   onOpenCollection,
 }: PostcardProps) {
@@ -351,7 +348,6 @@ export function Postcard({
             onToggleClean={toggleClean}
             allowPlay={Array.isArray(item.illustration_tags) && item.illustration_tags.length > 0}
             userId={userId}
-            onPostcardEarned={onPostcardEarned}
             onOpenAlbum={onOpenAlbum}
             onOpenCollection={onOpenCollection}
           />

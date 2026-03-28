@@ -14,6 +14,7 @@
     "reset:collection": "bash scripts/reset-collection.sh",
     "enrich:collection": "npx tsx scripts/enrich-collection.ts",
     "sync:prod": "npx tsx scripts/sync-to-prod.ts",
+    "seed:users": "npx tsx scripts/create-test-users.ts",
     "deploy": "npm run build && wrangler deploy --config dist/postal_peek/wrangler.json"
   },
   "dependencies": {

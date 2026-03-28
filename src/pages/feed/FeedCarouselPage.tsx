@@ -87,17 +87,26 @@ export function FeedCarouselPage() {
   }, [openPack]);
 
   const [showPackDoneToast, setShowPackDoneToast] = useState(false);
-  // Removed unused state hook here and just defaulting
+  const [claimToast, setClaimToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  
   const albumPostcardIds = new Set<string>();
 
   const handleClaimPostcard = useCallback(async (id: string) => {
-     // Re-implementing the simple version or delegating to the context logic
-     // Context provides `claim`, we just invoke it and handle simple side-effect refetches.
      const res = await claim(id);
      if (res.success) {
+         setClaimToast({ type: 'success', message: `¡Postal Sellada! Costo: ${res.stamp_cost ?? 2} ⭐` });
          refetchCollection();
          refetchAlbums();
+     } else {
+         if (res.error === 'INSUFFICIENT_STAMPS') {
+             setClaimToast({ type: 'error', message: `Necesitas ${res.stamp_cost ?? 2} ⭐ (Tienes ${res.balance ?? 0}). ¡A Jugar!` });
+         } else if (res.error === 'ALREADY_CLAIMED') {
+             setClaimToast({ type: 'error', message: 'Ya tienes esta postal.' });
+         } else {
+             setClaimToast({ type: 'error', message: 'Ups! Hubo un error al sellar.' });
+         }
      }
+     setTimeout(() => setClaimToast(null), 4000);
   }, [claim, refetchCollection, refetchAlbums]);
 
   return (
@@ -140,6 +149,26 @@ export function FeedCarouselPage() {
              }, 5000);
           } : undefined}
       />
+
+      {/* Claim Result Toast */}
+      <AnimatePresence>
+        {claimToast && (
+          <motion.div
+            key='claim-toast'
+            initial={{ y: 80, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 80, opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className={`absolute bottom-24 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-xl border pointer-events-none ${
+              claimToast.type === 'success' ? 'bg-indigo-900/90 border-indigo-500/30 text-white' : 'bg-rose-900/90 border-rose-500/30 text-white'
+            }`}
+          >
+            <div className='flex flex-col'>
+              <span className='text-sm font-bold tracking-wide'>{claimToast.message}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pack Done Toast */}
       <AnimatePresence>
