@@ -62,7 +62,8 @@ export function useStamps(userId: string | null | undefined) {
     setBalance(prev => ({
       ...prev,
       balance: prev.balance + amount,
-      total_earned: prev.total_earned + amount
+      total_earned: amount > 0 ? prev.total_earned + amount : prev.total_earned,
+      total_spent: amount < 0 ? prev.total_spent - amount : prev.total_spent
     }));
   }, []);
 

@@ -9,7 +9,7 @@ import { useGameProgress, gameModeToDb, type DbGameType } from '../hooks/useGame
 import { cn } from '../utils/cn';
 import { preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
-import { useLang } from '../utils/i18n';
+import { t, useLang } from '../utils/i18n';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
 import { TripSlide } from './TripSlide';
@@ -26,6 +26,7 @@ import { TriviaBottomPanel } from './TriviaRevealGame';
 import { GameProgressBar } from './GameProgressBar';
 import { useGameMode } from '../contexts/GameModeContext';
 import { useStampContext } from '../contexts/StampContext';
+import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 
 // Map DB game types to UI game modes (module-level for stable reference)
 const DB_TO_MODE: Record<DbGameType, GameMode> = {
@@ -648,29 +649,32 @@ export function PostcardFront({
         )}
       </AnimatePresence>
 
-      {/* Victory celebration overlay */}
+      {/* Game Summary overlay */}
       {showVictory && (
-        <VictoryOverlay onDismiss={() => {
-          setShowVictory(false);
-          if (item.album_id && onOpenAlbum) {
-            onOpenAlbum(item.album_id);
-          } else if (onOpenCollection) {
-            onOpenCollection();
-          }
-        }} />
+        <GameSummaryOverlay 
+          rows={gameProgress.completedRows}
+          onDismiss={() => {
+            setShowVictory(false);
+            if (item.album_id && onOpenAlbum) {
+              onOpenAlbum(item.album_id);
+            } else if (onOpenCollection) {
+              onOpenCollection();
+            }
+          }} 
+        />
       )}
     </div>
   );
 }
 
-/** Victory celebration shown when all games are complete */
-function VictoryOverlay({ onDismiss }: { onDismiss: () => void }) {
-  // Auto-dismiss after 4 seconds
-  React.useEffect(() => {
-    const timer = setTimeout(onDismiss, 4000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
+/** Game summary shown when all games are complete */
+function GameSummaryOverlay({ 
+  rows, 
+  onDismiss 
+}: { 
+  rows: { game_type: string; time_seconds: number | null }[]; 
+  onDismiss: () => void;
+}) {
   // Deterministic confetti (no Math.random needed)
   const COLORS = ['#fbbf24', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6'];
   const particles = Array.from({ length: 30 }, (_, i) => ({
@@ -682,13 +686,33 @@ function VictoryOverlay({ onDismiss }: { onDismiss: () => void }) {
     size: 4 + (i % 4) * 2,
   }));
 
+  const formatTime = (seconds: number | null) => {
+    if (seconds == null) return '-';
+    const sec = Math.round(seconds);
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+
+  const getGameLabel = (type: string) => {
+    switch (type) {
+      case 'find_objects': return { label: t({ es: 'Buscar Objetos', en: 'Find Objects' }), icon: '🔍' };
+      case 'puzzle': return { label: t({ es: 'Puzzle', en: 'Puzzle' }), icon: '🧩' };
+      case 'stamp_hunt': return { label: t({ es: 'Encontrar Sello', en: 'Find Stamp' }), icon: '📮' };
+      case 'trivia': return { label: t({ es: 'Trivia', en: 'Trivia' }), icon: '🧠' };
+      default: return { label: type, icon: '🎮' };
+    }
+  };
+
+  const totalStamps = rows.length;
+
   return (
     <div
       className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden"
-      onClick={onDismiss}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.3s_ease-out]" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.3s_ease-out]" />
 
       {/* Confetti particles */}
       {particles.map((p) => (
@@ -706,14 +730,52 @@ function VictoryOverlay({ onDismiss }: { onDismiss: () => void }) {
         />
       ))}
 
-      {/* Trophy card */}
-      <div className="relative z-10 flex flex-col items-center px-8 py-6 bg-white rounded-2xl shadow-2xl animate-[bounceIn_0.5s_ease-out]">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg mb-3">
-          <span className="text-3xl">🏆</span>
+      {/* Summary card */}
+      <div className="relative z-10 flex flex-col items-center p-6 bg-white rounded-3xl shadow-2xl animate-[bounceIn_0.5s_ease-out] w-[85%] max-w-sm max-h-[90%]">
+        
+        {/* PostalPeek Stamp Icon */}
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg mb-4 ring-4 ring-white shrink-0">
+          <PostalPeekStampSVG className="w-8 h-8 text-amber-900 border-amber-600/30" />
         </div>
-        <h3 className="text-xl font-bold text-stone-800">¡Es tuya!</h3>
-        <p className="text-xs text-stone-500 mt-1">Completaste todos los desafíos</p>
-        <p className="text-[10px] text-stone-400 mt-2">La postal se agregó a tu colección</p>
+
+        <h3 className="text-2xl font-black text-stone-800 tracking-tight text-center leading-tight shrink-0">
+          ¡Ganaste {totalStamps} sello{totalStamps !== 1 && 's'}!
+        </h3>
+        <p className="text-sm text-stone-500 mt-1.5 mb-5 text-center px-4 shrink-0">
+          {t({ es: 'Resumen de tus desafíos:', en: 'Challenge Summary:' })}
+        </p>
+
+        {/* Game list */}
+        <div className="w-full space-y-2 mb-6 overflow-y-auto min-h-0">
+          {rows.map((row, idx) => {
+            const info = getGameLabel(row.game_type);
+            return (
+              <div key={idx} className="flex items-center justify-between bg-stone-50 border border-stone-100 rounded-xl p-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-stone-100 text-lg">
+                    {info.icon}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-stone-700 leading-tight">{info.label}</span>
+                    <span className="text-[11px] text-stone-400 font-mono tracking-wider mt-0.5">
+                      {t({ es: 'Tardaste ', en: 'Time: ' })}<span className="text-stone-500 font-semibold">{formatTime(row.time_seconds)}</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 bg-amber-100/80 text-amber-700 px-2.5 py-1.5 rounded-full text-[11px] font-bold border border-amber-200/50">
+                  +1 <PostalPeekStampSVG className="w-3.5 h-3.5 text-amber-800" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={onDismiss}
+          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 text-white font-bold text-sm transition-all shadow-md active:scale-[0.98] shrink-0"
+        >
+          {t({ es: 'Continuar', en: 'Continue' })}
+        </button>
       </div>
     </div>
   );
