@@ -70,7 +70,7 @@ interface PostcardProps {
   onAuthRequired?: (postcardId: string) => void;
   /** Collectibles */
   isClaimedByMe?: boolean;
-  isClaimed?: boolean;
+  hasOwner?: boolean;
   onClaimPostcard?: (postcardId: string) => void;
   isClaimLoading?: boolean;
   /** Dev-only: whether this postcard is in an album */
@@ -117,7 +117,7 @@ export function Postcard({
   onToggleFavorite,
   onAuthRequired,
   isClaimedByMe = false,
-  isClaimed = false,
+  hasOwner = false,
   onClaimPostcard,
   isClaimLoading = false,
   isInAlbum = false,
@@ -341,7 +341,7 @@ export function Postcard({
               onHeroReady?.();
             }}
             isClaimedByMe={isClaimedByMe}
-            isClaimed={isClaimed}
+            hasOwner={hasOwner}
             onClaimPostcard={onClaimPostcard}
             isClaimLoading={isClaimLoading}
             isInAlbum={isInAlbum}

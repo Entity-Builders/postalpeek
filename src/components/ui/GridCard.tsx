@@ -18,7 +18,7 @@ interface GridCardProps {
   index: number;
   layout: CardLayout;
   onClick: () => void;
-  isClaimed?: boolean;
+  isClaimedByMe?: boolean;
   viewMode?: 'grid' | 'feed';
 }
 
@@ -30,8 +30,9 @@ export const GridCard = React.memo(function GridCard({
   index,
   layout,
   onClick,
-  isClaimed,
+  isClaimedByMe,
 }: GridCardProps) {
+  const hasOwner = !!item.owner_id;
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
   const srcSet = useSignedSrcSet(
     item.illustration_url,
@@ -147,7 +148,7 @@ export const GridCard = React.memo(function GridCard({
               sizes={sizes}
               alt={categoryLabel}
               className={`absolute inset-0 w-full h-full object-cover block transition-all duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-              style={!isClaimed ? { filter: 'grayscale(100%) blur(4px)', transform: 'scale(1.04)' } : undefined}
+              style={!hasOwner ? { filter: 'grayscale(100%) blur(4px)', transform: 'scale(1.04)' } : undefined}
               onLoad={() => setLoaded(true)}
               loading={index < 12 ? 'eager' : 'lazy'}
             />
@@ -159,7 +160,7 @@ export const GridCard = React.memo(function GridCard({
           />
 
           {/* Scarcity lock badge — unclaimed only */}
-          {!isClaimed && (
+          {!hasOwner && (
             <div className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[9px] font-semibold px-1.5 py-0.5 rounded-full pointer-events-none'>
               🔒 {t({ es: 'Sin sellar', en: 'Unsealed' }, lang)}
             </div>
@@ -170,8 +171,9 @@ export const GridCard = React.memo(function GridCard({
         {/* ── PostcardChin — unified chin (storytelling + city + actions) ── */}
         <PostcardChin
           item={item}
-          isClaimed={isClaimed}
-          isTriviaLocked={!isClaimed && !!item.generation_metadata?.trivia}
+          hasOwner={hasOwner}
+          isClaimedByMe={isClaimedByMe}
+          isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
           onClick={onClick}
         />
       </div>

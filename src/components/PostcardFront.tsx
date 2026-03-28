@@ -53,7 +53,7 @@ interface PostcardFrontProps {
   /** Collectibles: whether this postcard is claimed by the current user */
   isClaimedByMe?: boolean;
   /** Collectibles: whether this postcard is claimed by anyone */
-  isClaimed?: boolean;
+  hasOwner?: boolean;
   /** Collectibles: callback to claim this postcard */
   onClaimPostcard?: (postcardId: string) => void;
   /** Collectibles: whether a claim is currently in progress */
@@ -101,7 +101,7 @@ export function PostcardFront({
   onToggleClean,
   allowPlay = true,
   isClaimedByMe,
-  isClaimed,
+  hasOwner,
   isClaimLoading,
   onClaimPostcard,
   userId,
@@ -294,7 +294,7 @@ export function PostcardFront({
   // storytelling is now derived inside PostcardChin from activeItem
   const trivia = activeSlideItem.generation_metadata?.trivia;
   const hasCompletedTrivia = gameProgress.completedGames.has('trivia');
-  const isTriviaLocked = !!trivia && !isClaimedByMe && !isClaimed && !hasCompletedTrivia;
+  const isTriviaLocked = !!trivia && !isClaimedByMe && !hasOwner && !hasCompletedTrivia;
 
   const prevIsTriviaLocked = React.useRef(isTriviaLocked);
   
@@ -422,6 +422,7 @@ export function PostcardFront({
                             onDiscoverTag={discoverTag}
                             isTagDiscovered={isDiscovered}
                             isTagGenerating={isGenerating}
+                            hasOwner={!!slideItem.owner_id}
                           />
                         ))}
                       </div>
@@ -461,6 +462,7 @@ export function PostcardFront({
                     onDiscoverTag={discoverTag}
                     isTagDiscovered={isDiscovered}
                     isTagGenerating={isGenerating}
+                    hasOwner={hasOwner}
                   />
                 )}
 

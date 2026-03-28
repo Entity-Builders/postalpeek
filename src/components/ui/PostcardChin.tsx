@@ -52,7 +52,9 @@ export interface PostcardChinProps {
   /** Active item in carousel (may differ from item for album slides) */
   activeItem?: FeedItem;
   /** Current user owns this postcard */
-  isClaimed?: boolean;
+  isClaimedByMe?: boolean;
+  /** Anyone owns this postcard */
+  hasOwner?: boolean;
   /** Trivia is gating the reveal — hide storytelling, show lock state */
   isTriviaLocked?: boolean;
   /** Clean/fullscreen mode — hide the entire chin */
@@ -79,7 +81,8 @@ export interface PostcardChinProps {
 export function PostcardChin({
   item,
   activeItem,
-  isClaimed = false,
+  isClaimedByMe = false,
+  hasOwner = false,
   isTriviaLocked = false,
   isClean = false,
   hideActions = false,
@@ -192,15 +195,15 @@ export function PostcardChin({
         {/* Right: action buttons */}
         <div className='flex items-center gap-1.5 shrink-0'>
           {/* Claimed by another user */}
-          {item.claimed_at && !isClaimed && (
+          {hasOwner && !isClaimedByMe && (
             <span className='flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-stone-200'>
               <Lock className='w-2.5 h-2.5' />
               {t({ es: 'Reclamada', en: 'Claimed' }, lang)}
             </span>
           )}
 
-          {/* Owned → Certification Seal */}
-          {isClaimed && (
+          {/* Owned (by me) → Certification Seal */}
+          {isClaimedByMe && (
             <button
               className='flex items-center gap-1 px-2 py-1 rounded-sm border-2 border-emerald-600/60 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 transition-colors shadow-sm rotate-[-1deg] hover:rotate-0'
               style={{ fontFamily: 'monospace' }}
@@ -224,7 +227,7 @@ export function PostcardChin({
           )}
 
           {/* ✨ Certificar Propiedad — unclaimed cards only */}
-          {!isClaimed && handleWinClick && (
+          {!hasOwner && handleWinClick && (
             <button
               className='flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
               onClick={(e) => {

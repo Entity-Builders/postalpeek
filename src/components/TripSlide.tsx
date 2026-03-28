@@ -37,6 +37,8 @@ interface TripSlideProps {
   isTagGenerating?: (postcardId: string, tagLabelEn: string) => boolean;
   /** Trivia Reveal Game lock state */
   isTriviaLocked?: boolean;
+  /** Whether anyone owns this postcard */
+  hasOwner?: boolean;
 }
 
 /** Scale factor applied to the image in clean/loupe mode */
@@ -62,6 +64,7 @@ export function TripSlide({
   isTagDiscovered,
   isTagGenerating,
   isTriviaLocked = false,
+  hasOwner = true,
 }: TripSlideProps) {
   const pUrl = useSignedImage(
     preloadedMainUrl ? null : slideItem.illustration_url,
@@ -245,9 +248,17 @@ export function TripSlide({
             isClean
               ? 'scale-[1.35] opacity-0'
               : !slideItem.video_url && 'hover:scale-105',
-            isTriviaLocked && 'blur-md scale-110 saturate-50 brightness-90'
+            isTriviaLocked && 'blur-md scale-110 saturate-50 brightness-90',
+            !hasOwner && !isTriviaLocked && 'grayscale blur-[4px] scale-105'
           )}
         />
+      )}
+
+      {/* Scarcity lock badge — unclaimed only */}
+      {!hasOwner && !isClean && (
+        <div className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[11px] font-semibold px-2 py-0.5 rounded-full pointer-events-none z-20'>
+          🔒 {t({ es: 'Sin sellar', en: 'Unsealed' })}
+        </div>
       )}
 
       {/* Loupe lens — disabled for now (TODO: revisit later) */}

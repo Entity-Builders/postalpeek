@@ -224,7 +224,7 @@ export function WalkerGrid({
                   index={index}
                   layout={layoutMap.get(item.id) || computeCardLayout(item)}
                   onClick={() => handleCardClick(index, item)}
-                  isClaimed={claimedIds.has(item.id)}
+                  isClaimedByMe={claimedIds.has(item.id)}
                   viewMode={viewMode}
                 />
               ))}
