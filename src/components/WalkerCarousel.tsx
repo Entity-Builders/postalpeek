@@ -441,8 +441,11 @@ export function WalkerCarousel({
               {!heroReadyIds.has(item.id) && (
                 <div className='absolute inset-0 z-[5] flex items-center justify-center pointer-events-none'>
                   <div 
-                    className='w-[95vw] max-w-[480px] md:max-w-[520px] flex items-center justify-center'
-                    style={{ aspectRatio: '4/5' }}
+                    className='mx-auto flex items-center justify-center'
+                    style={{ 
+                      aspectRatio: '4/5',
+                      width: `min(95vw, 520px, 80dvh * ${4/5})`
+                    }}
                   >
                     <div 
                       className='w-full h-full bg-white/90 backdrop-blur-sm shadow-[0_8px_30px_rgba(0,0,0,0.12),inset_0_0_0_1px_rgba(0,0,0,0.05)] rounded-[12px] flex flex-col p-2 pb-8'
@@ -455,8 +458,11 @@ export function WalkerCarousel({
 
               {/* Actual card content */}
               <div 
-                className='z-10 w-[95vw] max-w-[480px] md:max-w-[520px] mx-auto flex items-center justify-center transition-all duration-500 ease-in-out'
-                style={{ aspectRatio: isGameActive && slideIndex === currentSlideIndex ? '9/16' : '4/5' }}
+                className='z-10 mx-auto flex items-center justify-center transition-all duration-500 ease-in-out'
+                style={{ 
+                  aspectRatio: isGameActive && slideIndex === currentSlideIndex ? '9/16' : '4/5',
+                  width: `min(95vw, 520px, 80dvh * ${isGameActive && slideIndex === currentSlideIndex ? 9/16 : 4/5})`
+                }}
               >
                 <div 
                   className='relative w-full h-full flex flex-col'
