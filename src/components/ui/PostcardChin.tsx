@@ -123,6 +123,11 @@ export function PostcardChin({
   const handleClaimClick = onClaim ?? onClick;
   const handleTradeClick = onTrade ?? onClick;
 
+  const isPlayedToday = Boolean(
+    active.last_played_at && 
+    new Date(active.last_played_at).toDateString() === new Date().toDateString()
+  );
+
   return (
     <div
       className={cn(
@@ -206,9 +211,17 @@ export function PostcardChin({
         <div className='flex items-center gap-1.5 shrink-0'>
           {/* Claimed by another user */}
           {hasOwner && !isClaimedByMe && (
-            <span className='flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-stone-200'>
-              <Lock className='w-2.5 h-2.5' />
-              {t({ es: 'Reclamada', en: 'Claimed' }, lang)}
+            <span className='flex items-center gap-1.5 bg-stone-100/90 text-stone-500 text-[10px] font-semibold pl-0.5 pr-2 py-0.5 rounded-full border border-stone-200/60 shadow-sm'>
+              <img 
+                src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${active.owner_id || item.owner_id || 'default'}`} 
+                alt="Owner Avatar" 
+                className="w-5 h-5 rounded-full bg-stone-200 border border-stone-300 shadow-inner" 
+                loading="lazy"
+              />
+              <span className="flex items-center gap-0.5 text-[9px] uppercase tracking-wider">
+                <Lock className='w-2.5 h-2.5 text-stone-400/80 mb-[1px]' />
+                {t({ es: 'Reclamada', en: 'Claimed' }, lang)}
+              </span>
             </span>
           )}
 
@@ -251,18 +264,31 @@ export function PostcardChin({
             </button>
           )}
 
-          {/* 🎲 Jugar — claimed cards (by anyone) */}
-          {hasOwner && handlePlayClick && (
+          {/* 🎲 Jugar — ONLY on cards owned by the current user */}
+          {isClaimedByMe && handlePlayClick && !isPlayedToday && (
             <button
               className='flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-800 hover:bg-black text-white font-bold shadow-md transition-all text-xs border border-stone-600'
               onClick={(e) => {
                 e.stopPropagation();
                 handlePlayClick();
               }}
-              title={t({ es: 'Jugar y ganar sellos', en: 'Play for stamps' }, lang)}
+              title={t({ es: 'Jugar (1 vez al día)', en: 'Play (1/day)' }, lang)}
             >
               <Dice5 className='w-3.5 h-3.5 md:w-4 md:h-4' />
               {t({ es: 'Jugar', en: 'Play' }, lang)}
+            </button>
+          )}
+
+          {/* ⏳ Jugada — Disable if played today */}
+          {isClaimedByMe && handlePlayClick && isPlayedToday && (
+            <button
+              className='flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-200 text-stone-400 font-bold shadow-none text-xs border border-stone-300 cursor-not-allowed opacity-90'
+              onClick={(e) => e.stopPropagation()}
+              disabled
+              title={t({ es: 'Vuelve mañana', en: 'Come back tomorrow' }, lang)}
+            >
+              <Dice5 className='w-3.5 h-3.5 md:w-4 md:h-4 opacity-50' />
+              {t({ es: 'Jugada', en: 'Played' }, lang)}
             </button>
           )}
 

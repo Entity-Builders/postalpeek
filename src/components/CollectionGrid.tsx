@@ -517,15 +517,15 @@ export function CollectionGrid({
           }}
           className='pb-6'
         >
-          {/* Curated Albums Section */}
+          {/* My Albums Section */}
           <div className='px-4 pt-2'>
             <h3 className='font-serif text-lg text-stone-800 flex items-center gap-2 mb-4'>
               <Trophy className='w-5 h-5 text-amber-500' />
-              {t({ es: 'Álbumes Curados', en: 'Curated Albums' }, lang)}
+              {t({ es: 'Mis Álbumes', en: 'My Albums' }, lang)}
             </h3>
-            {albums.length > 0 || isLoadingAlbums ? (
+            {albums.filter(a => a.collected_slots > 0).length > 0 || isLoadingAlbums ? (
               <AlbumList
-                albums={albums}
+                albums={albums.filter(a => a.collected_slots > 0)}
                 isLoading={isLoadingAlbums}
                 onOpenAlbum={(a) => onOpenAlbum?.(a)}
               />
@@ -533,7 +533,7 @@ export function CollectionGrid({
               <div className='flex flex-col items-center py-8 text-center bg-stone-50 rounded-2xl border border-stone-200'>
                 <span className='text-4xl mb-3'>📚</span>
                 <p className='text-sm text-stone-400 max-w-xs'>
-                  {t({ es: 'Los álbumes curados irán apareciendo aquí.', en: 'Curated albums will appear here.' }, lang)}
+                  {t({ es: 'Tus álbumes en progreso y completados aparecerán aquí.', en: 'Your in-progress and completed albums will appear here.' }, lang)}
                 </p>
               </div>
             )}

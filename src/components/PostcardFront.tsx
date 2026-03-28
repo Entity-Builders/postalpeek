@@ -179,6 +179,7 @@ export function PostcardFront({
     if (rewardedStamps > 0) {
       addLocalStamps(rewardedStamps);
       setEarnedStampsStr(rewardedStamps);
+      item.last_played_at = new Date().toISOString(); // local mutation to disable button
       setTimeout(() => setEarnedStampsStr(null), 3500);
     }
 
@@ -192,7 +193,7 @@ export function PostcardFront({
       const nextGame = getNextGame(newCompletedGames);
       setPlayingMode(nextGame);
     }
-  }, [userId, gameProgress, getNextGame, addLocalStamps]);
+  }, [userId, gameProgress, getNextGame, addLocalStamps, item]);
 
   // Victory celebration state
   const [showVictory, setShowVictory] = useState(false);
