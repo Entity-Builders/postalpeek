@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Target, Lightbulb } from 'lucide-react';
+import { Sparkles, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Target, Lightbulb } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t, getLang } from '../utils/i18n';
@@ -78,6 +78,8 @@ export function usePostcardGame(item: FeedItem) {
   // would collide — discovering one would mark both as found, leaving the game stuck.
   const [discoveredIndices, setDiscoveredIndices] = useState<Set<number>>(new Set());
   const [showReward, setShowReward] = useState<string | null>(null);
+  const [lastFoundTarget, setLastFoundTarget] = useState<string | null>(null);
+  const [lastFoundTargetEn, setLastFoundTargetEn] = useState<string | null>(null);
   const [allFound, setAllFound] = useState(false);
   const [hintIndex, setHintIndex] = useState<number | null>(null);
   const missCountRef = useRef(0);
@@ -173,8 +175,11 @@ export function usePostcardGame(item: FeedItem) {
                   clickY >= (ymin - padY) && clickY <= (ymax + padY);
 
     const targetLabel = getLabel(targetTag.label);
+    const targetEnLabel = typeof targetTag.label === 'object' ? targetTag.label?.en : String(targetTag.label);
 
     if (isHit) {
+      setLastFoundTarget(targetLabel);
+      setLastFoundTargetEn(targetEnLabel || null);
       const newDiscovered = new Set([...discoveredIndices, currentTargetIndex]);
       setDiscoveredIndices(newDiscovered);
       missCountRef.current = 0;
@@ -206,6 +211,7 @@ export function usePostcardGame(item: FeedItem) {
 
   return {
     discoveredIndices, showReward, allFound, hintIndex,
+    lastFoundTarget, lastFoundTargetEn,
     isScanning, scanError, tagsWithBbox, totalObjects, currentTarget,
     handleImageClick, elapsedSeconds, hintsUsed,
   };
@@ -311,8 +317,10 @@ export function GameImageOverlay({ game }: GameImageOverlayProps) {
             {game.showReward === '__ALL_FOUND__' ? (
               <>
                 <span className="text-lg">🎉</span>
-                <span className="text-white font-bold text-sm tracking-tight">
-                  {t({ es: '¡Encontrado!', en: 'Found it!' })}
+                <span className="text-white font-bold text-sm tracking-tight capitalize">
+                  {game.lastFoundTarget
+                    ? game.lastFoundTarget.replace(/_/g, ' ')
+                    : t({ es: '¡Encontrado!', en: 'Found it!' })}
                 </span>
               </>
             ) : (
@@ -391,7 +399,7 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mt-2 md:mt-3 px-1 pb-1 shrink-0"
+        className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
       >
         {/* Green completed progress bar */}
         <div className="mb-2">
@@ -443,7 +451,7 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className="mt-2 md:mt-3 px-1 pb-1 shrink-0"
+      className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
     >
       {/* ─── Progress bar ─── */}
       <div className="mb-2">
@@ -493,19 +501,6 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
             </motion.div>
           ) : null}
 
-          {/* Exit */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-500 text-[11px] font-semibold transition-all"
-            >
-              <X className="w-3 h-3" />
-              {t({ es: 'Salir', en: 'Exit' })}
-            </button>
-          </div>
         </div>
 
         {/* Visual progress bar */}
@@ -531,17 +526,6 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
         {scanError && <p className="text-red-500 text-[11px] mt-1">{scanError}</p>}
       </div>
 
-      {/* ─── Facts / Know about this place (hidden when riddles are active) ─── */}
-      {riddles.size === 0 && (
-        <div className="flex flex-col gap-1 mt-1">
-          {facts.slice(0, 3).map((fact, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-stone-500 text-[11px] leading-snug">
-              <span className="text-stone-400 flex-shrink-0 mt-0.5">{fact.icon}</span>
-              <span className="capitalize" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{fact.text}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </motion.div>
   );
 }

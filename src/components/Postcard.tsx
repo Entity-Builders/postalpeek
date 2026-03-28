@@ -132,9 +132,10 @@ export function Postcard({
   const [heroReady, setHeroReady] = useState(false);
   const hasFactType = !!item.generation_metadata?.storytelling?.fact_type;
   /** Clean/expand mode — hides chrome, enables fullscreen overlay */
-  const [isClean, setIsClean] = useState(hasFactType);
-  /** Track whether a game is active inside PostcardFront (ref to avoid re-renders) */
-  const isGameActiveRef = useRef(false);
+  const [isClean, setIsClean] = useState(false);
+  const isInitialMount = useRef(true);
+  /** Track whether a game is active inside PostcardFront */
+  const [isGameActive, setIsGameActive] = useState(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // ── Animation primitives ──
@@ -184,12 +185,12 @@ export function Postcard({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest('button, a')) return;
-      if (isGameActiveRef.current) return;
+      if (isGameActive) return;
       if (onTap) {
         onTap();
       }
     },
-    [onTap],
+    [onTap, isGameActive],
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,9 +247,16 @@ export function Postcard({
   React.useEffect(() => {
     if (!isActive) {
       setIsClean(false);
-    } else if (hasFactType) {
-      // Re-enter clean mode when swiping back to this card
-      setIsClean(true);
+      isInitialMount.current = false;
+    } else {
+      if (isInitialMount.current) {
+        // Opened directly (e.g. from grid) -> don't auto-maximize initially
+        isInitialMount.current = false;
+        setIsClean(false);
+      } else if (hasFactType) {
+        // Swiped to this card -> auto-maximize
+        setIsClean(true);
+      }
     }
   }, [isActive, hasFactType]);
 
@@ -294,17 +302,17 @@ export function Postcard({
         ref={scope}
         className={cn(
           'w-full h-full relative transition-[background-color,padding,border-radius,box-shadow] duration-300',
-          isClean && !isFlipped ? 'bg-transparent' : 'bg-white',
+          (isClean || isGameActive) && !isFlipped ? 'bg-transparent' : 'bg-white',
         )}
         style={{
           transformStyle: 'preserve-3d',
           willChange: 'transform',
           rotateY,
-          boxShadow: isClean && !isFlipped
+          boxShadow: (isClean || isGameActive) && !isFlipped
             ? 'none'
             : '0 8px 30px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05)',
-          padding: isClean && !isFlipped ? '0' : '8px 8px 32px 8px',
-          borderRadius: isClean && !isFlipped ? '0' : '12px',
+          padding: (isClean || isGameActive) && !isFlipped ? '0' : '8px 8px 32px 8px',
+          borderRadius: (isClean || isGameActive) && !isFlipped ? '0' : '12px',
         }}
       >
         <div
@@ -345,7 +353,7 @@ export function Postcard({
             userId={userId}
             onPostcardEarned={onPostcardEarned}
             onOpenAlbum={onOpenAlbum}
-            onGameActiveChange={(active: boolean) => { isGameActiveRef.current = active; }}
+            onGameActiveChange={setIsGameActive}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

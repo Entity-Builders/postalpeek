@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Eye, Star, Puzzle } from 'lucide-react';
+import { Eye, Star, Puzzle } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t } from '../utils/i18n';
@@ -313,7 +313,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mt-2 md:mt-3 px-1 pb-1 shrink-0"
+        className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
       >
         {/* Green completed progress bar */}
         <div className="mb-2">
@@ -366,7 +366,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className="mt-2 md:mt-3 px-1 pb-1 shrink-0"
+      className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
     >
       {/* Progress bar */}
       <div className="mb-2">
@@ -411,16 +411,6 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
                 </button>
               </>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-500 text-[11px] font-semibold transition-all"
-            >
-              <X className="w-3 h-3" />
-              {t({ es: 'Salir', en: 'Exit' })}
-            </button>
           </div>
         </div>
 

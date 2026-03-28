@@ -364,7 +364,7 @@ export function PostcardFront({
       >
         <div className={cn(
           "flex-1 w-full min-h-0 relative flex flex-col transition-all duration-300",
-          isClean ? 'p-0' : 'p-1 pb-0 bg-white overflow-hidden',
+          isClean || isPlaying ? 'p-0 bg-transparent' : 'p-1 pb-0 bg-white overflow-hidden',
         )}>
           {/* 3D flip container — used when the game completes */}
           <div
@@ -385,7 +385,9 @@ export function PostcardFront({
               <div
                 className={cn(
                   'absolute inset-0 w-full h-full',
-                  isClean ? 'rounded-none loupe-active' : 'overflow-hidden shadow-inner bg-stone-200 rounded',
+                  isClean ? 'rounded-none loupe-active'
+                    : isPlaying ? 'overflow-hidden rounded-xl bg-stone-200'
+                    : 'overflow-hidden shadow-inner bg-stone-200 rounded',
                 )}
                 style={{
                   backfaceVisibility: 'hidden',
@@ -515,39 +517,84 @@ export function PostcardFront({
                 <PostcardGameResults
                   item={item}
                   gameType="hunt"
-                  totalObjects={game.totalObjects}
-                  hintsUsed={game.hintsUsed}
+                  targetLabel={game.lastFoundTarget || undefined}
+                  targetEnLabel={game.lastFoundTargetEn || undefined}
                   albumTitle={item.generation_metadata?.tripContext?.title}
                   albumSequence={item.album_sequence}
                   albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
+                  onOpenAlbum={onOpenAlbum}
                 />
               )}
               {playingMode === 'puzzle' && (
                 <PostcardGameResults
                   item={item}
                   gameType="puzzle"
-                  totalObjects={puzzle.total}
-                  hintsUsed={puzzle.peeksUsed}
-                  moves={puzzle.moves}
                   albumTitle={item.generation_metadata?.tripContext?.title}
                   albumSequence={item.album_sequence}
                   albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
+                  onOpenAlbum={onOpenAlbum}
                 />
               )}
               {playingMode === 'stamp' && (
                 <PostcardGameResults
                   item={item}
                   gameType="stamp"
-                  totalObjects={1}
-                  hintsUsed={stampHunt.hintsUsed}
-                  taps={stampHunt.tapsCount}
                   albumTitle={item.generation_metadata?.tripContext?.title}
                   albumSequence={item.album_sequence}
                   albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
+                  onOpenAlbum={onOpenAlbum}
                 />
               )}
             </div>
           </div>
+
+          {/* Floating Game HUD Layer */}
+          {isPlaying && playingMode !== 'trivia' && (
+            <div className="absolute inset-0 z-50 pointer-events-none flex flex-col">
+              {playingMode === 'hunt' && (
+                <>
+                  <GameProgressBar
+                    availableGames={availableGamesList}
+                    completedGames={gameProgress.completedGames}
+                    activeGame={gameModeToDb('hunt')}
+                  />
+                  <GameBottomPanel
+                    item={item}
+                    game={game}
+                    onClose={() => handleGameClose('hunt')}
+                  />
+                </>
+              )}
+              {playingMode === 'puzzle' && (
+                <>
+                  <GameProgressBar
+                    availableGames={availableGamesList}
+                    completedGames={gameProgress.completedGames}
+                    activeGame={gameModeToDb('puzzle')}
+                  />
+                  <PuzzleBottomPanel
+                    item={item}
+                    puzzle={puzzle}
+                    onClose={() => handleGameClose('puzzle')}
+                  />
+                </>
+              )}
+              {playingMode === 'stamp' && (
+                <>
+                  <GameProgressBar
+                    availableGames={availableGamesList}
+                    completedGames={gameProgress.completedGames}
+                    activeGame={gameModeToDb('stamp')}
+                  />
+                  <StampHuntBottomPanel
+                    item={item}
+                    hunt={stampHunt}
+                    onClose={() => handleGameClose('stamp')}
+                  />
+                </>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Title + Buttons row — hidden in clean mode and game mode */}
@@ -597,45 +644,6 @@ export function PostcardFront({
               }
             }}
           />
-        ) : playingMode === 'hunt' ? (
-          <>
-            <GameProgressBar
-              availableGames={availableGamesList}
-              completedGames={gameProgress.completedGames}
-              activeGame={gameModeToDb('hunt')}
-            />
-            <GameBottomPanel
-              item={item}
-              game={game}
-              onClose={() => handleGameClose('hunt')}
-            />
-          </>
-        ) : playingMode === 'puzzle' ? (
-          <>
-            <GameProgressBar
-              availableGames={availableGamesList}
-              completedGames={gameProgress.completedGames}
-              activeGame={gameModeToDb('puzzle')}
-            />
-            <PuzzleBottomPanel
-              item={item}
-              puzzle={puzzle}
-              onClose={() => handleGameClose('puzzle')}
-            />
-          </>
-        ) : playingMode === 'stamp' ? (
-          <>
-            <GameProgressBar
-              availableGames={availableGamesList}
-              completedGames={gameProgress.completedGames}
-              activeGame={gameModeToDb('stamp')}
-            />
-            <StampHuntBottomPanel
-              item={item}
-              hunt={stampHunt}
-              onClose={() => handleGameClose('stamp')}
-            />
-          </>
         ) : null}
       </div>
 
