@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Upload,
   Library,
+  Stamp,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -38,7 +39,7 @@ import { AdminAlbumCreator } from '../components/AdminAlbumCreator';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'generation' | 'browser' | 'postcards' | 'albums' | 'settings' | 'sync';
+type NavSection = 'dashboard' | 'generation' | 'browser' | 'postcards' | 'albums' | 'settings' | 'sync' | 'stamps';
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface AdminPageProps {
@@ -973,6 +974,36 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     }
   }, [user?.id]);
 
+  // ── Grant Stamps ──
+  const [grantTargetEmail, setGrantTargetEmail] = useState('');
+  const [grantAmount, setGrantAmount] = useState('10');
+  const [grantReason, setGrantReason] = useState('Admin grant');
+  const [grantStatus, setGrantStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+
+  const grantStamps = useCallback(async () => {
+    if (!grantTargetEmail.trim() || !grantAmount.trim()) return;
+    const amount = parseInt(grantAmount.trim(), 10);
+    if (isNaN(amount) || amount <= 0) {
+      setGrantStatus({ status: 'error', message: 'Amount must be a positive number' });
+      return;
+    }
+    setGrantStatus({ status: 'loading', message: `Granting ${amount} stamps to ${grantTargetEmail.trim()}…` });
+    try {
+      const { data, error } = await supabase.rpc('postalpeek_admin_grant_stamps', {
+        p_user_email: grantTargetEmail.trim(),
+        p_amount: amount,
+        p_reason: grantReason.trim() || 'Admin grant',
+      });
+      if (error) throw error;
+      const result = data as { success: boolean; new_balance?: number; error?: string };
+      if (!result.success) throw new Error(result.error || 'Grant failed');
+      setGrantStatus({ status: 'success', message: `✅ ${amount} sellos otorgados. Nuevo saldo: ${result.new_balance}` });
+      setGrantTargetEmail('');
+    } catch (err: unknown) {
+      setGrantStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }, [grantTargetEmail, grantAmount, grantReason]);
+
   // ── Sidebar links ──
 
   // ── Sync to Prod state ──
@@ -1037,6 +1068,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     { key: 'albums'     as NavSection, icon: <Library     className="w-4 h-4" />, label: 'Albums'       },
     { key: 'sync'       as NavSection, icon: <Upload      className="w-4 h-4" />, label: 'Sync to Prod' },
     { key: 'settings'   as NavSection, icon: <Settings    className="w-4 h-4" />, label: 'User Actions' },
+    { key: 'stamps'     as NavSection, icon: <Stamp       className="w-4 h-4" />, label: 'Grant Stamps' },
   ];
 
   return (
@@ -1615,6 +1647,120 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                   <StatusMsg status={userStatus.status} message={userStatus.message} />
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── Grant Stamps ── */}
+          {activeSection === 'stamps' && (
+            <div className="max-w-lg space-y-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Stamp className="w-5 h-5 text-amber-400" />
+                Grant Stamps
+              </h2>
+              <p className="text-white/40 text-sm">Otorgar sellos a cualquier usuario por su email.</p>
+
+              <div
+                className="rounded-xl p-5 space-y-4 border"
+                style={{ background: 'rgba(245,158,11,0.04)', borderColor: 'rgba(245,158,11,0.15)' }}
+              >
+                <div className="space-y-3">
+                  {/* Target email */}
+                  <div>
+                    <label className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1 block">
+                      User Email
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+                      <input
+                        type="email"
+                        value={grantTargetEmail}
+                        onChange={(e) => setGrantTargetEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-mono"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1 block">
+                        Amount (Sellos)
+                      </label>
+                      <div className="flex gap-2">
+                        {[5, 10, 25, 50].map((preset) => (
+                          <button
+                            key={preset}
+                            onClick={() => setGrantAmount(String(preset))}
+                            className="px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all"
+                            style={{
+                              background: grantAmount === String(preset) ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${grantAmount === String(preset) ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                              color: grantAmount === String(preset) ? '#fbbf24' : 'rgba(255,255,255,0.5)',
+                            }}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                        <input
+                          type="number"
+                          min="1"
+                          value={grantAmount}
+                          onChange={(e) => setGrantAmount(e.target.value)}
+                          className="w-20 px-3 py-1.5 rounded-lg text-xs font-mono text-center"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1 block">
+                      Reason (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={grantReason}
+                      onChange={(e) => setGrantReason(e.target.value)}
+                      placeholder="Admin grant"
+                      className="w-full px-3 py-2.5 rounded-xl text-sm"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                <ActionBtn
+                  onClick={grantStamps}
+                  disabled={grantStatus.status === 'loading' || !grantTargetEmail.trim()}
+                  variant="amber"
+                >
+                  {grantStatus.status === 'loading'
+                    ? <Loader className="w-3.5 h-3.5 animate-spin" />
+                    : <Stamp className="w-3.5 h-3.5" />
+                  }
+                  <span>Otorgar {grantAmount} sellos</span>
+                </ActionBtn>
+
+                <StatusMsg status={grantStatus.status} message={grantStatus.message} />
+              </div>
+
+              {/* Rarity reference */}
+              <div className="rounded-xl p-4 border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+                <p className="text-white/40 text-[10px] uppercase tracking-widest font-semibold">Rarity Reference</p>
+                {[
+                  { tier: 'Common',    cost: 2,  color: '#9ca3af' },
+                  { tier: 'Rare',      cost: 6,  color: '#60a5fa' },
+                  { tier: 'Epic',      cost: 15, color: '#a78bfa' },
+                  { tier: 'Legendary', cost: 35, color: '#f59e0b' },
+                ].map((r) => (
+                  <div key={r.tier} className="flex items-center justify-between text-xs">
+                    <span style={{ color: r.color }} className="font-medium">{r.tier}</span>
+                    <span className="text-white/40 font-mono">{r.cost} sellos</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
