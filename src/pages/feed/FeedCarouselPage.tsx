@@ -131,7 +131,6 @@ export function FeedCarouselPage() {
           isPackLoading={isPackLoading}
           onOpenPack={user ? handleOpenPack : undefined}
           onPackComplete={user ? () => {
-             setPackDoneAlbumCount(0);
              setShowPackDoneToast(true);
              setTimeout(() => {
                 setShowPackDoneToast(false);

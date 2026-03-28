@@ -4,6 +4,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGameProgress, gameModeToDb, type DbGameType } from '../hooks/useGameProgress';
 import { cn } from '../utils/cn';
 import { preSignUrls } from '../utils/imageUtils';
@@ -112,6 +113,7 @@ export function PostcardFront({
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
   const [showSelector, setShowSelector] = useState(false);
   const [gameFlipped, setGameFlipped] = useState(false);
+  const [earnedStampsStr, setEarnedStampsStr] = useState<number | null>(null);
   const game = usePostcardGame(item);
   const puzzle = usePostcardPuzzle(item);
   const stampHunt = useStampHunt(item);
@@ -173,7 +175,12 @@ export function PostcardFront({
     const dbType = gameModeToDb(mode);
     // Compute updated set locally so getNextGame works with fresh data immediately
     const newCompletedGames = new Set([...gameProgress.completedGames, dbType]);
-    const isLastGame = await gameProgress.saveGameCompletion(dbType, 0);
+    const { allComplete: isLastGame, rewardedStamps } = await gameProgress.saveGameCompletion(dbType, 0);
+
+    if (rewardedStamps > 0) {
+      setEarnedStampsStr(rewardedStamps);
+      setTimeout(() => setEarnedStampsStr(null), 3500);
+    }
 
     if (isLastGame) {
       // All games complete → earn the postcard, show victory
@@ -590,7 +597,6 @@ export function PostcardFront({
         ) : null}
       </div>
 
-      {/* Challenge overlay (replaces modal selector) */}
       <PostcardGameSelector
         open={showSelector}
         hasHuntMode={hasHuntMode_}
@@ -600,6 +606,26 @@ export function PostcardFront({
         onStart={startChallenge}
         onClose={() => setShowSelector(false)}
       />
+
+      {/* Earned Stamp Floating Toast */}
+      <AnimatePresence>
+        {earnedStampsStr !== null && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: -30 }}
+            className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] flex flex-col items-center pointer-events-none"
+          >
+            <div className="w-16 h-16 bg-amber-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(251,191,36,0.6)] mb-2 border-4 border-white">
+              <span className="text-3xl">📮</span>
+            </div>
+            <div className="bg-stone-900/95 text-white font-bold px-4 py-1.5 rounded-full text-sm shadow-xl backdrop-blur-md border border-white/10 flex items-center gap-1.5">
+              <span className="text-amber-400">+</span>
+              {earnedStampsStr} Sello{earnedStampsStr !== 1 ? 's' : ''}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Victory celebration overlay */}
       {showVictory && (

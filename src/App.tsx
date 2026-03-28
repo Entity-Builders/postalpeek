@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import './index.css';
-import { WalkerFeed } from './components/WalkerFeed';
+// WalkerFeed was replaced with FeedLayout + Pages
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
 import { AdminLoginModal } from './components/AdminLoginModal';
