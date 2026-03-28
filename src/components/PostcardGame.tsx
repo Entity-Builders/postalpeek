@@ -351,12 +351,11 @@ export function GameImageOverlay({ game }: GameImageOverlayProps) {
 interface GameBottomPanelProps {
   item: FeedItem;
   game: ReturnType<typeof usePostcardGame>;
-  onClose: () => void;
+  onClose: (won: boolean, elapsedSeconds: number) => void;
 }
 
 export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
-  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, hintsUsed, tagsWithBbox, elapsedSeconds, status } = game;
-  const progress = totalObjects > 0 ? (discoveredIndices.size / totalObjects) * 100 : 0;
+  const { isScanning, scanError, discoveredIndices, currentTarget, allFound, hintsUsed, tagsWithBbox, elapsedSeconds, status } = game;
 
   // ── Riddles integration ──
   const { riddles, isLoading: riddlesLoading } = useRiddles(item.id);
@@ -448,7 +447,7 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
 
           {/* Auto-advance countdown */}
           <div className="flex-1" />
-          <NextGameCountdown seconds={3} onAdvance={onClose} />
+          <NextGameCountdown seconds={3} onAdvance={() => onClose(true, elapsedSeconds)} />
         </motion.div>
       </motion.div>
     );
@@ -467,14 +466,15 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="flex items-center justify-between mt-2"
+          className="flex items-center gap-3"
         >
-          <div className="flex items-center gap-1.5 text-red-600 px-2">
+          <div className="flex items-center gap-1.5 text-red-600">
             <span className="text-xl">👎</span>
             <span className="text-sm font-bold">{t({ es: '¡Intenta más rápido!', en: 'Try faster!' })}</span>
           </div>
+          <div className="flex-1" />
           <button
-            onClick={onClose}
+            onClick={() => onClose(false, elapsedSeconds)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white font-bold text-sm"
           >
             {t({ es: 'Continuar', en: 'Continue' })}

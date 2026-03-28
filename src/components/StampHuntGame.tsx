@@ -16,6 +16,7 @@ import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngin
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
+import { GameTimerBar } from './GameTimerBar';
 import { t } from '../utils/i18n';
 
 // ── Seeded random from string (deterministic positions per postcard) ────
@@ -91,6 +92,7 @@ export function useStampHunt(item: FeedItem) {
     gameType: 'stamp_hunt',
     userId: user?.id,
     autoStartTimer: true,
+    loseCondition: (m) => m.elapsedSeconds >= 15,
   });
 
   const [placement, setPlacement] = useState(() => computeStampPlacement(item.id + Math.random().toString()));
@@ -176,6 +178,7 @@ export function useStampHunt(item: FeedItem) {
     hintActive,
     showReward,
     elapsedSeconds: engine.metrics.elapsedSeconds,
+    status: engine.status,
     handleImageClick,
   };
 }
@@ -365,11 +368,11 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
 interface StampHuntBottomPanelProps {
   item: FeedItem;
   hunt: ReturnType<typeof useStampHunt>;
-  onClose: () => void;
+  onClose: (won: boolean, elapsedSeconds: number) => void;
 }
 
 export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProps) {
-  const { found, tapsCount, hintsUsed, placement } = hunt;
+  const { found, tapsCount, hintsUsed, placement, elapsedSeconds, status } = hunt;
 
   // Star rating: 3 = no hints, 2 = 1 hint, 1 = 2+ hints
   const starRating = hintsUsed === 0 ? 3 : hintsUsed <= 1 ? 2 : 1;
@@ -389,25 +392,14 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
   }[placement.difficulty];
 
   // ── Complete state ──
-  if (found) {
+  if (found || status === 'won') {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-red-500/30"
       >
-        {/* Red completed progress bar */}
-        <div className="mb-2">
-          <div className="w-full h-1.5 rounded-full bg-stone-200 overflow-hidden">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #b43c32, #8c2823)' }}
-              initial={{ width: 0 }}
-              animate={{ width: '100%' }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
+        <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status="won" />
 
         {/* Compact stats + Listo button */}
         <motion.div
@@ -435,7 +427,37 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
           </div>
 
           <div className="flex-1" />
-          <NextGameCountdown seconds={3} onAdvance={onClose} />
+          <NextGameCountdown seconds={3} onAdvance={() => onClose(true, elapsedSeconds)} />
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // ── Lost state ──
+  if (status === 'lost') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-red-500/50"
+      >
+        <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status="lost" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-between mt-2"
+        >
+          <div className="flex items-center gap-1.5 text-red-600 px-2">
+            <span className="text-xl">👎</span>
+            <span className="text-sm font-bold">{t({ es: '¡Intenta más rápido!', en: 'Try faster!' })}</span>
+          </div>
+          <button
+            onClick={() => onClose(false, elapsedSeconds)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white font-bold text-sm"
+          >
+            {t({ es: 'Continuar', en: 'Continue' })}
+          </button>
         </motion.div>
       </motion.div>
     );
@@ -468,18 +490,8 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
 
         </div>
 
-        {/* Taps indicator */}
-        <div className="flex items-center gap-2">
-          <div className="w-full h-1.5 rounded-full bg-stone-200 overflow-hidden">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #b43c32, #8c2823)' }}
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(tapsCount * 10, 95)}%` }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
+        {/* Visual Timer Bar */}
+        <GameTimerBar elapsedSeconds={elapsedSeconds} maxSeconds={15} status={status} />
       </div>
 
       {/* Tap count + hint tip */}

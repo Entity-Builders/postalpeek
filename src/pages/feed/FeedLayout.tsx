@@ -213,7 +213,6 @@ export function FeedLayout({
   }, [onWelcomeChange, showWelcome]);
 
   const { favoriteIds, favoriteItems, toggle: toggleFavorite } = useFavorites(user ?? null);
-  const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(user?.id);
   const { collection, isLoading: isCollectionLoading, refetch: refetchCollection } = useCollection(user?.id);
   const { albums, isLoading: isLoadingAlbums, refetch: refetchAlbums } = useAlbums(user?.id);
   const { detail: albumDetail, isLoading: isAlbumDetailLoading, fetchDetail: fetchAlbumDetail, reset: resetAlbumDetail } = useAlbumDetail();
@@ -226,7 +225,7 @@ export function FeedLayout({
     return set;
   }, [albums]);
 
-  const { stampBalance, claimDailyStamps } = useStampContext();
+  const { stampBalance, claimDailyStamps, addLocalStamps, setLocalStamps } = useStampContext();
   useEffect(() => { if (user?.id) claimDailyStamps(); }, [user?.id, claimDailyStamps]);
 
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
@@ -234,6 +233,8 @@ export function FeedLayout({
   const isSpotlightMode = Boolean(
     spotlightQuery.trim().length > 0 || isSpotlightSearching || spotlightResults.length > 0,
   );
+
+  const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(user?.id, addLocalStamps, setLocalStamps);
 
   const contextValue = useMemo<FeedLayoutContextType>(() => ({
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,

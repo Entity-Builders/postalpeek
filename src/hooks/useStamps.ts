@@ -67,6 +67,13 @@ export function useStamps(userId: string | null | undefined) {
     }));
   }, []);
 
+  const setLocalStamps = useCallback((balance: number) => {
+    setBalance(prev => ({
+      ...prev,
+      balance,
+    }));
+  }, []);
+
   /**
    * Award the daily login bonus (2 stamps once per calendar day).
    * Safe to call on every app open — the RPC is idempotent.
@@ -154,5 +161,6 @@ export function useStamps(userId: string | null | undefined) {
     spendStamps,
     refreshStamps,
     addLocalStamps,
+    setLocalStamps,
   };
 }

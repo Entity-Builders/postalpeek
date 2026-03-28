@@ -55,6 +55,7 @@ export interface FeedItem {
   time_of_day?: string | null;
   weather?: string | null;
   human_activity?: string | null;
+  stamp_cost?: number;
 }
 
 interface PostcardProps {

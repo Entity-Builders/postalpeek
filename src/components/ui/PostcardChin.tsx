@@ -126,7 +126,7 @@ export function PostcardChin({
     new Date(active.last_played_at).toDateString() === new Date().toDateString()
   );
 
-  const stampCost = active.rarity === 'legendary' ? 35 : active.rarity === 'epic' ? 15 : active.rarity === 'rare' ? 6 : 2;
+  const stampCost = active.stamp_cost ?? (active.rarity === 'legendary' ? 35 : active.rarity === 'epic' ? 15 : active.rarity === 'rare' ? 6 : 2);
 
   return (
     <div

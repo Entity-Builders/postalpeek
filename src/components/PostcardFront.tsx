@@ -168,7 +168,7 @@ export function PostcardFront({
   }, [getNextGame]);
 
   // Handle game completion: save progress → then auto-advance
-  const handleGameClose = useCallback(async (mode: GameMode) => {
+  const handleGameClose = useCallback(async (mode: GameMode, won: boolean = true, timeSeconds: number = 0) => {
     if (!userId) {
       // No user: just move on
       setPlayingMode(null);
@@ -178,7 +178,7 @@ export function PostcardFront({
     const dbType = gameModeToDb(mode);
     // Compute updated set locally so getNextGame works with fresh data immediately
     const newCompletedGames = new Set([...gameProgress.completedGames, dbType]);
-    const { allComplete: isLastGame, rewardedStamps } = await gameProgress.saveGameCompletion(dbType, 0);
+    const { allComplete: isLastGame, rewardedStamps } = await gameProgress.saveGameCompletion(dbType, timeSeconds, won);
 
     if (rewardedStamps > 0) {
       addLocalStamps(rewardedStamps);
@@ -545,21 +545,21 @@ export function PostcardFront({
                 <GameBottomPanel
                   item={item}
                   game={game}
-                  onClose={() => handleGameClose('hunt')}
+                  onClose={(won, timeSeconds) => handleGameClose('hunt', won, timeSeconds)}
                 />
               )}
               {playingMode === 'puzzle' && (
                 <PuzzleBottomPanel
                   item={item}
                   puzzle={puzzle}
-                  onClose={() => handleGameClose('puzzle')}
+                  onClose={(won, timeSeconds) => handleGameClose('puzzle', won, timeSeconds)}
                 />
               )}
               {playingMode === 'stamp' && (
                 <StampHuntBottomPanel
                   item={item}
                   hunt={stampHunt}
-                  onClose={() => handleGameClose('stamp')}
+                  onClose={(won, timeSeconds) => handleGameClose('stamp', won, timeSeconds)}
                 />
               )}
             </div>
@@ -672,7 +672,7 @@ function GameSummaryOverlay({
   rows, 
   onDismiss 
 }: { 
-  rows: { game_type: string; time_seconds: number | null }[]; 
+  rows: { game_type: string; time_seconds: number | null; won?: boolean }[]; 
   onDismiss: () => void;
 }) {
   // Deterministic confetti (no Math.random needed)
@@ -705,7 +705,7 @@ function GameSummaryOverlay({
     }
   };
 
-  const totalStamps = rows.length;
+  const totalStamps = rows.filter((r) => r.won !== false).length;
 
   return (
     <div
@@ -749,21 +749,22 @@ function GameSummaryOverlay({
         <div className="w-full space-y-2 mb-6 overflow-y-auto min-h-0">
           {rows.map((row, idx) => {
             const info = getGameLabel(row.game_type);
+            const isWon = row.won !== false; // treat undefined as win for backwards compat
             return (
-              <div key={idx} className="flex items-center justify-between bg-stone-50 border border-stone-100 rounded-xl p-3 shadow-sm">
+              <div key={idx} className={cn("flex items-center justify-between border rounded-xl p-3 shadow-sm", isWon ? "bg-stone-50 border-stone-100" : "bg-stone-100/50 border-stone-200/50")}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-stone-100 text-lg">
+                  <div className={cn("w-10 h-10 rounded-full shadow-sm flex items-center justify-center border text-lg", isWon ? "bg-white border-stone-100" : "bg-stone-200/50 border-stone-200 opacity-80 grayscale")}>
                     {info.icon}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-stone-700 leading-tight">{info.label}</span>
-                    <span className="text-[11px] text-stone-400 font-mono tracking-wider mt-0.5">
-                      {t({ es: 'Tardaste ', en: 'Time: ' })}<span className="text-stone-500 font-semibold">{formatTime(row.time_seconds)}</span>
+                    <span className={cn("text-sm font-bold leading-tight", isWon ? "text-stone-700" : "text-stone-500")}>{info.label}</span>
+                    <span className={cn("text-[11px] font-mono tracking-wider mt-0.5", isWon ? "text-stone-400" : "text-stone-400/70")}>
+                      {t({ es: 'Tardaste ', en: 'Time: ' })}<span className={cn("font-semibold", isWon ? "text-stone-500" : "text-stone-400")}>{formatTime(row.time_seconds)}</span>
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-amber-100/80 text-amber-700 px-2.5 py-1.5 rounded-full text-[11px] font-bold border border-amber-200/50">
-                  +1 <PostalPeekStampSVG className="w-3.5 h-3.5 text-amber-800" />
+                <div className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border", isWon ? "bg-amber-100/80 text-amber-700 border-amber-200/50" : "bg-stone-200/50 text-stone-500 border-stone-300/50")}>
+                  {isWon ? "+1 " : "0 "}<PostalPeekStampSVG className={cn("w-3.5 h-3.5", isWon ? "text-amber-800" : "text-stone-400 grayscale opacity-60")} />
                 </div>
               </div>
             );

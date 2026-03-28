@@ -25,7 +25,11 @@ interface ClaimResult {
   balance?: number; // returned on INSUFFICIENT_STAMPS
 }
 
-export function useClaimPostcard(userId: string | null | undefined) {
+export function useClaimPostcard(
+  userId: string | null | undefined,
+  addLocalStamps?: (amount: number) => void,
+  setLocalStamps?: (balance: number) => void
+) {
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>({
     daily_used: 0,
@@ -67,7 +71,7 @@ export function useClaimPostcard(userId: string | null | undefined) {
   }, [userId]);
 
   const claim = useCallback(
-    async (postcardId: string): Promise<ClaimResult> => {
+    async (postcardId: string, expectedCost: number = 3): Promise<ClaimResult> => {
       if (!userId) {
         return { success: false, error: 'AUTH_REQUIRED' };
       }
@@ -79,6 +83,9 @@ export function useClaimPostcard(userId: string | null | undefined) {
 
       // OPTIMISTIC UI: instantly add to claimed set so UI reacts without delay
       setClaimedIds((prev) => new Set(prev).add(postcardId));
+      if (addLocalStamps && expectedCost > 0) {
+        addLocalStamps(-expectedCost);
+      }
 
       try {
         const { data, error } = await supabase.rpc('postalpeek_claim_postcard', {
@@ -104,6 +111,14 @@ export function useClaimPostcard(userId: string | null | undefined) {
               monthly_limit: result.monthly_limit ?? prev.monthly_limit,
             }));
           }
+          
+          if (setLocalStamps && result.remaining_stamps != null) {
+            setLocalStamps(result.remaining_stamps);
+          } else if (addLocalStamps && result.stamp_cost != null && result.stamp_cost !== expectedCost) {
+            // Adjust optimistic deduction if cost was different
+            const diff = expectedCost - result.stamp_cost;
+            if (diff !== 0) addLocalStamps(diff);
+          }
 
           analytics.track('postcard_claimed', {
             postcard_id: postcardId,
@@ -117,6 +132,13 @@ export function useClaimPostcard(userId: string | null | undefined) {
             next.delete(postcardId);
             return next;
           });
+          
+          if (addLocalStamps && expectedCost > 0) {
+            addLocalStamps(expectedCost); // Revert
+          }
+          if (setLocalStamps && result.balance != null) {
+             setLocalStamps(result.balance); // Sync with source of truth
+          }
 
           if (result.error === 'INSUFFICIENT_STAMPS') {
             setInsufficientStamps(true);
@@ -136,6 +158,9 @@ export function useClaimPostcard(userId: string | null | undefined) {
           next.delete(postcardId);
           return next;
         });
+        if (addLocalStamps && expectedCost > 0) {
+          addLocalStamps(expectedCost); // Revert
+        }
         
         console.error('Failed to claim postcard:', err);
         analytics.captureError(err, { context: 'claim_postcard', postcard_id: postcardId });
@@ -144,7 +169,7 @@ export function useClaimPostcard(userId: string | null | undefined) {
         setIsClaiming(false);
       }
     },
-    [userId, isClaiming],
+    [userId, isClaiming, addLocalStamps, setLocalStamps],
   );
 
     return {

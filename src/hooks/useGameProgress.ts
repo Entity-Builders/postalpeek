@@ -29,6 +29,7 @@ interface GameProgressRow {
   game_type: DbGameType;
   completed_at: string;
   time_seconds: number | null;
+  won?: boolean;
 }
 
 interface UseGameProgressReturn {
@@ -41,7 +42,7 @@ interface UseGameProgressReturn {
   /** Number of games completed / total available */
   progress: { done: number; total: number };
   /** Save a game completion to DB. Returns if it was the last game and how many stamps were awarded. */
-  saveGameCompletion: (gameType: DbGameType, timeSeconds: number) => Promise<{ allComplete: boolean; rewardedStamps: number }>;
+  saveGameCompletion: (gameType: DbGameType, timeSeconds: number, won?: boolean) => Promise<{ allComplete: boolean; rewardedStamps: number }>;
   /** Earn the postcard: set owner_id. Called after all games complete. */
   earnPostcard: () => Promise<{ success: boolean; error?: string }>;
   /** Whether an earn operation is in progress */
@@ -98,7 +99,7 @@ export function useGameProgress(
       try {
         const { data, error } = await supabase
           .from('postalpeek_game_progress')
-          .select('game_type, completed_at, time_seconds')
+          .select('game_type, completed_at, time_seconds, won')
           .eq('user_id', userId!)
           .eq('postcard_id', postcardId!);
 
@@ -118,7 +119,7 @@ export function useGameProgress(
 
   // Save a game completion
   const saveGameCompletion = useCallback(
-    async (gameType: DbGameType, timeSeconds: number): Promise<{ allComplete: boolean; rewardedStamps: number }> => {
+    async (gameType: DbGameType, timeSeconds: number, won: boolean = true): Promise<{ allComplete: boolean; rewardedStamps: number }> => {
       if (!postcardId || !userId) return { allComplete: false, rewardedStamps: 0 };
 
       // Optimistic update
@@ -126,7 +127,7 @@ export function useGameProgress(
         if (prev.some((r) => r.game_type === gameType)) return prev;
         return [
           ...prev,
-          { game_type: gameType, completed_at: new Date().toISOString(), time_seconds: timeSeconds },
+          { game_type: gameType, completed_at: new Date().toISOString(), time_seconds: timeSeconds, won },
         ];
       });
 
@@ -140,6 +141,7 @@ export function useGameProgress(
             postcard_id: postcardId,
             game_type: gameType,
             time_seconds: timeSeconds,
+            won,
           }, { onConflict: 'user_id,postcard_id,game_type' });
 
         if (upsertError) {
@@ -147,14 +149,16 @@ export function useGameProgress(
           return { allComplete: false, rewardedStamps: 0 };
         }
 
-        // Try to claim the stamp reward securely
-        const { data: rewardData, error: rewardError } = await supabase.rpc('postalpeek_claim_game_reward', {
-          p_postcard_id: postcardId,
-          p_game_type: gameType
-        });
-        
-        if (!rewardError && rewardData?.success) {
-          awardedStamps = rewardData.awarded || 0;
+        if (won) {
+          // Try to claim the stamp reward securely
+          const { data: rewardData, error: rewardError } = await supabase.rpc('postalpeek_claim_game_reward', {
+            p_postcard_id: postcardId,
+            p_game_type: gameType
+          });
+          
+          if (!rewardError && rewardData?.success) {
+            awardedStamps = rewardData.awarded || 0;
+          }
         }
 
         // Check if all games are now complete
