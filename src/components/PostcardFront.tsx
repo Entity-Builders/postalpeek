@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { useGameProgress, gameModeToDb, type DbGameType } from '../hooks/useGameProgress';
 import { cn } from '../utils/cn';
 import { preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
@@ -21,6 +22,14 @@ import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './Post
 import { useStampHunt, StampHuntOverlay, StampHuntBottomPanel } from './StampHuntGame';
 import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 import { TriviaBottomPanel } from './TriviaRevealGame';
+import { GameProgressBar } from './GameProgressBar';
+
+// Map DB game types to UI game modes (module-level for stable reference)
+const DB_TO_MODE: Record<DbGameType, GameMode> = {
+  find_objects: 'hunt',
+  puzzle: 'puzzle',
+  stamp_hunt: 'stamp',
+};
 
 interface PostcardFrontProps {
   item: FeedItem;
@@ -61,6 +70,10 @@ interface PostcardFrontProps {
   onToggleClean?: () => void;
   /** Game mode: allow play (show the Play button) */
   allowPlay?: boolean;
+  /** Current user ID for game progress tracking */
+  userId?: string;
+  /** Callback when postcard is earned through game completion */
+  onPostcardEarned?: (postcardId: string) => void;
 }
 
 export function PostcardFront({
@@ -87,6 +100,8 @@ export function PostcardFront({
   isClaimed,
   isClaimLoading,
   onClaimPostcard,
+  userId,
+  onPostcardEarned,
 }: PostcardFrontProps) {
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
@@ -97,8 +112,8 @@ export function PostcardFront({
   const stampHunt = useStampHunt(item);
   const isPlaying = playingMode !== null;
 
-  // Check if hunt mode is available (needs illustration_tags with bboxes)
-  const hasHuntMode = useMemo(() => {
+  // ── Game progress tracking (play-to-earn) ──
+  const hasHuntMode_ = useMemo(() => {
     const raw = item.illustration_tags as unknown as Array<{ box_2d?: number[]; bbox?: number[] }> | null;
     if (!raw || !Array.isArray(raw)) return false;
     return raw.some((t) => {
@@ -107,27 +122,106 @@ export function PostcardFront({
     });
   }, [item.illustration_tags]);
 
-  // Flip the card when hunt game completes
+  const gameProgress = useGameProgress(item.id, userId, hasHuntMode_);
+
+  // Get the ordered list of available games (as DB types)
+  const availableGamesList = useMemo(() => {
+    const games: DbGameType[] = [];
+    if (hasHuntMode_) games.push('find_objects');
+    games.push('puzzle', 'stamp_hunt');
+    return games;
+  }, [hasHuntMode_]);
+
+  // Get next incomplete game
+  const getNextGame = useCallback((): GameMode | null => {
+    for (const dbType of availableGamesList) {
+      if (!gameProgress.completedGames.has(dbType)) {
+        return DB_TO_MODE[dbType];
+      }
+    }
+    return null;
+  }, [availableGamesList, gameProgress.completedGames]);
+
+  // Start the challenge: auto-pick first incomplete game
+  const startChallenge = useCallback(() => {
+    setShowSelector(false);
+    const nextGame = getNextGame();
+    if (nextGame) {
+      setPlayingMode(nextGame);
+    }
+  }, [getNextGame]);
+
+  // Handle game completion: save progress + auto-advance to next game
+  // Returns true if ALL games are now complete
+  const handleGameDone = useCallback(async (mode: GameMode): Promise<boolean> => {
+    if (!userId) return false;
+
+    const dbType = gameModeToDb(mode);
+    // Timer display removed — pass 0 for time tracking
+    const timeSeconds = 0;
+
+    const isLastGame = await gameProgress.saveGameCompletion(dbType, timeSeconds);
+
+    if (isLastGame) {
+      // All games complete → earn the postcard!
+      const result = await gameProgress.earnPostcard();
+      if (result.success) {
+        onPostcardEarned?.(item.id);
+      }
+      return true;
+    }
+    return false;
+  }, [userId, gameProgress, item.id, onPostcardEarned]);
+
+  // Auto-advance: when a game completes, save + start next
+  const handleGameClose = useCallback(async (mode: GameMode) => {
+    const allDone = await handleGameDone(mode);
+
+    if (allDone) {
+      // All games done! Reset state in single batch to avoid flip useEffect re-triggering
+      setPlayingMode(null);
+      setGameFlipped(false);
+      setShowVictory(true);
+    } else {
+      // More games — un-flip, wait for animation, then start next game
+      setGameFlipped(false);
+      setTimeout(() => {
+        const nextGame = getNextGame();
+        if (nextGame) {
+          setPlayingMode(nextGame);
+        } else {
+          setPlayingMode(null);
+        }
+      }, 700);
+    }
+  }, [handleGameDone, getNextGame]);
+
+
+
+  // Victory celebration state
+  const [showVictory, setShowVictory] = useState(false);
+
+  // Flip the card when hunt game completes (auto-advance handled by NextGameCountdown)
   useEffect(() => {
     if (playingMode === 'hunt' && game.allFound && !gameFlipped) {
-      const timer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(timer);
+      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(flipTimer);
     }
   }, [game.allFound, playingMode, gameFlipped]);
 
-  // Flip the card when puzzle completes
+  // Flip the card when puzzle completes (auto-advance handled by NextGameCountdown)
   useEffect(() => {
     if (playingMode === 'puzzle' && puzzle.isComplete && !gameFlipped) {
-      const timer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(timer);
+      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(flipTimer);
     }
   }, [puzzle.isComplete, playingMode, gameFlipped]);
 
-  // Flip the card when stamp hunt completes
+  // Flip the card when stamp hunt completes (auto-advance handled by NextGameCountdown)
   useEffect(() => {
     if (playingMode === 'stamp' && stampHunt.found && !gameFlipped) {
-      const timer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(timer);
+      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
+      return () => clearTimeout(flipTimer);
     }
   }, [stampHunt.found, playingMode, gameFlipped]);
   // Sticker discovery system (used by TripSlide)
@@ -403,7 +497,6 @@ export function PostcardFront({
                   item={item}
                   gameType="hunt"
                   totalObjects={game.totalObjects}
-                  elapsedSeconds={game.elapsedSeconds}
                   hintsUsed={game.hintsUsed}
                 />
               )}
@@ -412,7 +505,6 @@ export function PostcardFront({
                   item={item}
                   gameType="puzzle"
                   totalObjects={puzzle.total}
-                  elapsedSeconds={puzzle.elapsedSeconds}
                   hintsUsed={puzzle.peeksUsed}
                   moves={puzzle.moves}
                 />
@@ -422,7 +514,6 @@ export function PostcardFront({
                   item={item}
                   gameType="stamp"
                   totalObjects={1}
-                  elapsedSeconds={stampHunt.elapsedSeconds}
                   hintsUsed={stampHunt.hintsUsed}
                   taps={stampHunt.tapsCount}
                 />
@@ -460,7 +551,8 @@ export function PostcardFront({
               storytellingTitle={storytelling ? 'short' : undefined}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay && !isTriviaLocked ? () => setShowSelector(true) : undefined}
+              onPlay={allowPlay && !isTriviaLocked && !isClaimedByMe ? () => setShowSelector(true) : undefined}
+              isOwned={isClaimedByMe}
             />
           </>
         ) : playingMode === 'trivia' ? (
@@ -479,67 +571,118 @@ export function PostcardFront({
             }}
           />
         ) : playingMode === 'hunt' ? (
-          <GameBottomPanel
-            item={item}
-            game={game}
-            onClose={() => {
-              if (gameFlipped) {
-                setGameFlipped(false);
-                setTimeout(() => {
-                  setPlayingMode(null);
-                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
-                }, 700);
-              } else {
-                setPlayingMode(null);
-              }
-            }}
-          />
+          <>
+            <GameProgressBar
+              availableGames={availableGamesList}
+              completedGames={gameProgress.completedGames}
+              activeGame={gameModeToDb('hunt')}
+            />
+            <GameBottomPanel
+              item={item}
+              game={game}
+              onClose={() => handleGameClose('hunt')}
+            />
+          </>
         ) : playingMode === 'puzzle' ? (
-          <PuzzleBottomPanel
-            item={item}
-            puzzle={puzzle}
-            onClose={() => {
-              if (gameFlipped) {
-                setGameFlipped(false);
-                setTimeout(() => {
-                  setPlayingMode(null);
-                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
-                }, 700);
-              } else {
-                setPlayingMode(null);
-              }
-            }}
-          />
+          <>
+            <GameProgressBar
+              availableGames={availableGamesList}
+              completedGames={gameProgress.completedGames}
+              activeGame={gameModeToDb('puzzle')}
+            />
+            <PuzzleBottomPanel
+              item={item}
+              puzzle={puzzle}
+              onClose={() => handleGameClose('puzzle')}
+            />
+          </>
         ) : playingMode === 'stamp' ? (
-          <StampHuntBottomPanel
-            item={item}
-            hunt={stampHunt}
-            onClose={() => {
-              if (gameFlipped) {
-                setGameFlipped(false);
-                setTimeout(() => {
-                  setPlayingMode(null);
-                  window.dispatchEvent(new CustomEvent('postalpeek:next-card'));
-                }, 700);
-              } else {
-                setPlayingMode(null);
-              }
-            }}
-          />
+          <>
+            <GameProgressBar
+              availableGames={availableGamesList}
+              completedGames={gameProgress.completedGames}
+              activeGame={gameModeToDb('stamp')}
+            />
+            <StampHuntBottomPanel
+              item={item}
+              hunt={stampHunt}
+              onClose={() => handleGameClose('stamp')}
+            />
+          </>
         ) : null}
       </div>
 
-      {/* Game mode selector */}
+      {/* Challenge overlay (replaces modal selector) */}
       <PostcardGameSelector
         open={showSelector}
-        hasHuntMode={hasHuntMode}
+        hasHuntMode={hasHuntMode_}
         hasTriviaMode={!!trivia}
-        onSelect={(mode) => {
-          setShowSelector(false);
-          setPlayingMode(mode);
-        }}
+        completedGames={gameProgress.completedGames}
+        progress={gameProgress.progress}
+        onStart={startChallenge}
         onClose={() => setShowSelector(false)}
       />
+
+      {/* Victory celebration overlay */}
+      {showVictory && (
+        <VictoryOverlay onDismiss={() => setShowVictory(false)} />
+      )}
+    </div>
+  );
+}
+
+/** Victory celebration shown when all games are complete */
+function VictoryOverlay({ onDismiss }: { onDismiss: () => void }) {
+  // Auto-dismiss after 4 seconds
+  React.useEffect(() => {
+    const timer = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  // Deterministic confetti (no Math.random needed)
+  const COLORS = ['#fbbf24', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6'];
+  const particles = Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    x: ((i * 37 + 13) % 100),
+    delay: (i % 5) * 0.1,
+    duration: 1.5 + (i % 3) * 0.5,
+    color: COLORS[i % 6],
+    size: 4 + (i % 4) * 2,
+  }));
+
+  return (
+    <div
+      className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden"
+      onClick={onDismiss}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.3s_ease-out]" />
+
+      {/* Confetti particles */}
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.x}%`,
+            top: '-5%',
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            animation: `confettiFall ${p.duration}s ${p.delay}s linear forwards`,
+          }}
+        />
+      ))}
+
+      {/* Trophy card */}
+      <div className="relative z-10 flex flex-col items-center px-8 py-6 bg-white rounded-2xl shadow-2xl animate-[bounceIn_0.5s_ease-out]">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg mb-3">
+          <span className="text-3xl">🏆</span>
+        </div>
+        <h3 className="text-xl font-bold text-stone-800">¡Es tuya!</h3>
+        <p className="text-xs text-stone-500 mt-1">Completaste todos los desafíos</p>
+        <p className="text-[10px] text-stone-400 mt-2">La postal se agregó a tu colección</p>
+      </div>
     </div>
   );
 }

@@ -10,8 +10,9 @@
  */
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Star, Stamp, Sparkles } from 'lucide-react';
+import { X, Star, Stamp, Sparkles } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { NextGameCountdown } from './NextGameCountdown';
 import { t } from '../utils/i18n';
 
 // ── Seeded random from string (deterministic positions per postcard) ────
@@ -354,16 +355,12 @@ interface StampHuntBottomPanelProps {
 }
 
 export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProps) {
-  const { found, tapsCount, elapsedSeconds, hintsUsed, placement } = hunt;
+  const { found, tapsCount, hintsUsed, placement } = hunt;
 
   // Star rating: 3 = no hints, 2 = 1 hint, 1 = 2+ hints
   const starRating = hintsUsed === 0 ? 3 : hintsUsed <= 1 ? 2 : 1;
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
+
 
   const difficultyLabel = {
     easy: t({ es: 'Fácil', en: 'Easy' }),
@@ -412,13 +409,6 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
             </span>
           </div>
           <div className="w-px h-3 bg-stone-200" />
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-stone-400" />
-            <span className="text-stone-600 text-xs font-medium tabular-nums">
-              {formatTime(elapsedSeconds)}
-            </span>
-          </div>
-          <div className="w-px h-3 bg-stone-200" />
           <div className="flex items-center gap-0.5">
             {[1, 2, 3].map((i) => (
               <Star
@@ -431,19 +421,7 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
           </div>
 
           <div className="flex-1" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, #b43c32, #8c2823)',
-              boxShadow: '0 2px 8px rgba(180,60,50,0.3)',
-            }}
-          >
-            {t({ es: 'Listo', en: 'Done' })} ✨
-          </button>
+          <NextGameCountdown seconds={3} onAdvance={onClose} />
         </motion.div>
       </motion.div>
     );
@@ -474,12 +452,8 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
             </span>
           </motion.div>
 
-          {/* Timer + Exit */}
+          {/* Exit */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-medium text-stone-400 tabular-nums flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatTime(elapsedSeconds)}
-            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();

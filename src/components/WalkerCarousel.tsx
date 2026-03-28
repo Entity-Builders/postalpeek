@@ -496,6 +496,7 @@ export function WalkerCarousel({
                         isClaimLoading={isClaimLoading}
                         isInAlbum={albumPostcardIds.has(item.id)}
                         showClaimGuide={showWelcome && claimedIds.size === 0 && itemIndex === 0}
+                        userId={user?.id}
 
                         onHeroReady={() => {
                           setHeroReadyIds((prev) => {

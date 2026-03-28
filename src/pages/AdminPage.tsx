@@ -24,6 +24,7 @@ import {
   Search,
   ChevronDown,
   Upload,
+  Library,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -33,10 +34,11 @@ import { useGenerationLog } from '../hooks/useGenerationLog';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 import type { GenerationLogEntry } from '../hooks/useGenerationLog';
+import { AdminAlbumCreator } from '../components/AdminAlbumCreator';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'generation' | 'browser' | 'postcards' | 'settings' | 'sync';
+type NavSection = 'dashboard' | 'generation' | 'browser' | 'postcards' | 'albums' | 'settings' | 'sync';
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface AdminPageProps {
@@ -1032,6 +1034,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     { key: 'generation' as NavSection, icon: <Zap         className="w-4 h-4" />, label: 'Generation'   },
     { key: 'browser'    as NavSection, icon: <LayoutGrid  className="w-4 h-4" />, label: 'Browse All'   },
     { key: 'postcards'  as NavSection, icon: <Image       className="w-4 h-4" />, label: 'Postcards'    },
+    { key: 'albums'     as NavSection, icon: <Library     className="w-4 h-4" />, label: 'Albums'       },
     { key: 'sync'       as NavSection, icon: <Upload      className="w-4 h-4" />, label: 'Sync to Prod' },
     { key: 'settings'   as NavSection, icon: <Settings    className="w-4 h-4" />, label: 'User Actions' },
   ];
@@ -1451,6 +1454,13 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
             </div>
           )}
 
+
+          {/* ── Albums ── */}
+          {activeSection === 'albums' && (
+            <div className="max-w-4xl">
+              <AdminAlbumCreator />
+            </div>
+          )}
 
           {/* ── Sync to Prod ── */}
           {activeSection === 'sync' && (

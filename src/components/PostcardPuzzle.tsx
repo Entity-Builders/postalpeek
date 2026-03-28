@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Eye, Clock, Star, Puzzle } from 'lucide-react';
+import { X, Eye, Star, Puzzle } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { NextGameCountdown } from './NextGameCountdown';
 import { t } from '../utils/i18n';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -297,7 +298,6 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
     isPreviewing,
     handlePeek,
     isPeeking,
-    elapsedSeconds,
   } = puzzle;
 
   const progress = total > 0 ? (correctCount / total) * 100 : 0;
@@ -305,11 +305,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
   // Star rating based on moves (for 3×3, optimal ~9 swaps)
   const starRating = moves <= 12 ? 3 : moves <= 20 ? 2 : 1;
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
+
 
   // ── Complete state ──
   if (isComplete) {
@@ -346,13 +342,6 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
             </span>
           </div>
           <div className="w-px h-3 bg-stone-200" />
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-stone-400" />
-            <span className="text-stone-600 text-xs font-medium tabular-nums">
-              {formatTime(elapsedSeconds)}
-            </span>
-          </div>
-          <div className="w-px h-3 bg-stone-200" />
           <div className="flex items-center gap-0.5">
             {[1, 2, 3].map((i) => (
               <Star
@@ -365,19 +354,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
           </div>
 
           <div className="flex-1" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
-            }}
-          >
-            {t({ es: 'Listo', en: 'Done' })} ✨
-          </button>
+          <NextGameCountdown seconds={3} onAdvance={onClose} />
         </motion.div>
       </motion.div>
     );

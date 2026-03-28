@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Star, Clock, Target } from 'lucide-react';
+import { Star, Target } from 'lucide-react';
 import type { FeedItem } from './Postcard';
 import { t, useLang } from '../utils/i18n';
 
@@ -15,7 +15,6 @@ interface PostcardGameResultsProps {
   item: FeedItem;
   gameType?: 'hunt' | 'puzzle' | 'stamp';
   totalObjects: number;
-  elapsedSeconds: number;
   hintsUsed: number;
   moves?: number;
   taps?: number;
@@ -25,7 +24,6 @@ export function PostcardGameResults({
   item,
   gameType = 'hunt',
   totalObjects,
-  elapsedSeconds,
   hintsUsed,
   moves,
   taps,
@@ -36,11 +34,7 @@ export function PostcardGameResults({
     ? (moves != null && moves <= 12 ? 3 : moves != null && moves <= 20 ? 2 : 1)
     : (hintsUsed === 0 ? 3 : hintsUsed <= 2 ? 2 : 1);
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
+
 
   // ── Extract generation metadata ──
   const meta = item.generation_metadata;
@@ -118,19 +112,6 @@ export function PostcardGameResults({
                 : gameType === 'puzzle'
                   ? t({ es: 'Movimientos', en: 'Moves' })
                   : t({ es: 'Objetos', en: 'Objects' })}
-            </span>
-          </div>
-
-          <div className="w-px h-8 bg-stone-200" />
-
-          {/* Time */}
-          <div className="flex flex-col items-center gap-0.5">
-            <Clock className="w-4 h-4 text-stone-400" />
-            <span className="text-sm font-bold text-stone-800 tabular-nums">
-              {formatTime(elapsedSeconds)}
-            </span>
-            <span className="text-[9px] text-stone-400 uppercase tracking-wider">
-              {t({ es: 'Tiempo', en: 'Time' })}
             </span>
           </div>
 

@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Clock, Target, Lightbulb } from 'lucide-react';
+import { Sparkles, X, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Target, Lightbulb } from 'lucide-react';
 import type { FeedItem } from './Postcard';
+import { NextGameCountdown } from './NextGameCountdown';
 import { t, getLang } from '../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { useRiddles } from '../hooks/useRiddles';
@@ -338,7 +339,7 @@ interface GameBottomPanelProps {
 }
 
 export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
-  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, elapsedSeconds, hintsUsed, tagsWithBbox } = game;
+  const { isScanning, scanError, totalObjects, discoveredIndices, currentTarget, allFound, hintsUsed, tagsWithBbox } = game;
   const progress = totalObjects > 0 ? (discoveredIndices.size / totalObjects) * 100 : 0;
 
   // ── Riddles integration ──
@@ -367,13 +368,6 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
 
   // Star rating based on hints used
   const starRating = hintsUsed === 0 ? 3 : hintsUsed <= 2 ? 2 : 1;
-
-  // Format elapsed time
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
 
   // Build facts from item metadata
   const facts: { icon: React.ReactNode; text: string }[] = [];
@@ -424,11 +418,6 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
             <span className="text-stone-700 text-xs font-bold tabular-nums">{totalObjects}/{totalObjects}</span>
           </div>
           <div className="w-px h-3 bg-stone-200" />
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-stone-400" />
-            <span className="text-stone-600 text-xs font-medium tabular-nums">{formatTime(elapsedSeconds)}</span>
-          </div>
-          <div className="w-px h-3 bg-stone-200" />
           <div className="flex items-center gap-0.5">
             {[1, 2, 3].map((i) => (
               <Star
@@ -440,21 +429,9 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
             ))}
           </div>
 
-          {/* Spacer + Listo button aligned right */}
+          {/* Auto-advance countdown */}
           <div className="flex-1" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
-            }}
-          >
-            {t({ es: 'Listo', en: 'Done' })} ✨
-          </button>
+          <NextGameCountdown seconds={3} onAdvance={onClose} />
         </motion.div>
       </motion.div>
     );

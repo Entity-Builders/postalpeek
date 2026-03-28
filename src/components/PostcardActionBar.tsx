@@ -1,9 +1,8 @@
 import React from 'react';
-import { Ticket, Joystick } from 'lucide-react';
+import { Ticket, Trophy } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
-import { LikeButton } from './ui/LikeButton';
 import { ShareButton } from './ui/ShareButton';
 import { CityLabel } from './ui/CityLabel';
 import { AlbumStopIndicator } from './ui/AlbumStopIndicator';
@@ -23,14 +22,13 @@ interface PostcardActionBarProps {
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
   onPlay?: () => void;
+  /** Whether the user already owns this postcard */
+  isOwned?: boolean;
 }
 
 export function PostcardActionBar({
   item,
   activeSlideItem,
-  isLiked,
-  onToggleFavorite,
-  onAuthRequired,
   onFlipCard,
   hideActions,
   isClean,
@@ -39,6 +37,7 @@ export function PostcardActionBar({
   albumStops,
   totalStops,
   onPlay,
+  isOwned,
 }: PostcardActionBarProps) {
 
   const stopMeta = activeSlideItem.album_sequence != null
@@ -79,28 +78,32 @@ export function PostcardActionBar({
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
-        <LikeButton
-          postcardId={item.id}
-          country={item.country}
-          city={item.city}
-          isLiked={isLiked}
-          onToggleFavorite={onToggleFavorite}
-          onAuthRequired={onAuthRequired}
-        />
-
-        {/* Play game button */}
+        {/* Owned trophy — tapping flips card to show details */}
+        {isOwned && (
+          <button
+            className='p-2 md:p-2.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 transition-colors shadow-sm'
+            onClick={(e) => {
+              e.stopPropagation();
+              onFlipCard('info');
+            }}
+            title={t({ es: 'Tu colección', en: 'Your collection' })}
+          >
+            <Trophy className='w-4 h-4 md:w-5 md:h-5' />
+          </button>
+        )}
+        {/* Challenge CTA */}
         {onPlay && (
           <button
-            className='flex items-center gap-1.5 px-3 py-1.5 md:px-3.5 md:py-2 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold shadow-sm hover:shadow-md transition-all text-sm animate-pulse-slow'
+            className='flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-950 font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-amber-500/30'
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
-              analytics.track('game_play_tapped', { postcard_id: item.id, country: item.country });
+              analytics.track('challenge_started', { postcard_id: item.id, country: item.country });
             }}
-            title={t({ es: 'Jugar', en: 'Play' })}
+            title={t({ es: 'Ganarla', en: 'Win it' })}
           >
-            <Joystick className='w-4 h-4 md:w-5 md:h-5' />
-            {t({ es: 'Jugar', en: 'Play' })}
+            <Trophy className='w-4 h-4 md:w-5 md:h-5' />
+            {t({ es: 'Ganarla', en: 'Win it' })}
           </button>
         )}
 

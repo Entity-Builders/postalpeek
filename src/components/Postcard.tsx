@@ -84,7 +84,10 @@ interface PostcardProps {
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
   /** Called on quick tap (replaces flip — parent decides the behavior) */
   onTap?: () => void;
-
+  /** Current user ID for game progress tracking */
+  userId?: string;
+  /** Callback when postcard is earned through game completion */
+  onPostcardEarned?: (postcardId: string) => void;
 }
 
 const springFlip = {
@@ -117,6 +120,8 @@ export function Postcard({
   hideActions = false,
   onHeroReady,
   onTap,
+  userId,
+  onPostcardEarned,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
@@ -350,6 +355,8 @@ export function Postcard({
             isClean={isClean}
             onToggleClean={toggleClean}
             allowPlay={Array.isArray(item.illustration_tags) && item.illustration_tags.length > 0}
+            userId={userId}
+            onPostcardEarned={onPostcardEarned}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

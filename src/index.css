@@ -239,6 +239,35 @@ h6 {
   }
 }
 
+@keyframes confettiFall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(120vh) rotate(720deg);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ── Mobile: prevent iOS zoom on input focus ──────────────── */
 /* iOS Safari zooms in when an input font-size < 16px.        */
 /* We force all inputs to render at ≥ 16px; the visual size   */
