@@ -15,6 +15,7 @@ import { EnvelopeSlide } from './EnvelopeSlide';
 import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { AmbientBackground } from './ui/AmbientBackground';
+import { useGameMode } from '../contexts/GameModeContext';
 
 const FREE_CARD_LIMIT = 4;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -51,7 +52,6 @@ interface WalkerCarouselProps {
   onPackComplete?: () => void;
   /** Expand image to fullscreen lightbox */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
-
 }
 
 export function WalkerCarousel({
@@ -81,13 +81,21 @@ export function WalkerCarousel({
   onOpenPack,
   onPackComplete,
 }: WalkerCarouselProps) {
+  const { isGameActive } = useGameMode();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const navigate = useNavigate();
   // Track which album covers have been "opened" to show the full Postcard view
   const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   // Track which cards have loaded their hero image so we can hide the skeleton
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
+  // Ref so handlers always see the latest value without stale closures
+  const isGameActiveRef = useRef(false);
   const isPackMode = packCards.length > 0;
+
+  // Sync ref when game state changes
+  useEffect(() => {
+    isGameActiveRef.current = isGameActive;
+  }, [isGameActive]);
 
   const [staggeredItems, setStaggeredItems] = useState<FeedItem[]>(() =>
     displayItems.slice(0, 2),
@@ -124,6 +132,12 @@ export function WalkerCarousel({
     duration: 30,
     watchSlides: true,
   });
+
+  // Disable/enable Embla drag based on game state
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.reInit({ watchDrag: !isGameActive });
+  }, [emblaApi, isGameActive]);
 
   // Reset carousel to first slide when any filter changes
   useEffect(() => {
@@ -311,6 +325,7 @@ export function WalkerCarousel({
 
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
+      if (isGameActiveRef.current) return; // 🔒 locked during game
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         if (!emblaApi) return;
         if (Math.abs(e.deltaY) < 5) return;
@@ -322,6 +337,7 @@ export function WalkerCarousel({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isGameActiveRef.current) return; // 🔒 locked during game
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -439,8 +455,8 @@ export function WalkerCarousel({
 
               {/* Actual card content */}
               <div 
-                className='z-10 w-[95vw] max-w-[480px] md:max-w-[520px] mx-auto flex items-center justify-center'
-                style={{ aspectRatio: '4/5' }}
+                className='z-10 w-[95vw] max-w-[480px] md:max-w-[520px] mx-auto flex items-center justify-center transition-all duration-500 ease-in-out'
+                style={{ aspectRatio: isGameActive && slideIndex === currentSlideIndex ? '9/16' : '4/5' }}
               >
                 <div 
                   className='relative w-full h-full flex flex-col'
@@ -503,7 +519,10 @@ export function WalkerCarousel({
                           analytics.track('postcard_album_icon_clicked', { album_id: albumId, postcard_id: item.id });
                           navigate(`/album/${albumId}`);
                         }}
-
+                        onOpenCollection={() => {
+                          analytics.track('postcard_collection_auto_navigated', { postcard_id: item.id });
+                          navigate('/feed/collection');
+                        }}
                         onHeroReady={() => {
                           setHeroReadyIds((prev) => {
                             if (prev.has(item.id)) return prev;

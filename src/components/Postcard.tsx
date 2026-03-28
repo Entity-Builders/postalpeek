@@ -16,6 +16,7 @@ import { PostcardFront } from './PostcardFront';
 import { FullscreenOverlay } from './FullscreenOverlay';
 import { PostcardBack } from './PostcardBack';
 import { PostcardCoupon } from './PostcardCoupon';
+import { useGameMode } from '../contexts/GameModeContext';
 
 export interface FeedItem {
   id: string;
@@ -90,6 +91,8 @@ interface PostcardProps {
   onPostcardEarned?: (postcardId: string) => void;
   /** Navigate directly to an album */
   onOpenAlbum?: (albumId: string) => void;
+  /** Navigate directly to the collection */
+  onOpenCollection?: () => void;
 }
 
 const springFlip = {
@@ -125,17 +128,17 @@ export function Postcard({
   userId,
   onPostcardEarned,
   onOpenAlbum,
+  onOpenCollection,
 }: PostcardProps) {
+  const { isGameActive } = useGameMode();
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
   const [heroReady, setHeroReady] = useState(false);
-  const hasFactType = !!item.generation_metadata?.storytelling?.fact_type;
+
   /** Clean/expand mode — hides chrome, enables fullscreen overlay */
   const [isClean, setIsClean] = useState(false);
   const isInitialMount = useRef(true);
-  /** Track whether a game is active inside PostcardFront */
-  const [isGameActive, setIsGameActive] = useState(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // ── Animation primitives ──
@@ -252,13 +255,10 @@ export function Postcard({
       if (isInitialMount.current) {
         // Opened directly (e.g. from grid) -> don't auto-maximize initially
         isInitialMount.current = false;
-        setIsClean(false);
-      } else if (hasFactType) {
-        // Swiped to this card -> auto-maximize
-        setIsClean(true);
       }
+      setIsClean(false);
     }
-  }, [isActive, hasFactType]);
+  }, [isActive]);
 
   const toggleClean = useCallback(() => {
     setIsClean((prev) => {
@@ -353,7 +353,7 @@ export function Postcard({
             userId={userId}
             onPostcardEarned={onPostcardEarned}
             onOpenAlbum={onOpenAlbum}
-            onGameActiveChange={setIsGameActive}
+            onOpenCollection={onOpenCollection}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

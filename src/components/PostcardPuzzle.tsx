@@ -313,7 +313,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
       >
         {/* Green completed progress bar */}
         <div className="mb-2">
@@ -366,7 +366,7 @@ export function PuzzleBottomPanel({ puzzle, onClose }: PuzzleBottomPanelProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
+      className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
     >
       {/* Progress bar */}
       <div className="mb-2">

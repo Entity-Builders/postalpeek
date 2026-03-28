@@ -10,6 +10,7 @@ import { PostcardDetailPage } from './pages/PostcardDetailPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initAnalytics, analytics } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
+import { GameModeProvider } from './contexts/GameModeContext';
 
 // ── Feed (main app) ────────────────────────────────────────────────────
 
@@ -134,35 +135,37 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Routes>
-        {/* SEO-friendly feed route */}
-        <Route path="/feed" element={feedElement} />
-        <Route path="/feed/country/:country" element={feedElement} />
-        <Route path="/feed/collection" element={feedElement} />
-        <Route path="/feed/album/:albumId" element={feedElement} />
+      <GameModeProvider>
+        <Routes>
+          {/* SEO-friendly feed route */}
+          <Route path="/feed" element={feedElement} />
+          <Route path="/feed/country/:country" element={feedElement} />
+          <Route path="/feed/collection" element={feedElement} />
+          <Route path="/feed/album/:albumId" element={feedElement} />
 
-        {/* Root redirects to /feed */}
-        <Route path="/" element={<Navigate to="/feed" replace />} />
+          {/* Root redirects to /feed */}
+          <Route path="/" element={<Navigate to="/feed" replace />} />
 
-        {/* Full-page admin (protected) */}
-        <Route
-          path="/admin"
-          element={
-            isAdmin
-              ? <AdminPage user={user} onPostcardGenerated={() => {}} />
-              : <Navigate to="/feed" replace />
-          }
-        />
+          {/* Full-page admin (protected) */}
+          <Route
+            path="/admin"
+            element={
+              isAdmin
+                ? <AdminPage user={user} onPostcardGenerated={() => {}} />
+                : <Navigate to="/feed" replace />
+            }
+          />
 
-        {/* Postcard admin detail — /p/:id only */}
-        <Route path="/p/:id" element={<PostcardDetailPage />} />
+          {/* Postcard admin detail — /p/:id only */}
+          <Route path="/p/:id" element={<PostcardDetailPage />} />
 
-        {/* Standalone album page — /album/:albumId */}
-        <Route path="/album/:albumId" element={<AlbumPage />} />
+          {/* Standalone album page — /album/:albumId */}
+          <Route path="/album/:albumId" element={<AlbumPage />} />
 
-        {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-        <Route path="/:id" element={feedElement} />
-      </Routes>
+          {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
+          <Route path="/:id" element={feedElement} />
+        </Routes>
+      </GameModeProvider>
     </ErrorBoundary>
   );
 }

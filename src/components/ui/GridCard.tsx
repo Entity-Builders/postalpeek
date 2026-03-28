@@ -1,20 +1,11 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
-import { Info, BookImage, BookOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { analytics } from '../../lib/analytics';
-
-/* ── Storytelling fact helpers (shared with StorytellingPreview) ── */
-const FACT_EMOJI: Record<string, string> = {
-  historical: '🏛️', architectural: '🏗️', cultural: '🎭',
-  gastronomic: '🍽️', natural: '🌿', artistic: '🎨',
-};
+import { PostcardChin } from './PostcardChin';
 
 import type { CardLayout } from './cardLayout';
 
@@ -28,13 +19,13 @@ interface GridCardProps {
   layout: CardLayout;
   onClick: () => void;
   isClaimed?: boolean;
+  viewMode?: 'grid' | 'feed';
 }
 
 /** Above-fold cards get framer-motion entry animation; below-fold cards render instantly */
 const ANIMATE_THRESHOLD = 12;
 
 export const GridCard = React.memo(function GridCard({ item, index, layout, onClick, isClaimed }: GridCardProps) {
-  const navigate = useNavigate();
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
   const srcSet = useSignedSrcSet(item.illustration_url, WIDTHS.gridSrcSet as unknown as number[]);
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
@@ -43,9 +34,6 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const lang = useLang();
 
   const categoryLabel = typeof item.category === 'string' ? item.category : t(item.category, lang);
-  const storytelling = item.generation_metadata?.storytelling;
-  const trivia = item.generation_metadata?.trivia;
-  const isTriviaLocked = !!trivia && !isClaimed;
 
   const { aspectRatio, monumental } = layout;
 
@@ -134,59 +122,15 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
           )}
 
           {imgUrl && (
-            <>
-              <img
-                src={imgUrl}
-                srcSet={srcSet || undefined}
-                sizes={sizes}
-                alt={categoryLabel}
-                className={`absolute inset-0 w-full h-full object-cover block transition-all duration-500 ${loaded ? 'opacity-100' : 'opacity-0'} ${isTriviaLocked ? 'blur-md scale-110 saturate-50 brightness-90' : ''}`}
-                onLoad={() => setLoaded(true)}
-                loading={index < 12 ? 'eager' : 'lazy'}
-              />
-              {isTriviaLocked && loaded && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
-                  <div className="bg-stone-900/60 backdrop-blur-md rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-2xl">
-                    <span className="text-xl" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>✨</span>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Storytelling overlay — prominent while loading, fades out on load */}
-          <AnimatePresence>
-            {storytelling && !loaded && (
-              <motion.div
-                key="storytelling-loading"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 z-20 flex flex-col justify-end p-3 pointer-events-none"
-              >
-                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
-                  <span className="inline-block text-[9px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">
-                    {FACT_EMOJI[storytelling.fact_type] || '📖'}{' '}
-                    {storytelling.fact_type || t({ es: 'Dato', en: 'Fact' }, lang)}
-                  </span>
-                  <p className="text-[10px] text-white/90 leading-snug line-clamp-2">
-                    💡 {t(storytelling.did_you_know, lang)}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Persistent storytelling badge — small emoji after load */}
-          {storytelling && loaded && (
-            <div className="absolute top-1.5 left-1.5 z-20">
-              <span className="bg-black/40 backdrop-blur-sm text-[10px] px-1.5 py-0.5 rounded-full border border-white/15 shadow-sm"
-                title={t({ es: 'Tiene dato curioso', en: 'Has fun fact' }, lang)}
-              >
-                {FACT_EMOJI[storytelling.fact_type] || '📖'}
-              </span>
-            </div>
+            <img
+              src={imgUrl}
+              srcSet={srcSet || undefined}
+              sizes={sizes}
+              alt={categoryLabel}
+              className={`absolute inset-0 w-full h-full object-cover block transition-all duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setLoaded(true)}
+              loading={index < 12 ? 'eager' : 'lazy'}
+            />
           )}
 
           <div className="absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
@@ -194,54 +138,13 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
 
           {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>
-
-        {/* ── Postcard chin — city name + CTA ── */}
-        <div className="flex items-center justify-between px-1.5 py-2 min-h-[28px]">
-          {isTriviaLocked ? (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-600">
-              <Sparkles className="w-3 h-3 animate-pulse" />
-              {t({ es: 'Descubrirla', en: 'Discover it' })}
-            </span>
-          ) : (
-            <div className="flex items-center justify-between w-full">
-              <p className="text-stone-500 text-[10px] font-medium leading-tight truncate">
-                {item.city}
-              </p>
-              <div className="flex items-center gap-1 shrink-0 text-stone-400">
-                {item.album_id && (
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      analytics.track('postcard_album_icon_clicked', { album_id: item.album_id, postcard_id: item.id, source: 'grid' });
-                      navigate(`/album/${item.album_id}`);
-                    }}
-                    className="hover:text-amber-500 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
-                    title={t({ es: 'Ver álbum', en: 'View album' }, lang)}
-                  >
-                    <BookImage className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  </button>
-                )}
-                {storytelling && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onClick(); }}
-                    className="hover:text-amber-500 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
-                    title={t({ es: 'Saber más', en: 'Know about' }, lang)}
-                  >
-                    <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  </button>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); onClick(); }}
-                  className="hover:text-stone-600 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
-                  title={t({ es: 'Datos de la postal', en: 'Postcard data' }, lang)}
-                >
-                  <Info className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                </button>
-                {!isClaimed && <Sparkles className="w-3 h-3 text-violet-400 opacity-60 animate-pulse flex-shrink-0 ml-1" />}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* ── PostcardChin — unified chin (storytelling + city + actions) ── */}
+        <PostcardChin
+          item={item}
+          isClaimed={isClaimed}
+          isTriviaLocked={!isClaimed && !!item.generation_metadata?.trivia}
+          onClick={onClick}
+        />
       </div>
     </Wrapper>
   );

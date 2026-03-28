@@ -36,10 +36,11 @@ interface WalkerGridProps {
   user?: User | null;
   unlockedCountries?: Set<string>;
   onOpenAlbumsModal?: () => void;
-  onToggleCollection?: () => void;
   showWelcome?: boolean;
   previewCards?: FeedItem[];
   claimedIds?: Set<string>;
+  viewMode: 'grid' | 'feed';
+  onToggleViewMode: () => void;
 }
 
 export function WalkerGrid({
@@ -62,10 +63,11 @@ export function WalkerGrid({
   user = null,
   unlockedCountries = new Set(),
   onOpenAlbumsModal,
-  onToggleCollection,
   showWelcome = false,
   previewCards = [],
   claimedIds = new Set<string>(),
+  viewMode,
+  onToggleViewMode,
 }: WalkerGridProps) {
   const displayItems = spotlightQuery && spotlightResults.length > 0 ? spotlightResults : items;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -184,11 +186,12 @@ export function WalkerGrid({
               onSelectCountry={onSelectCountry}
               isLoggedIn={!!user}
               onOpenAlbumsModal={onOpenAlbumsModal || (() => {})}
-              onToggleCollection={onToggleCollection}
               spotlightQuery={spotlightQuery}
               isSpotlightSearching={isSpotlightSearching}
               onSpotlightSearch={onSpotlightSearch}
               onSpotlightDismiss={onSpotlightDismiss}
+              viewMode={viewMode}
+              onToggleViewMode={onToggleViewMode}
             />
           </div>
         </div>
@@ -197,15 +200,17 @@ export function WalkerGrid({
         <div className="w-full max-w-[1800px] mx-auto px-4 md:px-8 pb-24">
           <style>{`
             .walker-columns {
-              column-count: 2;
+              column-count: ${viewMode === 'feed' ? 1 : 2};
               column-gap: 8px;
+              ${viewMode === 'feed' ? 'display: flex; flex-direction: column; align-items: center;' : ''}
             }
             .walker-columns > * {
               break-inside: avoid;
-              margin-bottom: 8px;
+              margin-bottom: ${viewMode === 'feed' ? '24px' : '8px'};
+              ${viewMode === 'feed' ? 'width: 100%; max-width: 500px;' : ''}
             }
-            @media (min-width: 768px)  { .walker-columns { column-count: 2; } }
-            @media (min-width: 1024px) { .walker-columns { column-count: 3; } }
+            @media (min-width: 768px)  { .walker-columns { column-count: ${viewMode === 'feed' ? 1 : 2}; } }
+            @media (min-width: 1024px) { .walker-columns { column-count: ${viewMode === 'feed' ? 1 : 3}; } }
           `}</style>
 
           {isLoading ? (
@@ -220,6 +225,7 @@ export function WalkerGrid({
                   layout={layoutMap.get(item.id) || computeCardLayout(item)}
                   onClick={() => handleCardClick(index, item)}
                   isClaimed={claimedIds.has(item.id)}
+                  viewMode={viewMode}
                 />
               ))}
             </div>

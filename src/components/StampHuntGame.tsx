@@ -236,12 +236,27 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
     updateLens(e.clientX, e.clientY);
   }, [updateLens]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 1) {
-      e.preventDefault();
-      updateLens(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, [updateLens]);
+  // Block scroll via a native non-passive listener (React touch events are passive by default,
+  // so e.preventDefault() in the synthetic handler is silently ignored by the browser).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || found) return;
+
+    const blockScroll = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        updateLens(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    el.addEventListener('touchmove', blockScroll, { passive: false });
+    return () => el.removeEventListener('touchmove', blockScroll);
+  }, [found, updateLens]);
+
+  // Kept as a no-op to satisfy the JSX onTouchMove prop (actual work is in the effect above)
+  const handleTouchMove = useCallback(() => {
+    // handled by native non-passive listener above
+  }, []);
 
   // Stamp rendered as a percentage-positioned element
   const stampStyle: React.CSSProperties = {
@@ -380,7 +395,7 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
+        className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50"
       >
         {/* Red completed progress bar */}
         <div className="mb-2">
@@ -433,7 +448,7 @@ export function StampHuntBottomPanel({ hunt, onClose }: StampHuntBottomPanelProp
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className="absolute bottom-6 inset-x-4 max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
+      className="w-full max-w-sm mx-auto pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50"
     >
       {/* Progress hint */}
       <div className="mb-2">

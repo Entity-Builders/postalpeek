@@ -19,7 +19,10 @@ interface GameProgressBarProps {
   activeGame: DbGameType | null;
 }
 
-const GAME_META: Record<DbGameType, { icon: typeof Search; label: string; color: string }> = {
+const GAME_META: Record<
+  DbGameType,
+  { icon: typeof Search; label: string; color: string }
+> = {
   find_objects: { icon: Search, label: 'Buscar', color: 'amber' },
   puzzle: { icon: Puzzle, label: 'Puzzle', color: 'blue' },
   stamp_hunt: { icon: Stamp, label: 'Sello', color: 'red' },
@@ -30,10 +33,9 @@ export function GameProgressBar({
   completedGames,
   activeGame,
 }: GameProgressBarProps) {
-
   return (
-    <div className="mx-auto mt-4 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full border border-white/50 shadow-md min-w-[200px] max-w-xs pointer-events-auto flex items-center justify-center">
-      <div className="flex items-center gap-0 w-full">
+    <div className='relative mx-auto px-5 py-2.5 bg-white/90 backdrop-blur-md rounded-full border border-white/50 shadow-sm min-w-[240px] max-w-xs pointer-events-auto flex items-center justify-center'>
+      <div className='absolute flex items-center gap-0 w-full'>
         {availableGames.map((gameType, idx) => {
           const meta = GAME_META[gameType];
           const Icon = meta.icon;
@@ -44,28 +46,30 @@ export function GameProgressBar({
             <React.Fragment key={gameType}>
               {/* Connector line */}
               {idx > 0 && (
-                <div className={`flex-1 h-0.5 mx-1 rounded-full transition-colors duration-500 ${
-                  isDone || isActive ? 'bg-emerald-400' : 'bg-stone-200'
-                }`} />
+                <div
+                  className={`flex-1 h-[2px] mx-1.5 rounded-full transition-colors duration-500 ${
+                    isDone || isActive ? 'bg-emerald-400' : 'bg-stone-200'
+                  }`}
+                />
               )}
 
               {/* Step circle */}
-              <div className={`relative flex items-center justify-center w-7 h-7 rounded-full transition-all duration-300 ${
-                isDone
-                  ? 'bg-emerald-500 text-white shadow-sm'
-                  : isActive
-                    ? 'bg-white ring-2 ring-amber-400 text-amber-600 shadow-md scale-110'
-                    : 'bg-stone-100 text-stone-400'
-              }`}>
+              <div
+                className={`relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-300 ${
+                  isDone
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : isActive
+                      ? 'bg-white ring-2 ring-amber-400 text-amber-600 shadow-md scale-110'
+                      : 'bg-stone-100 text-stone-400'
+                }`}
+              >
                 {isDone ? (
-                  <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                  <Check className='w-4.5 h-4.5' strokeWidth={3} />
                 ) : (
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className='w-4.5 h-4.5' />
                 )}
                 {isActive && (
-                  <div
-                    className="absolute inset-0 rounded-full ring-2 ring-amber-400 animate-pulse"
-                  />
+                  <div className='absolute inset-0 rounded-full ring-2 ring-amber-400 animate-pulse' />
                 )}
               </div>
             </React.Fragment>
@@ -73,16 +77,17 @@ export function GameProgressBar({
         })}
 
         {/* Trophy at the end */}
-        <div className="flex-1 h-0.5 mx-1 rounded-full bg-stone-200" />
-        <div className={`flex items-center justify-center w-7 h-7 rounded-full transition-all ${
-          completedGames.size >= availableGames.length
-            ? 'bg-amber-400 text-amber-900 shadow-md'
-            : 'bg-stone-100 text-stone-300'
-        }`}>
-          <Trophy className="w-3.5 h-3.5" />
+        <div className='flex-1 h-[2px] mx-1.5 rounded-full bg-stone-200' />
+        <div
+          className={`flex items-center justify-center w-9 h-9 rounded-full transition-all ${
+            completedGames.size >= availableGames.length
+              ? 'bg-amber-400 text-amber-900 shadow-md'
+              : 'bg-stone-100 text-stone-300'
+          }`}
+        >
+          <Trophy className='w-4.5 h-4.5' />
         </div>
       </div>
     </div>
   );
 }
-

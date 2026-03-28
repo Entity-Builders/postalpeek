@@ -12,12 +12,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 
 // Maps from UI GameMode to DB game_type
-export type DbGameType = 'find_objects' | 'puzzle' | 'stamp_hunt';
+export type DbGameType = 'find_objects' | 'puzzle' | 'stamp_hunt' | 'trivia';
 
 const GAME_MODE_TO_DB: Record<string, DbGameType> = {
   hunt: 'find_objects',
   puzzle: 'puzzle',
   stamp: 'stamp_hunt',
+  trivia: 'trivia',
 };
 
 export function gameModeToDb(mode: string): DbGameType {

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { Globe, Search, X, Sparkles, ChevronDown, Gem } from 'lucide-react';
+import { Globe, Search, X, Sparkles, ChevronDown, LayoutGrid, List } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useLang, t } from '../utils/i18n';
 
@@ -36,12 +36,13 @@ interface WalkerFilterMenuProps {
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
   isLoggedIn: boolean;
-  onToggleCollection?: () => void;
   onOpenAlbumsModal: () => void;
   spotlightQuery?: string;
   isSpotlightSearching?: boolean;
   onSpotlightSearch?: (query: string) => void;
   onSpotlightDismiss?: () => void;
+  viewMode: 'grid' | 'feed';
+  onToggleViewMode: () => void;
 }
 
 export function WalkerFilterMenu({
@@ -50,11 +51,12 @@ export function WalkerFilterMenu({
   selectedCountry,
   onSelectCountry,
   isLoggedIn,
-  onToggleCollection,
   spotlightQuery = '',
   isSpotlightSearching = false,
   onSpotlightSearch,
   onSpotlightDismiss,
+  viewMode,
+  onToggleViewMode,
 }: WalkerFilterMenuProps) {
   const lang = useLang();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -171,18 +173,23 @@ export function WalkerFilterMenu({
           </button>
         </div>
 
-        {/* Mi Colección — hides when search is focused */}
-        {isLoggedIn && onToggleCollection && (
+        {/* Toggle Grid / Feed Mode */}
+        {isLoggedIn && (
           <button
-            onClick={onToggleCollection}
+            onClick={onToggleViewMode}
             className={cn(
-              'shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/15 shadow-lg hover:bg-amber-500/80 hover:border-amber-400 transition-all duration-300 cursor-pointer',
+              'shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/15 shadow-lg hover:bg-white/10 hover:border-white/30 transition-all duration-300 cursor-pointer',
               isFocused ? 'w-0 opacity-0 overflow-hidden p-0 border-0' : 'opacity-100',
             )}
-            aria-label='Mi Colección'
+            title={viewMode === 'grid' ? t({ es: 'Ver como feed', en: 'View as feed' }, lang) : t({ es: 'Ver como grilla', en: 'View as grid' }, lang)}
+            aria-label={viewMode === 'grid' ? 'Modo Feed' : 'Modo Grid'}
             tabIndex={isFocused ? -1 : 0}
           >
-            <Gem className='w-4 h-4 text-stone-300' />
+            {viewMode === 'grid' ? (
+              <List className='w-4 h-4 text-stone-300' />
+            ) : (
+              <LayoutGrid className='w-4 h-4 text-stone-300' />
+            )}
           </button>
         )}
       </div>

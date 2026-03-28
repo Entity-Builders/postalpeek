@@ -15,7 +15,7 @@ import { TripSlide } from './TripSlide';
 import { useDiscoveries } from '../hooks/useDiscoveries';
 import { AlbumStackEffect } from './ui/AlbumStackEffect';
 import { PostcardActionBar } from './PostcardActionBar';
-import { StorytellingPreview } from './ui/StorytellingPreview';
+// StorytellingPreview is now rendered inside PostcardChin (via PostcardActionBar)
 import { usePostcardGame, GameImageOverlay, GameBottomPanel } from './PostcardGame';
 import { PostcardGameResults } from './PostcardGameResults';
 import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './PostcardPuzzle';
@@ -23,12 +23,14 @@ import { useStampHunt, StampHuntOverlay, StampHuntBottomPanel } from './StampHun
 import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 import { TriviaBottomPanel } from './TriviaRevealGame';
 import { GameProgressBar } from './GameProgressBar';
+import { useGameMode } from '../contexts/GameModeContext';
 
 // Map DB game types to UI game modes (module-level for stable reference)
 const DB_TO_MODE: Record<DbGameType, GameMode> = {
   find_objects: 'hunt',
   puzzle: 'puzzle',
   stamp_hunt: 'stamp',
+  trivia: 'trivia',
 };
 
 interface PostcardFrontProps {
@@ -72,10 +74,10 @@ interface PostcardFrontProps {
   userId?: string;
   /** Callback when postcard is earned through game completion */
   onPostcardEarned?: (postcardId: string) => void;
-  /** Notify parent when game mode is active (to block zoom) */
-  onGameActiveChange?: (active: boolean) => void;
   /** Navigate directly to an album */
   onOpenAlbum?: (albumId: string) => void;
+  /** Navigate directly to the collection */
+  onOpenCollection?: () => void;
 }
 
 export function PostcardFront({
@@ -102,9 +104,10 @@ export function PostcardFront({
   onClaimPostcard,
   userId,
   onPostcardEarned,
-  onGameActiveChange,
   onOpenAlbum,
+  onOpenCollection,
 }: PostcardFrontProps) {
+  const { setGameActive } = useGameMode();
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
   const [showSelector, setShowSelector] = useState(false);
@@ -116,10 +119,8 @@ export function PostcardFront({
 
   // Notify parent when game mode or selector changes (so it can block zoom)
   useEffect(() => {
-    if (onGameActiveChange) {
-      onGameActiveChange(isPlaying || showSelector);
-    }
-  }, [isPlaying, showSelector, onGameActiveChange]);
+    setGameActive(isPlaying || showSelector);
+  }, [isPlaying, showSelector, setGameActive]);
 
   // ── Game progress tracking (play-to-earn) ──
   const hasHuntMode_ = useMemo(() => {
@@ -141,10 +142,11 @@ export function PostcardFront({
     return games;
   }, [hasHuntMode_]);
 
-  // Get next incomplete game
-  const getNextGame = useCallback((): GameMode | null => {
+  // Get next incomplete game, optionally using a fresh completed set
+  const getNextGame = useCallback((completedOverride?: Set<DbGameType>): GameMode | null => {
+    const completed = completedOverride ?? gameProgress.completedGames;
     for (const dbType of availableGamesList) {
-      if (!gameProgress.completedGames.has(dbType)) {
+      if (!completed.has(dbType)) {
         return DB_TO_MODE[dbType];
       }
     }
@@ -160,79 +162,35 @@ export function PostcardFront({
     }
   }, [getNextGame]);
 
-  // Handle game completion: save progress + auto-advance to next game
-  // Returns true if ALL games are now complete
-  const handleGameDone = useCallback(async (mode: GameMode): Promise<boolean> => {
-    if (!userId) return false;
+  // Handle game completion: save progress → then auto-advance
+  const handleGameClose = useCallback(async (mode: GameMode) => {
+    if (!userId) {
+      // No user: just move on
+      setPlayingMode(null);
+      return;
+    }
 
     const dbType = gameModeToDb(mode);
-    // Timer display removed — pass 0 for time tracking
-    const timeSeconds = 0;
-
-    const isLastGame = await gameProgress.saveGameCompletion(dbType, timeSeconds);
+    // Compute updated set locally so getNextGame works with fresh data immediately
+    const newCompletedGames = new Set([...gameProgress.completedGames, dbType]);
+    const isLastGame = await gameProgress.saveGameCompletion(dbType, 0);
 
     if (isLastGame) {
-      // All games complete → earn the postcard!
+      // All games complete → earn the postcard, show victory
       const result = await gameProgress.earnPostcard();
-      if (result.success) {
-        onPostcardEarned?.(item.id);
-      }
-      return true;
-    }
-    return false;
-  }, [userId, gameProgress, item.id, onPostcardEarned]);
-
-  // Auto-advance: when a game completes, save + start next
-  const handleGameClose = useCallback(async (mode: GameMode) => {
-    const allDone = await handleGameDone(mode);
-
-    if (allDone) {
-      // All games done! Reset state in single batch to avoid flip useEffect re-triggering
+      if (result.success) onPostcardEarned?.(item.id);
       setPlayingMode(null);
       setGameFlipped(false);
       setShowVictory(true);
     } else {
-      // More games — un-flip, wait for animation, then start next game
-      setGameFlipped(false);
-      setTimeout(() => {
-        const nextGame = getNextGame();
-        if (nextGame) {
-          setPlayingMode(nextGame);
-        } else {
-          setPlayingMode(null);
-        }
-      }, 700);
+      // Directly start next game without flipping the card
+      const nextGame = getNextGame(newCompletedGames);
+      setPlayingMode(nextGame);
     }
-  }, [handleGameDone, getNextGame]);
-
-
+  }, [userId, gameProgress, item.id, onPostcardEarned, getNextGame]);
 
   // Victory celebration state
   const [showVictory, setShowVictory] = useState(false);
-
-  // Flip the card when hunt game completes (auto-advance handled by NextGameCountdown)
-  useEffect(() => {
-    if (playingMode === 'hunt' && game.allFound && !gameFlipped) {
-      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(flipTimer);
-    }
-  }, [game.allFound, playingMode, gameFlipped]);
-
-  // Flip the card when puzzle completes (auto-advance handled by NextGameCountdown)
-  useEffect(() => {
-    if (playingMode === 'puzzle' && puzzle.isComplete && !gameFlipped) {
-      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(flipTimer);
-    }
-  }, [puzzle.isComplete, playingMode, gameFlipped]);
-
-  // Flip the card when stamp hunt completes (auto-advance handled by NextGameCountdown)
-  useEffect(() => {
-    if (playingMode === 'stamp' && stampHunt.found && !gameFlipped) {
-      const flipTimer = setTimeout(() => setGameFlipped(true), 1200);
-      return () => clearTimeout(flipTimer);
-    }
-  }, [stampHunt.found, playingMode, gameFlipped]);
   // Sticker discovery system (used by TripSlide)
   const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   useLang(); // subscribe to language changes
@@ -323,9 +281,10 @@ export function PostcardFront({
   const activeSlideItem = albumItems[currentIndex] || item;
 
   const isAlbumGroup = !!item.album_id;
-  const storytelling = activeSlideItem.generation_metadata?.storytelling;
+  // storytelling is now derived inside PostcardChin from activeItem
   const trivia = activeSlideItem.generation_metadata?.trivia;
-  const isTriviaLocked = !!trivia && !isClaimedByMe && !isClaimed;
+  const hasCompletedTrivia = gameProgress.completedGames.has('trivia');
+  const isTriviaLocked = !!trivia && !isClaimedByMe && !isClaimed && !hasCompletedTrivia;
 
   const prevIsTriviaLocked = React.useRef(isTriviaLocked);
   
@@ -359,13 +318,24 @@ export function PostcardFront({
 
       {/* Main card */}
       <div
-        className={cn('relative w-full h-full flex flex-col transition-all duration-300', isClean ? 'bg-transparent' : 'bg-white')}
+        className={cn('relative w-full h-full flex flex-col transition-all duration-300', isClean || isPlaying ? 'bg-transparent' : 'bg-white')}
         style={{ zIndex: 1 }}
       >
         <div className={cn(
           "flex-1 w-full min-h-0 relative flex flex-col transition-all duration-300",
           isClean || isPlaying ? 'p-0 bg-transparent' : 'p-1 pb-0 bg-white overflow-hidden',
         )}>
+          {/* Top Game HUD Layer */}
+          {isPlaying && playingMode !== 'trivia' && (
+            <div className="w-full flex justify-center px-4 pt-3 pb-2 shrink-0 z-50 pointer-events-none">
+              <GameProgressBar
+                availableGames={availableGamesList}
+                completedGames={gameProgress.completedGames}
+                activeGame={gameModeToDb(playingMode as 'hunt' | 'puzzle' | 'stamp')}
+              />
+            </div>
+          )}
+
           {/* 3D flip container — used when the game completes */}
           <div
             className="relative flex-1 min-h-0 w-full"
@@ -548,50 +518,29 @@ export function PostcardFront({
             </div>
           </div>
 
-          {/* Floating Game HUD Layer */}
+          {/* Bottom Game HUD Layer */}
           {isPlaying && playingMode !== 'trivia' && (
-            <div className="absolute inset-0 z-50 pointer-events-none flex flex-col">
+            <div className="w-full px-4 pt-2 pb-6 shrink-0 z-50 pointer-events-auto">
               {playingMode === 'hunt' && (
-                <>
-                  <GameProgressBar
-                    availableGames={availableGamesList}
-                    completedGames={gameProgress.completedGames}
-                    activeGame={gameModeToDb('hunt')}
-                  />
-                  <GameBottomPanel
-                    item={item}
-                    game={game}
-                    onClose={() => handleGameClose('hunt')}
-                  />
-                </>
+                <GameBottomPanel
+                  item={item}
+                  game={game}
+                  onClose={() => handleGameClose('hunt')}
+                />
               )}
               {playingMode === 'puzzle' && (
-                <>
-                  <GameProgressBar
-                    availableGames={availableGamesList}
-                    completedGames={gameProgress.completedGames}
-                    activeGame={gameModeToDb('puzzle')}
-                  />
-                  <PuzzleBottomPanel
-                    item={item}
-                    puzzle={puzzle}
-                    onClose={() => handleGameClose('puzzle')}
-                  />
-                </>
+                <PuzzleBottomPanel
+                  item={item}
+                  puzzle={puzzle}
+                  onClose={() => handleGameClose('puzzle')}
+                />
               )}
               {playingMode === 'stamp' && (
-                <>
-                  <GameProgressBar
-                    availableGames={availableGamesList}
-                    completedGames={gameProgress.completedGames}
-                    activeGame={gameModeToDb('stamp')}
-                  />
-                  <StampHuntBottomPanel
-                    item={item}
-                    hunt={stampHunt}
-                    onClose={() => handleGameClose('stamp')}
-                  />
-                </>
+                <StampHuntBottomPanel
+                  item={item}
+                  hunt={stampHunt}
+                  onClose={() => handleGameClose('stamp')}
+                />
               )}
             </div>
           )}
@@ -600,15 +549,6 @@ export function PostcardFront({
         {/* Title + Buttons row — hidden in clean mode and game mode */}
         {!isPlaying ? (
           <>
-            {/* Storytelling preview — tap to expand */}
-            {storytelling && !isTriviaLocked && (
-              <StorytellingPreview
-                storytelling={storytelling}
-                isClean={isClean}
-                onFlipCard={() => onFlipCard('info')}
-              />
-            )}
-
             <PostcardActionBar
               item={item}
               activeSlideItem={activeSlideItem}
@@ -621,7 +561,7 @@ export function PostcardFront({
               hideActions={hideActions}
               isClean={isClean}
               isBusiness={isBusiness}
-              storytellingTitle={storytelling ? 'short' : undefined}
+              isTriviaLocked={isTriviaLocked}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
               onPlay={allowPlay && !isTriviaLocked && !isClaimedByMe ? () => setShowSelector(true) : undefined}
@@ -636,6 +576,9 @@ export function PostcardFront({
             isTriviaLocked={isTriviaLocked}
             onClose={() => setPlayingMode(null)}
             onResolve={() => {
+              // Save trivia completion so they never have to answer again
+              gameProgress.saveGameCompletion('trivia', 0);
+              
               if (onClaimPostcard && !isClaimLoading) {
                 onClaimPostcard(item.id);
               } else if (!isTriviaLocked) {
@@ -660,7 +603,14 @@ export function PostcardFront({
 
       {/* Victory celebration overlay */}
       {showVictory && (
-        <VictoryOverlay onDismiss={() => setShowVictory(false)} />
+        <VictoryOverlay onDismiss={() => {
+          setShowVictory(false);
+          if (item.album_id && onOpenAlbum) {
+            onOpenAlbum(item.album_id);
+          } else if (onOpenCollection) {
+            onOpenCollection();
+          }
+        }} />
       )}
     </div>
   );

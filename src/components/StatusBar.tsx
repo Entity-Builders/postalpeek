@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Dice5, Mail } from 'lucide-react';
+import { Trophy, Dice5, Mail, Stamp } from 'lucide-react';
 import type { Album } from '../hooks/useAlbums';
 import { useLang, t } from '../utils/i18n';
 
@@ -9,12 +9,16 @@ interface StatusBarProps {
   albums: Album[];
   /** Total postcards owned by the user */
   collectionCount: number;
+  /** Current stamp balance */
+  stampBalance: number;
   /** Callback when the user taps the album section */
   onAlbumTap: (album: Album) => void;
   /** Callback to open the game */
   onPlayTap: () => void;
   /** Callback to open the collection */
   onCollectionTap: () => void;
+  /** Callback when user taps the stamp balance widget */
+  onStampTap?: () => void;
 }
 
 /**
@@ -36,9 +40,11 @@ function pickFocusedAlbum(albums: Album[]): Album | null {
 export function StatusBar({
   albums,
   collectionCount,
+  stampBalance,
   onAlbumTap,
   onPlayTap,
   onCollectionTap,
+  onStampTap,
 }: StatusBarProps) {
   const lang = useLang();
   const focused = pickFocusedAlbum(albums);
@@ -126,6 +132,26 @@ export function StatusBar({
               )}{' '}
               {t({ es: 'postales', en: 'cards' }, lang)}
             </span>
+          </button>
+
+          {/* ── Stamp balance ── */}
+          <button
+            onClick={onStampTap}
+            className="flex flex-col items-center justify-center px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center mb-0.5">
+              <Stamp className="w-4 h-4 text-amber-400" />
+            </div>
+            <motion.span
+              key={stampBalance}
+              initial={{ scale: stampBalance === 0 ? 1 : 1.4, color: stampBalance === 0 ? 'rgba(255,255,255,0.5)' : '#fbbf24' }}
+              animate={{ scale: 1, color: 'rgba(255,255,255,0.5)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              className="text-[9px] font-semibold uppercase tracking-wider"
+            >
+              <span className="text-white/70">{stampBalance}</span>{' '}
+              {t({ es: 'sellos', en: 'stamps' }, lang)}
+            </motion.span>
           </button>
         </div>
       </div>

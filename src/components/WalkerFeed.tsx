@@ -8,6 +8,7 @@ import { useCollection } from '../hooks/useCollection';
 import { useAlbums } from '../hooks/useAlbums';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
 import { useDailyPack } from '../hooks/useDailyPack';
+import { useStamps } from '../hooks/useStamps';
 import type { FeedItem } from './Postcard';
 import { WalkerCarousel } from './WalkerCarousel';
 import { WalkerGrid } from './WalkerGrid';
@@ -30,9 +31,42 @@ import { FeatureFlags } from '../lib/featureFlags';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SmartSearchResult } from '../hooks/useSmartSearch';
+import { useGameMode } from '../contexts/GameModeContext';
 
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
 const AUTH_GATE_CARDS_KEY = 'postalpeek_auth_cards';
+
+function FeedBackButton({
+  isFullscreen,
+  setFocusedIndex,
+  navigate,
+  lang,
+}: {
+  isFullscreen: boolean;
+  setFocusedIndex: (idx: number | null) => void;
+  navigate: ReturnType<typeof useNavigate>;
+  lang: ReturnType<typeof useLang>;
+}) {
+  const { isGameActive } = useGameMode();
+  if (isFullscreen) return null;
+
+  return (
+    <button
+      onClick={() => {
+        setFocusedIndex(null);
+        navigate('/feed');
+      }}
+      className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
+    >
+      {t(
+        isGameActive
+          ? { es: '← Salir', en: '← Exit' }
+          : { es: '← Explorar', en: '← Explore' },
+        lang,
+      )}
+    </button>
+  );
+}
 
 export function WalkerFeed({
   isIdle,
@@ -393,6 +427,16 @@ export function WalkerFeed({
       });
   }, [albums]);
 
+  // ── Stamps Economy ──
+  const { stampBalance, claimDailyStamps } = useStamps(user?.id);
+
+  // Claim daily stamps on every session (RPC is idempotent — safe to call every open)
+  useEffect(() => {
+    if (user?.id) {
+      claimDailyStamps();
+    }
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // PackDone toast state — declared after albumPostcardIds so inline callbacks compile
   const [showPackDoneToast, setShowPackDoneToast] = useState(false);
   const [packDoneAlbumCount, setPackDoneAlbumCount] = useState(0);
@@ -437,6 +481,7 @@ export function WalkerFeed({
 
   // ── Unified flow: Grid (default) → Feed (carousel) ────────────
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null);
+  const [viewMode, setViewMode] = React.useState<'grid' | 'feed'>('grid');
 
   // Auto-enter carousel mode for share links
   React.useEffect(() => {
@@ -448,12 +493,15 @@ export function WalkerFeed({
   // Feed mode: user tapped a card in the grid → show fullscreen carousel
   // Track fullscreen overlay state to hide chrome
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+
   React.useEffect(() => {
     const handler = (e: Event) => {
       setIsFullscreen((e as CustomEvent<boolean>).detail);
     };
     window.addEventListener('postalpeek:fullscreen', handler);
-    return () => window.removeEventListener('postalpeek:fullscreen', handler);
+    return () => {
+      window.removeEventListener('postalpeek:fullscreen', handler);
+    };
   }, []);
 
   if (focusedIndex !== null) {
@@ -464,18 +512,12 @@ export function WalkerFeed({
 
     return (
       <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
-        {/* Back button — hidden during fullscreen overlay */}
-        {!isFullscreen && (
-          <button
-            onClick={() => {
-              setFocusedIndex(null);
-              navigate('/feed');
-            }}
-            className='absolute top-3 left-3 z-[60] flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/15 hover:bg-black/60 transition-all shadow-lg cursor-pointer'
-          >
-            {t({ es: '← Explorar', en: '← Explore' }, lang)}
-          </button>
-        )}
+        <FeedBackButton
+          isFullscreen={isFullscreen}
+          setFocusedIndex={setFocusedIndex}
+          navigate={navigate}
+          lang={lang}
+        />
         <WalkerCarousel
           items={feedItems}
           displayItems={feedItems}
@@ -640,15 +682,8 @@ export function WalkerFeed({
           setIsAlbumsModalOpen(true);
           analytics.track('albums_opened');
         }}
-        onToggleCollection={
-          user
-            ? () => {
-                navigate('/feed/collection');
-                refetchCollection();
-                analytics.track('collection_opened');
-              }
-            : undefined
-        }
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode((v) => (v === 'grid' ? 'feed' : 'grid'))}
       />
 
       {/* Collection Grid */}
@@ -776,6 +811,7 @@ export function WalkerFeed({
           <StatusBar
             albums={albums}
             collectionCount={collection.length}
+            stampBalance={stampBalance}
             onAlbumTap={(album) => {
               navigate(`/album/${album.id}`);
               analytics.track('statusbar_album_tapped', { album_id: album.id });
