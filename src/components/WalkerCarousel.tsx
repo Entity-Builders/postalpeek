@@ -13,6 +13,7 @@ import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import { PackRevealSlide } from './PackRevealSlide';
 import { EnvelopeSlide } from './EnvelopeSlide';
 import type { User } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { AmbientBackground } from './ui/AmbientBackground';
 
 const FREE_CARD_LIMIT = 4;
@@ -81,6 +82,7 @@ export function WalkerCarousel({
   onPackComplete,
 }: WalkerCarouselProps) {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const navigate = useNavigate();
   // Track which album covers have been "opened" to show the full Postcard view
   const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
   // Track which cards have loaded their hero image so we can hide the skeleton
@@ -497,6 +499,10 @@ export function WalkerCarousel({
                         isInAlbum={albumPostcardIds.has(item.id)}
                         showClaimGuide={showWelcome && claimedIds.size === 0 && itemIndex === 0}
                         userId={user?.id}
+                        onOpenAlbum={(albumId) => {
+                          analytics.track('postcard_album_icon_clicked', { album_id: albumId, postcard_id: item.id });
+                          navigate(`/album/${albumId}`);
+                        }}
 
                         onHeroReady={() => {
                           setHeroReadyIds((prev) => {

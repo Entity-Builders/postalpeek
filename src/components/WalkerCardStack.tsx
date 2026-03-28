@@ -8,6 +8,7 @@ import { AlbumCover } from './AlbumCover';
 import { WalkerWelcome } from './WalkerWelcome';
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import type { User } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 
 const FREE_CARD_LIMIT = 5;
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
@@ -196,6 +197,7 @@ function SwipeableCard({
   items,
 }: SwipeableCardProps) {
   const lang = useLang();
+  const navigate = useNavigate();
   const x = useMotionValue(0);
   const controls = useAnimation();
   
@@ -335,6 +337,10 @@ function SwipeableCard({
                     isClaimLoading={isClaimLoading}
                     isInAlbum={albumPostcardIds.has(item.id)}
                     showClaimGuide={showWelcome && claimedIds.size === 0 && swipedCount === 0}
+                    onOpenAlbum={(albumId) => {
+                      analytics.track('postcard_album_icon_clicked', { album_id: albumId, postcard_id: item.id });
+                      navigate(`/album/${albumId}`);
+                    }}
                     onHeroReady={() => {
                       setHeroReadyIds((prev: Set<string>) => {
                         if (prev.has(item.id)) return prev;

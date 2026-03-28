@@ -5,6 +5,7 @@ import type { FeedItem } from './Postcard';
 import { Postcard } from './Postcard';
 import type { User } from '@supabase/supabase-js';
 import { analytics } from '../lib/analytics';
+import { useNavigate } from 'react-router-dom';
 
 export type RevealMode = 'tap' | 'auto-scroll' | 'cascade';
 
@@ -54,6 +55,7 @@ export function DailyPackCard({
   setShowAuthGate,
   setPendingFavoriteId,
 }: DailyPackCardProps) {
+  const navigate = useNavigate();
 
   // Auto-scroll mode: reveal when slide becomes active
   useEffect(() => {
@@ -185,6 +187,10 @@ export function DailyPackCard({
               isClaimLoading={isClaimLoading}
               isInAlbum={albumPostcardIds.has(item.id)}
               hideActions={true}
+              onOpenAlbum={(albumId) => {
+                analytics.track('daily_pack_album_icon_clicked', { album_id: albumId, postcard_id: item.id });
+                navigate(`/album/${albumId}`);
+              }}
               onAuthRequired={
                 !user
                   ? (postcardId) => {

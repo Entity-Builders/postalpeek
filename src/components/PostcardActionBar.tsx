@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ticket, Trophy, Sparkles } from 'lucide-react';
+import { Ticket, BookImage, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
@@ -23,6 +23,7 @@ interface PostcardActionBarProps {
   onPlay?: () => void;
   /** Whether the user already owns this postcard */
   isOwned?: boolean;
+  onOpenAlbum?: (albumId: string) => void;
 }
 
 export function PostcardActionBar({
@@ -36,6 +37,7 @@ export function PostcardActionBar({
   totalStops,
   onPlay,
   isOwned,
+  onOpenAlbum,
 }: PostcardActionBarProps) {
 
   const stopMeta = activeSlideItem.album_sequence != null
@@ -60,17 +62,22 @@ export function PostcardActionBar({
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
-        {/* Owned trophy — tapping flips card to show details */}
+        {/* Owned badge — tapping navigates to the album */}
         {isOwned && (
           <button
             className='p-2 md:p-2.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 transition-colors shadow-sm'
             onClick={(e) => {
               e.stopPropagation();
-              onFlipCard('info');
+              const albumId = activeSlideItem.album_id || item.album_id;
+              if (onOpenAlbum && albumId) {
+                onOpenAlbum(albumId);
+              } else {
+                onFlipCard('info');
+              }
             }}
-            title={t({ es: 'Tu colección', en: 'Your collection' })}
+            title={t({ es: 'Ver álbum', en: 'View album' })}
           >
-            <Trophy className='w-4 h-4 md:w-5 md:h-5' />
+            <BookImage className='w-4 h-4 md:w-5 md:h-5' />
           </button>
         )}
         {/* Challenge CTA */}

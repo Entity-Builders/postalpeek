@@ -88,6 +88,8 @@ interface PostcardProps {
   userId?: string;
   /** Callback when postcard is earned through game completion */
   onPostcardEarned?: (postcardId: string) => void;
+  /** Navigate directly to an album */
+  onOpenAlbum?: (albumId: string) => void;
 }
 
 const springFlip = {
@@ -122,13 +124,15 @@ export function Postcard({
   onTap,
   userId,
   onPostcardEarned,
+  onOpenAlbum,
 }: PostcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [backView, setBackView] = useState<'info' | 'coupon'>('info');
   const [activeSlideItem, setActiveSlideItem] = useState<FeedItem>(item);
   const [heroReady, setHeroReady] = useState(false);
+  const hasFactType = !!item.generation_metadata?.storytelling?.fact_type;
   /** Clean/expand mode — hides chrome, enables fullscreen overlay */
-  const [isClean, setIsClean] = useState(false);
+  const [isClean, setIsClean] = useState(hasFactType);
   /** Track whether a game is active inside PostcardFront (ref to avoid re-renders) */
   const isGameActiveRef = useRef(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
@@ -172,36 +176,20 @@ export function Postcard({
           country: item.country,
         });
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [item.id, item.country],
+    [item.id, item.country, animate, rotateY, scope],
   );
 
-  // ── Simple click handler (replaces drag/peek) ──
+  // ── Container click handler (only delegates to onTap if provided) ──
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest('button, a')) return;
-      // Don't toggle zoom when a game is active
       if (isGameActiveRef.current) return;
       if (onTap) {
         onTap();
-      } else {
-        // Toggle clean/expand mode
-        setIsClean((prev) => {
-          const next = !prev;
-          localStorage.setItem('pp_clean_mode', String(next));
-          analytics.track(
-            next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
-            {
-              postcard_id: item.id,
-              country: item.country,
-            },
-          );
-          return next;
-        });
       }
     },
-    [onTap, item.id, item.country],
+    [onTap],
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -254,12 +242,15 @@ export function Postcard({
   const polaroidUrl = fallbackEnabled ? rawPolaroidUrl : basePolaroidUrl;
   const finalPlaceholder = fallbackEnabled ? undefined : placeholderUrl;
 
-  // Reset clean mode when card loses focus
+  // Manage clean mode focus state
   React.useEffect(() => {
-    if (!isActive && isClean) {
+    if (!isActive) {
       setIsClean(false);
+    } else if (hasFactType) {
+      // Re-enter clean mode when swiping back to this card
+      setIsClean(true);
     }
-  }, [isActive, isClean]);
+  }, [isActive, hasFactType]);
 
   const toggleClean = useCallback(() => {
     setIsClean((prev) => {
@@ -274,13 +265,6 @@ export function Postcard({
       return next;
     });
   }, [item.id, item.country]);
-
-  // Reset clean mode when card becomes inactive (user scrolled away)
-  React.useEffect(() => {
-    if (!isActive && isClean) {
-      setIsClean(false);
-    }
-  }, [isActive, isClean]);
 
   // Overlay appears after a brief delay so card dissolve starts first
   const [showOverlay, setShowOverlay] = React.useState(false);
@@ -302,7 +286,7 @@ export function Postcard({
         isActive && !heroReady && 'opacity-0',
         isActive && heroReady && 'opacity-100',
         !isActive && 'opacity-40 pointer-events-none',
-        isClean ? 'cursor-zoom-in' : 'cursor-pointer',
+        !onTap ? 'cursor-default' : (isClean ? 'cursor-zoom-in' : 'cursor-pointer'),
       )}
       onClick={handleClick}
     >
@@ -331,7 +315,6 @@ export function Postcard({
             item={item}
             isAdmin={isAdmin}
             isPriority={isPriority}
-            isActive={isActive}
             isLiked={isLiked}
             onToggleFavorite={onToggleFavorite}
             onAuthRequired={onAuthRequired}
@@ -361,20 +344,8 @@ export function Postcard({
             allowPlay={Array.isArray(item.illustration_tags) && item.illustration_tags.length > 0}
             userId={userId}
             onPostcardEarned={onPostcardEarned}
+            onOpenAlbum={onOpenAlbum}
             onGameActiveChange={(active: boolean) => { isGameActiveRef.current = active; }}
-            onCardTap={() => {
-              // Two-tap logic is managed inside PostcardFront via showExcerpt state.
-              // This callback is a fallback for cards without storytelling.
-              setIsClean((prev) => {
-                const next = !prev;
-                localStorage.setItem('pp_clean_mode', String(next));
-                analytics.track(
-                  next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
-                  { postcard_id: item.id, country: item.country },
-                );
-                return next;
-              });
-            }}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

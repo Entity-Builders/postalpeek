@@ -6,6 +6,9 @@ import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
+import { Info, BookImage, BookOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { analytics } from '../../lib/analytics';
 
 /* ── Storytelling fact helpers (shared with StorytellingPreview) ── */
 const FACT_EMOJI: Record<string, string> = {
@@ -31,6 +34,7 @@ interface GridCardProps {
 const ANIMATE_THRESHOLD = 12;
 
 export const GridCard = React.memo(function GridCard({ item, index, layout, onClick, isClaimed }: GridCardProps) {
+  const navigate = useNavigate();
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
   const srcSet = useSignedSrcSet(item.illustration_url, WIDTHS.gridSrcSet as unknown as number[]);
   const placeholderUrl = useSignedImage(item.illustration_url, { width: WIDTHS.blur, quality: 15 });
@@ -199,12 +203,43 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
               {t({ es: 'Descubrirla', en: 'Discover it' })}
             </span>
           ) : (
-            <p className="text-stone-500 text-[10px] font-medium leading-tight truncate">
-              {item.city}
-            </p>
-          )}
-          {!isTriviaLocked && !isClaimed && (
-            <Sparkles className="w-3 h-3 text-violet-400 opacity-60 animate-pulse flex-shrink-0" />
+            <div className="flex items-center justify-between w-full">
+              <p className="text-stone-500 text-[10px] font-medium leading-tight truncate">
+                {item.city}
+              </p>
+              <div className="flex items-center gap-1 shrink-0 text-stone-400">
+                {item.album_id && (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      analytics.track('postcard_album_icon_clicked', { album_id: item.album_id, postcard_id: item.id, source: 'grid' });
+                      navigate(`/album/${item.album_id}`);
+                    }}
+                    className="hover:text-amber-500 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
+                    title={t({ es: 'Ver álbum', en: 'View album' }, lang)}
+                  >
+                    <BookImage className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  </button>
+                )}
+                {storytelling && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onClick(); }}
+                    className="hover:text-amber-500 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
+                    title={t({ es: 'Saber más', en: 'Know about' }, lang)}
+                  >
+                    <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onClick(); }}
+                  className="hover:text-stone-600 transition-colors p-2 -my-2 flex items-center justify-center cursor-pointer"
+                  title={t({ es: 'Datos de la postal', en: 'Postcard data' }, lang)}
+                >
+                  <Info className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+                {!isClaimed && <Sparkles className="w-3 h-3 text-violet-400 opacity-60 animate-pulse flex-shrink-0 ml-1" />}
+              </div>
+            </div>
           )}
         </div>
       </div>

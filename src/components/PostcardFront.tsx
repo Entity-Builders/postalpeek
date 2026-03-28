@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Maximize2,
-  Minimize2,
+  X,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { useGameProgress, gameModeToDb, type DbGameType } from '../hooks/useGameProgress';
@@ -60,8 +60,6 @@ interface PostcardFrontProps {
   showClaimGuide?: boolean;
   /** Hide claim + share buttons (e.g. in daily pack reveal) */
   hideActions?: boolean;
-  /** Whether this card is the currently visible slide */
-  isActive?: boolean;
   /** Called when user taps expand to see fullscreen image */
   onExpandImage?: (item: FeedItem, sourceRect?: DOMRect) => void;
   /** Controlled clean/expand mode from parent */
@@ -76,8 +74,8 @@ interface PostcardFrontProps {
   onPostcardEarned?: (postcardId: string) => void;
   /** Notify parent when game mode is active (to block zoom) */
   onGameActiveChange?: (active: boolean) => void;
-  /** Called when the card body is tapped (not a button). Parent delegates here. */
-  onCardTap?: () => void;
+  /** Navigate directly to an album */
+  onOpenAlbum?: (albumId: string) => void;
 }
 
 export function PostcardFront({
@@ -95,7 +93,6 @@ export function PostcardFront({
   fallbackEnabled,
   onHeroLoad,
   hideActions = false,
-  isActive = true,
   isClean = false,
   onToggleClean,
   allowPlay = true,
@@ -106,7 +103,7 @@ export function PostcardFront({
   userId,
   onPostcardEarned,
   onGameActiveChange,
-  onCardTap,
+  onOpenAlbum,
 }: PostcardFrontProps) {
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
@@ -117,18 +114,12 @@ export function PostcardFront({
   const stampHunt = useStampHunt(item);
   const isPlaying = playingMode !== null;
 
-  // ── Two-tap interaction: first tap shows excerpt, second tap flips ──
-  const [showExcerpt, setShowExcerpt] = useState(false);
-
   // Notify parent when game mode or selector changes (so it can block zoom)
   useEffect(() => {
-    onGameActiveChange?.(isPlaying || showSelector);
+    if (onGameActiveChange) {
+      onGameActiveChange(isPlaying || showSelector);
+    }
   }, [isPlaying, showSelector, onGameActiveChange]);
-
-  // Reset excerpt when card goes out of view
-  useEffect(() => {
-    if (!isActive && showExcerpt) setShowExcerpt(false);
-  }, [isActive, showExcerpt]);
 
   // ── Game progress tracking (play-to-earn) ──
   const hasHuntMode_ = useMemo(() => {
@@ -408,20 +399,8 @@ export function PostcardFront({
 
                   e.stopPropagation(); // prevent parent Postcard handleClick
 
-                  // Two-tap state machine
-                  if (storytelling && !isTriviaLocked) {
-                    if (!showExcerpt) {
-                      // First tap → reveal the excerpt
-                      setShowExcerpt(true);
-                    } else {
-                      // Second tap → flip the card
-                      setShowExcerpt(false);
-                      onFlipCard('info');
-                    }
-                  } else {
-                    // No storytelling data → delegate to parent (toggle clean mode)
-                    onCardTap?.();
-                  }
+                  // Always maximize the image on tap
+                  onToggleClean?.();
                 }}
               >
 
@@ -512,10 +491,10 @@ export function PostcardFront({
                 {!isPlaying && (
                   <button
                     className={cn(
-                      'absolute z-40 rounded-md transition-all shadow-md ring-1 ring-white/20',
+                      'absolute z-40 transition-all shadow-md ring-1 ring-white/20',
                       isClean
-                        ? 'bottom-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white/90 hover:text-white backdrop-blur-sm'
-                        : 'bottom-2.5 right-2.5 p-1.5 bg-black/60 hover:bg-black/80 text-white/90 hover:text-white',
+                        ? 'top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white/90 hover:text-white backdrop-blur-sm rounded-full'
+                        : 'bottom-2.5 right-2.5 p-1.5 bg-black/60 hover:bg-black/80 text-white/90 hover:text-white rounded-md',
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -524,7 +503,7 @@ export function PostcardFront({
                     title={isClean ? 'Volver' : 'Ver en pantalla completa'}
                   >
                     {isClean
-                      ? <Minimize2 className='w-4 h-4' />
+                      ? <X className='w-5 h-5' />
                       : <Maximize2 className='w-3.5 h-3.5' />
                     }
                   </button>
@@ -574,15 +553,12 @@ export function PostcardFront({
         {/* Title + Buttons row — hidden in clean mode and game mode */}
         {!isPlaying ? (
           <>
-            {/* Storytelling preview — appears on first tap, tapping it flips the card */}
+            {/* Storytelling preview — tap to expand */}
             {storytelling && !isTriviaLocked && (
               <StorytellingPreview
                 storytelling={storytelling}
-                onFlipCard={() => {
-                  onFlipCard('info');
-                }}
                 isClean={isClean}
-                collapsed={!showExcerpt}
+                onFlipCard={() => onFlipCard('info')}
               />
             )}
 
@@ -603,6 +579,7 @@ export function PostcardFront({
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
               onPlay={allowPlay && !isTriviaLocked && !isClaimedByMe ? () => setShowSelector(true) : undefined}
               isOwned={isClaimedByMe}
+              onOpenAlbum={onOpenAlbum}
             />
           </>
         ) : playingMode === 'trivia' ? (
