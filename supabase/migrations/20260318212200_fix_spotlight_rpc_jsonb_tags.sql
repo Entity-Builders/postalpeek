@@ -1,9 +1,6 @@
--- Update postalpeek_spotlight_search to prefer illustration_tags for matching.
---
--- Logic:
---   - If a postcard has illustration_tags (new pipeline), use those for tag matching.
---   - If illustration_tags is empty (old postcards pre-backfill), fall back to visual_tags.
--- This ensures backward compatibility while new postcards use the correct source of truth.
+-- Fix: visual_tags and illustration_tags are jsonb columns, not text[].
+-- The && operator between jsonb and text[] does not exist in PostgreSQL.
+-- Cast jsonb arrays to text[] via ARRAY(jsonb_array_elements_text(...)) before using &&.
 
 CREATE OR REPLACE FUNCTION public.postalpeek_spotlight_search(
   p_tags text[] DEFAULT '{}',
@@ -20,10 +17,6 @@ RETURNS SETOF public.postalpeek_postcards
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-  -- Helper to choose the correct tags array for a postcard:
-  -- prefer illustration_tags if populated, else fall back to visual_tags
-  v_effective_tags_expr text;
 BEGIN
   RETURN QUERY
   SELECT p.*
@@ -36,9 +29,10 @@ BEGIN
       WHERE a.id = p.album_id AND a.status = 'completed'
     ))
 
-    -- Tags matching: prefer illustration_tags (what user sees), fallback to visual_tags
+    -- Tags matching: prefer illustration_tags if populated, else fall back to visual_tags.
+    -- Both columns are jsonb — cast to text[] via ARRAY() before using &&.
     AND (array_length(p_tags, 1) IS NULL OR (
-      -- Primary: use illustration_tags if non-empty, else visual_tags
+
       ARRAY(SELECT jsonb_array_elements_text(
         CASE
           WHEN jsonb_array_length(COALESCE(p.illustration_tags, '[]'::jsonb)) > 0
@@ -46,19 +40,17 @@ BEGIN
           ELSE CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
         END
       )) && p_tags
-      -- Secondary: also check detailed_tags (original photo, both schema versions)
+
+      -- Also match detailed_tags (structured bilingual labels, both schema versions)
       OR EXISTS (
         SELECT 1 FROM jsonb_array_elements(
           CASE jsonb_typeof(p.detailed_tags) WHEN 'array' THEN p.detailed_tags ELSE '[]'::jsonb END
         ) AS dt
         WHERE
-          -- New schema: label is {en, es, es_ar}
-          dt->'label'->>'en' = ANY(p_tags)
+          dt->'label'->>'en'    = ANY(p_tags)
           OR dt->'label'->>'es' = ANY(p_tags)
           OR dt->'label'->>'es_ar' = ANY(p_tags)
-          -- Old schema: label is a plain string
           OR (jsonb_typeof(dt->'label') = 'string' AND dt->>'label' = ANY(p_tags))
-          -- Old schema: spanish_label field
           OR dt->>'spanish_label' = ANY(p_tags)
       )
     ))
@@ -86,14 +78,14 @@ BEGIN
         ) AS it
         WHERE it ILIKE '%' || p_free_text || '%'
       ) OR
-      -- Search within visual_tags (fallback / supplemental)
+      -- Search within visual_tags (fallback)
       EXISTS (
         SELECT 1 FROM jsonb_array_elements_text(
           CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
         ) AS vt
         WHERE vt ILIKE '%' || p_free_text || '%'
       ) OR
-      -- Search within detailed_tags labels (both schema versions)
+      -- Search within detailed_tags labels
       EXISTS (
         SELECT 1 FROM jsonb_array_elements(
           CASE jsonb_typeof(p.detailed_tags) WHEN 'array' THEN p.detailed_tags ELSE '[]'::jsonb END

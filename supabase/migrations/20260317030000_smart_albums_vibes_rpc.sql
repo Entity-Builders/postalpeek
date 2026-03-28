@@ -2,8 +2,32 @@
 -- Phase 4.3: Smart Filters with Vibe Metadata
 -- ============================================================
 
--- 0. Ensure the custom return type exists (self-contained: safe to re-run)
---    The previous migration used DROP TYPE ... CASCADE which may have dropped this.
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'postalpeek_smart_album_rules') THEN
+    ALTER TABLE public.postalpeek_smart_album_rules 
+      DROP CONSTRAINT IF EXISTS postalpeek_smart_album_rules_filter_type_check;
+
+    ALTER TABLE public.postalpeek_smart_album_rules 
+      ADD CONSTRAINT postalpeek_smart_album_rules_filter_type_check 
+      CHECK (filter_type IN ('country', 'category', 'tag', 'aesthetic_vibe', 'architecture_style', 'color_palette'));
+
+    INSERT INTO public.postalpeek_smart_album_rules (filter_type, filter_value, creative_title) VALUES
+      ('color_palette', 'pastel', 'Sueños en Pastel 🌸'),
+      ('color_palette', 'neon', 'Noches de Neón 🏮'),
+      ('color_palette', 'monochromatic', 'Escenas Monocromáticas 📸'),
+      ('color_palette', 'earthy', 'Tonos Terrestres 🍂'),
+      ('architecture_style', 'colonial', 'Ruta Colonial 🏛️'),
+      ('architecture_style', 'brutalist', 'Joyas Brutalistas 🏢'),
+      ('aesthetic_vibe', 'cyberpunk', 'Paraísos Cyberpunk 👾'),
+      ('aesthetic_vibe', 'cottagecore', 'Refugios Cottagecore 🌿'),
+      ('aesthetic_vibe', 'melancholic', 'Rincones Melancólicos 🌧️')
+    ON CONFLICT (filter_type, filter_value) DO NOTHING;
+  END IF;
+END $$;
+
+-- 3. Redefine the Smart Albums RPC to include the new columns
+-- Ensure the return type exists (self-contained: safe to re-run)
 DROP TYPE IF EXISTS public.postalpeek_smart_album_list CASCADE;
 CREATE TYPE public.postalpeek_smart_album_list AS (
   album_type TEXT,
@@ -13,28 +37,6 @@ CREATE TYPE public.postalpeek_smart_album_list AS (
   cover_urls TEXT[]
 );
 
--- 1. Update the Dictionary Constraint to allow new Vibe types
-ALTER TABLE public.postalpeek_smart_album_rules 
-  DROP CONSTRAINT IF EXISTS postalpeek_smart_album_rules_filter_type_check;
-
-ALTER TABLE public.postalpeek_smart_album_rules 
-  ADD CONSTRAINT postalpeek_smart_album_rules_filter_type_check 
-  CHECK (filter_type IN ('country', 'category', 'tag', 'aesthetic_vibe', 'architecture_style', 'color_palette'));
-
--- 2. Seed some initial dictionary rules for the new vibes
-INSERT INTO public.postalpeek_smart_album_rules (filter_type, filter_value, creative_title) VALUES
-  ('color_palette', 'pastel', 'Sueños en Pastel 🌸'),
-  ('color_palette', 'neon', 'Noches de Neón 🏮'),
-  ('color_palette', 'monochromatic', 'Escenas Monocromáticas 📸'),
-  ('color_palette', 'earthy', 'Tonos Terrestres 🍂'),
-  ('architecture_style', 'colonial', 'Ruta Colonial 🏛️'),
-  ('architecture_style', 'brutalist', 'Joyas Brutalistas 🏢'),
-  ('aesthetic_vibe', 'cyberpunk', 'Paraísos Cyberpunk 👾'),
-  ('aesthetic_vibe', 'cottagecore', 'Refugios Cottagecore 🌿'),
-  ('aesthetic_vibe', 'melancholic', 'Rincones Melancólicos 🌧️')
-ON CONFLICT (filter_type, filter_value) DO NOTHING;
-
--- 3. Redefine the Smart Albums RPC to include the new columns
 CREATE OR REPLACE FUNCTION public.postalpeek_get_smart_albums(
   p_user_id UUID
 ) RETURNS SETOF public.postalpeek_smart_album_list AS $$

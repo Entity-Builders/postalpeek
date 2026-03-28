@@ -1,6 +1,7 @@
 -- ============================================================================
 -- postalpeek_game_progress: Track game completions per postcard per user
 -- + Auto-start album trigger when a postcard gets an owner
+-- (Mirror of apps/PostalPeek/supabase/migrations/20260327200000_game_progress_album_autostart.sql)
 -- ============================================================================
 
 -- 1. Game progress tracking
@@ -28,7 +29,6 @@ CREATE INDEX IF NOT EXISTS idx_game_progress_user_postcard
   ON postalpeek_game_progress(user_id, postcard_id);
 
 -- 2. Auto-start album when a postcard gets an owner
---    (inserts into album_progress if the postcard belongs to an album)
 CREATE OR REPLACE FUNCTION postalpeek_auto_start_album()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -41,7 +41,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop if exists to avoid duplicate trigger errors
 DROP TRIGGER IF EXISTS trg_auto_start_album ON postalpeek_postcards;
 
 CREATE TRIGGER trg_auto_start_album

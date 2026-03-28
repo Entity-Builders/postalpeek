@@ -1,10 +1,3 @@
--- Update postalpeek_spotlight_search to prefer illustration_tags for matching.
---
--- Logic:
---   - If a postcard has illustration_tags (new pipeline), use those for tag matching.
---   - If illustration_tags is empty (old postcards pre-backfill), fall back to visual_tags.
--- This ensures backward compatibility while new postcards use the correct source of truth.
-
 CREATE OR REPLACE FUNCTION public.postalpeek_spotlight_search(
   p_tags text[] DEFAULT '{}',
   p_time_of_day text DEFAULT NULL,
@@ -20,10 +13,6 @@ RETURNS SETOF public.postalpeek_postcards
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-  -- Helper to choose the correct tags array for a postcard:
-  -- prefer illustration_tags if populated, else fall back to visual_tags
-  v_effective_tags_expr text;
 BEGIN
   RETURN QUERY
   SELECT p.*
@@ -35,18 +24,11 @@ BEGIN
       SELECT 1 FROM public.postalpeek_albums a
       WHERE a.id = p.album_id AND a.status = 'completed'
     ))
-
-    -- Tags matching: prefer illustration_tags (what user sees), fallback to visual_tags
+    -- Tags matching: handles both detailed_tags schemas + visual_tags (jsonb)
     AND (array_length(p_tags, 1) IS NULL OR (
-      -- Primary: use illustration_tags if non-empty, else visual_tags
       ARRAY(SELECT jsonb_array_elements_text(
-        CASE
-          WHEN jsonb_array_length(COALESCE(p.illustration_tags, '[]'::jsonb)) > 0
-          THEN p.illustration_tags
-          ELSE CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
-        END
+        CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
       )) && p_tags
-      -- Secondary: also check detailed_tags (original photo, both schema versions)
       OR EXISTS (
         SELECT 1 FROM jsonb_array_elements(
           CASE jsonb_typeof(p.detailed_tags) WHEN 'array' THEN p.detailed_tags ELSE '[]'::jsonb END
@@ -62,15 +44,13 @@ BEGIN
           OR dt->>'spanish_label' = ANY(p_tags)
       )
     ))
-
     AND (p_time_of_day IS NULL OR p.time_of_day ILIKE '%' || p_time_of_day || '%')
     AND (p_weather IS NULL OR p.weather ILIKE '%' || p_weather || '%')
     AND (p_scene_type IS NULL OR p.scene_type ILIKE '%' || p_scene_type || '%')
     AND (p_country IS NULL OR p.country ILIKE '%' || p_country || '%')
     AND (p_city IS NULL OR p.city ILIKE '%' || p_city || '%')
     AND (p_rarity IS NULL OR p.rarity ILIKE '%' || p_rarity || '%')
-
-    -- Free text: searches descriptions, location fields, AND both tag sets
+    -- freeTextSearch: searches descriptions, location fields, AND tag labels (both schemas)
     AND (p_free_text IS NULL OR (
       p.description->>'en' ILIKE '%' || p_free_text || '%' OR
       p.description->>'es' ILIKE '%' || p_free_text || '%' OR
@@ -79,20 +59,6 @@ BEGIN
       p.location_name ILIKE '%' || p_free_text || '%' OR
       p.time_of_day ILIKE '%' || p_free_text || '%' OR
       p.scene_type ILIKE '%' || p_free_text || '%' OR
-      -- Search within illustration_tags (primary)
-      EXISTS (
-        SELECT 1 FROM jsonb_array_elements_text(
-          COALESCE(p.illustration_tags, '[]'::jsonb)
-        ) AS it
-        WHERE it ILIKE '%' || p_free_text || '%'
-      ) OR
-      -- Search within visual_tags (fallback / supplemental)
-      EXISTS (
-        SELECT 1 FROM jsonb_array_elements_text(
-          CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
-        ) AS vt
-        WHERE vt ILIKE '%' || p_free_text || '%'
-      ) OR
       -- Search within detailed_tags labels (both schema versions)
       EXISTS (
         SELECT 1 FROM jsonb_array_elements(
@@ -103,6 +69,13 @@ BEGIN
           OR dt->'label'->>'es' ILIKE '%' || p_free_text || '%'
           OR (jsonb_typeof(dt->'label') = 'string' AND dt->>'label' ILIKE '%' || p_free_text || '%')
           OR dt->>'spanish_label' ILIKE '%' || p_free_text || '%'
+      ) OR
+      -- Search within visual_tags
+      EXISTS (
+        SELECT 1 FROM jsonb_array_elements_text(
+          CASE jsonb_typeof(p.visual_tags) WHEN 'array' THEN p.visual_tags ELSE '[]'::jsonb END
+        ) AS vt
+        WHERE vt ILIKE '%' || p_free_text || '%'
       )
     ))
   ORDER BY random()

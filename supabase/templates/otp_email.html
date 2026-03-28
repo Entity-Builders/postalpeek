@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PostalPeek Login Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #fcfbf8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1c1917; text-align: center; -webkit-font-smoothing: antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #fcfbf8; padding: 40px 10px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 440px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e5e5e5; overflow: hidden; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <!-- Image Section -->
+          <tr>
+            <td style="background-color: #fafaf9; padding: 16px;">
+              <img src="https://xfcvuzcxvdpzkqpnahyx.supabase.co/functions/v1/postalpeek-random-postcard" alt="PostalPeek Postcard" style="width: 100%; max-height: 260px; width: 408px; object-fit: cover; border-radius: 8px; display: block; border: 1px solid #f0f0f0;" />
+            </td>
+          </tr>
+          
+          <!-- Stamp Section - Safe inline fallback for absolute positioning -->
+          <tr>
+            <td align="right" style="padding: 0 32px 0 0; background-color: #ffffff; line-height: 0;">
+              <table border="0" cellspacing="0" cellpadding="0" style="display: inline-table; width: 64px; height: 64px; background-color: #ffffff; border-radius: 50%; border: 1px solid #f0f0f0; text-align: center; margin-top: -32px;">
+                <tr>
+                  <td align="center" valign="middle">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; border: 1px dashed #a8a29e; margin: 0 auto;">
+                      <p style="font-family: 'Courier New', Courier, monospace; font-size: 8px; color: #78716c; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2; margin-top: 16px;">POSTAL<br/>PEEK</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Content Section -->
+          <tr>
+            <td align="center" style="padding: 20px 32px 32px 32px; background-color: #ffffff;">
+              <h1 style="font-family: 'Georgia', serif; font-size: 26px; font-weight: normal; color: #1c1917; margin: 0 0 8px 0;">Your login code</h1>
+              <p style="font-size: 14px; color: #78716c; margin: 0 0 32px 0;">Enter this code to continue exploring</p>
+              
+              <div style="background-color: #f9f8fe; border: 1px solid #efeef9; border-radius: 12px; padding: 24px 10px; margin-bottom: 24px;">
+                <p style="font-family: 'Courier New', Courier, monospace; font-size: 38px; font-weight: bold; letter-spacing: 12px; color: #1e1b4b; margin: 0;">{{ .Token }}</p>
+              </div>
+              
+              <p style="font-size: 13px; color: #a8a29e; font-style: italic; margin: 0 0 32px 0;">This code expires in 10 minutes</p>
+              
+              <div style="border-top: 1px solid #f0efeb; padding-top: 24px;">
+                <p style="font-family: 'Georgia', serif; font-style: italic; color: #78716c; font-size: 16px; margin: 0 0 8px 0;">From the sketchbook of Kyle Walker</p>
+                <p style="font-family: 'Courier New', Courier, monospace; color: #a8a29e; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 0;">PostalPeek — The World, Reimagined</p>
+              </div>
+            </td>
+          </tr>
+        </table>
+        
+        <p style="font-size: 11px; color: #d6d3d1; margin-top: 32px; text-align: center;">If you didn't request this code, you can safely ignore this email.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
