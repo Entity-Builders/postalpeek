@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronUp,
   Stamp,
+  Dice5,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
@@ -64,8 +66,12 @@ export interface PostcardChinProps {
   /** Album stop metadata keyed by sequence */
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
-  /** Play button callback (carousel): shows ✨ Ganarla pill */
+  /** Play button callback (carousel): starts mini-games to grind stamps */
   onPlay?: () => void;
+  /** Sellar button callback (carousel): spends stamps to claim */
+  onClaim?: () => void;
+  /** Trade button callback (carousel): propose trade */
+  onTrade?: () => void;
   /** Navigate to album (carousel) */
   onOpenAlbum?: (albumId: string) => void;
   /** Flip card (carousel only) */
@@ -89,6 +95,8 @@ export function PostcardChin({
   albumStops,
   totalStops,
   onPlay,
+  onClaim,
+  onTrade,
   onOpenAlbum,
   onFlipCard,
   onClick,
@@ -110,8 +118,10 @@ export function PostcardChin({
 
   const showStorytelling = !!storytelling && !isTriviaLocked;
 
-  // Unified "win" action: prefer explicit onPlay (carousel), fall back to onClick (grid)
-  const handleWinClick = onPlay ?? onClick;
+  // Unified click handlers: prefer explicit callback (carousel), fall back to onClick (grid)
+  const handlePlayClick = onPlay ?? onClick;
+  const handleClaimClick = onClaim ?? onClick;
+  const handleTradeClick = onTrade ?? onClick;
 
   return (
     <div
@@ -226,23 +236,51 @@ export function PostcardChin({
             </button>
           )}
 
-          {/* ✨ Certificar Propiedad — unclaimed cards only */}
-          {!hasOwner && handleWinClick && (
+          {/* 🔄 Intercambiar — claimed by someone else */}
+          {hasOwner && !isClaimedByMe && handleTradeClick && (
+            <button
+              className='flex items-center gap-1 px-3 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold shadow-sm transition-all border border-stone-300'
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTradeClick();
+              }}
+              title={t({ es: 'Proponer Intercambio', en: 'Propose Trade' }, lang)}
+            >
+              <ArrowRightLeft className='w-3.5 h-3.5' />
+              <span className="text-[10px] hidden sm:inline">{t({ es: 'Intercambiar', en: 'Trade' }, lang)}</span>
+            </button>
+          )}
+
+          {/* 🎲 Jugar — claimed cards (by anyone) */}
+          {hasOwner && handlePlayClick && (
+            <button
+              className='flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-800 hover:bg-black text-white font-bold shadow-md transition-all text-xs border border-stone-600'
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePlayClick();
+              }}
+              title={t({ es: 'Jugar y ganar sellos', en: 'Play for stamps' }, lang)}
+            >
+              <Dice5 className='w-3.5 h-3.5 md:w-4 md:h-4' />
+              {t({ es: 'Jugar', en: 'Play' }, lang)}
+            </button>
+          )}
+
+          {/* ✨ Sellar — unclaimed cards only */}
+          {!hasOwner && handleClaimClick && (
             <button
               className='flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
               onClick={(e) => {
                 e.stopPropagation();
-                handleWinClick();
-                analytics.track('challenge_started', {
-                  postcard_id: item.id,
-                  country: item.country,
-                  source: onPlay ? 'carousel' : 'grid',
-                });
+                handleClaimClick();
+                if (onClaim) {
+                  analytics.track('buy_intention', { postcard_id: item.id });
+                }
               }}
-              title={t({ es: '¡Sello!', en: 'Stamp!' }, lang)}
+              title={t({ es: 'Sellar (⭐ 2)', en: 'Buy (⭐ 2)' }, lang)}
             >
               <Sparkles className='w-4 h-4 md:w-5 md:h-5' />
-              {t({ es: '¡Sello!', en: 'Stamp!' }, lang)}
+              {t({ es: 'Sellar (⭐ 2)', en: 'Buy (⭐ 2)' }, lang)}
             </button>
           )}
 

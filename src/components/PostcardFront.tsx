@@ -576,8 +576,11 @@ export function PostcardFront({
               isTriviaLocked={isTriviaLocked}
               albumStops={albumStops}
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
-              onPlay={allowPlay && !isTriviaLocked && !isClaimedByMe ? () => setShowSelector(true) : undefined}
+              onPlay={allowPlay && !isTriviaLocked && hasOwner ? () => setShowSelector(true) : undefined}
+              onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? () => onClaimPostcard(item.id) : undefined}
+              onTrade={hasOwner && !isClaimedByMe ? () => console.warn('Trade not implemented yet') : undefined}
               isOwned={isClaimedByMe}
+              hasOwner={hasOwner}
               onOpenAlbum={onOpenAlbum}
             />
           </>

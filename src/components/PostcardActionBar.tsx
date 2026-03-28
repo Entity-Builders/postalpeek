@@ -22,7 +22,10 @@ interface PostcardActionBarProps {
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
   onPlay?: () => void;
+  onClaim?: () => void;
+  onTrade?: () => void;
   isOwned?: boolean;
+  hasOwner?: boolean;
   onOpenAlbum?: (albumId: string) => void;
 }
 
@@ -37,20 +40,26 @@ export function PostcardActionBar({
   albumStops,
   totalStops,
   onPlay,
+  onClaim,
+  onTrade,
   isOwned = false,
+  hasOwner = false,
   onOpenAlbum,
 }: PostcardActionBarProps) {
   return (
     <PostcardChin
       item={item}
       activeItem={activeSlideItem}
-      isClaimed={isOwned}
+      isClaimedByMe={isOwned}
+      hasOwner={hasOwner}
       isTriviaLocked={isTriviaLocked}
       isClean={isClean}
       hideActions={hideActions}
       albumStops={albumStops}
       totalStops={totalStops}
       onPlay={onPlay}
+      onClaim={onClaim}
+      onTrade={onTrade}
       onOpenAlbum={onOpenAlbum}
       onFlipCard={onFlipCard}
       isBusiness={isBusiness}
