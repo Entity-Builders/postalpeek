@@ -2,7 +2,6 @@ import type { FeedItem } from '../Postcard';
 
 export interface CardLayout {
   aspectRatio: string;
-  showCaption: boolean;
   monumental?: boolean;
 }
 
@@ -71,12 +70,10 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
   const h = hashToFloat(id);
   
   let aspectRatio: string = ASPECT_RATIOS[Math.floor(h * ASPECT_RATIOS.length)];
-  let showCaption = h > 0.45;
 
   if (isItem) {
     const categoryNorm = normCategory(itemOrId.category);
     
-    // Important = square card, always show caption
     const isImportant = isMonumentalCard(itemOrId);
 
     const isBasic = 
@@ -90,16 +87,14 @@ export function computeCardLayout(itemOrId: FeedItem | string): CardLayout {
       categoryNorm.includes('vida');
 
     if (isImportant) {
-      // Monumental → tallest card, always show caption
+      // Monumental → tallest card
       const tallRatios = ['9/16', '2/3', '9/14'];
       aspectRatio = tallRatios[Math.floor(h * tallRatios.length)];
-      showCaption = true;
     } else if (isBasic) {
       const shortRatios = ['1/1', '5/4', '4/5'] as const;
       aspectRatio = shortRatios[Math.floor(h * shortRatios.length)];
-      showCaption = h > 0.7;
     }
   }
 
-  return { aspectRatio, showCaption, monumental: isItem ? isMonumentalCard(itemOrId as FeedItem) : false };
+  return { aspectRatio, monumental: isItem ? isMonumentalCard(itemOrId as FeedItem) : false };
 }

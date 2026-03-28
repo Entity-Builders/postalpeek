@@ -5,7 +5,6 @@ import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
-import { CityLabel } from './CityLabel';
 
 /* ──────────────────────────────────────────────────────────────────
    Feature Card — full-width panoramic card for monumental postcards
@@ -119,15 +118,7 @@ export const FeatureCard = React.memo(function FeatureCard({ item, index, onClic
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-transparent" />
 
-          {/* City + Category label */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 md:px-6 md:pb-4 flex items-end justify-between">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-white/80 text-[10px] md:text-xs font-semibold uppercase tracking-wider">
-                {categoryLabel}
-              </p>
-              <CityLabel city={item.city} variant='scrim' />
-            </div>
-          </div>
+          {/* Subtle gradient — no text, maximum mystery */}
 
           {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>

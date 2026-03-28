@@ -80,10 +80,9 @@ export function PostcardGameSelector({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
         >
-          {/* Frosted background */}
+          {/* Frosted background — no dismiss on tap, only the X button closes */}
           <div
             className="absolute inset-0 bg-white/90 backdrop-blur-md"
-            onClick={onClose}
           />
 
           {/* Content */}

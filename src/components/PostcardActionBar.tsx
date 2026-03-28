@@ -1,10 +1,9 @@
 import React from 'react';
-import { Ticket, Trophy } from 'lucide-react';
+import { Ticket, Trophy, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { analytics } from '../lib/analytics';
 import type { FeedItem } from './Postcard';
 import { ShareButton } from './ui/ShareButton';
-import { CityLabel } from './ui/CityLabel';
 import { AlbumStopIndicator } from './ui/AlbumStopIndicator';
 import { t } from '../utils/i18n';
 
@@ -33,7 +32,6 @@ export function PostcardActionBar({
   hideActions,
   isClean,
   isBusiness,
-  storytellingTitle,
   albumStops,
   totalStops,
   onPlay,
@@ -59,22 +57,6 @@ export function PostcardActionBar({
             stopDescription={stopMeta?.stop_description}
           />
         )}
-        <h3
-          className={cn(
-            'font-serif font-semibold tracking-tight leading-none mb-1 truncate',
-            storytellingTitle ? 'text-base md:text-lg' : 'text-lg md:text-xl',
-          )}
-          style={{ color: '#1a1a1a' }}
-        >
-          {t(activeSlideItem.category)
-            .replace(/[\u{1F300}-\u{1F9FF}]/u, '')
-            .trim()}
-        </h3>
-        <CityLabel
-          city={activeSlideItem.city}
-          country={activeSlideItem.country}
-          variant='inline'
-        />
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
@@ -94,16 +76,16 @@ export function PostcardActionBar({
         {/* Challenge CTA */}
         {onPlay && (
           <button
-            className='flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-950 font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-amber-500/30'
+            className='flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2.5 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
               analytics.track('challenge_started', { postcard_id: item.id, country: item.country });
             }}
-            title={t({ es: 'Ganarla', en: 'Win it' })}
+            title={t({ es: 'Descubrirla', en: 'Discover it' })}
           >
-            <Trophy className='w-4 h-4 md:w-5 md:h-5' />
-            {t({ es: 'Ganarla', en: 'Win it' })}
+            <Sparkles className='w-4 h-4 md:w-5 md:h-5' />
+            {t({ es: 'Descubrirla', en: 'Discover it' })}
           </button>
         )}
 

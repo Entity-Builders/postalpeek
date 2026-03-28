@@ -35,19 +35,22 @@ interface StorytellingPreviewProps {
   };
   onFlipCard: () => void;
   isClean?: boolean;
+  /** When true, the excerpt is hidden (zero height). Used for first-tap reveal. */
+  collapsed?: boolean;
 }
 
-export function StorytellingPreview({ storytelling, onFlipCard, isClean = false }: StorytellingPreviewProps) {
+export function StorytellingPreview({ storytelling, onFlipCard, isClean = false, collapsed = false }: StorytellingPreviewProps) {
+  const isHidden = isClean || collapsed;
   return (
     <motion.button
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.15 }}
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+      animate={{ opacity: isHidden ? 0 : 1, y: isHidden ? 10 : 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      whileHover={isHidden ? undefined : { scale: 1.01 }}
+      whileTap={isHidden ? undefined : { scale: 0.99 }}
       className={cn(
-        'group mx-2 mt-3 p-3 rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50 to-orange-50/80 shadow-[0_2px_10px_rgba(251,191,36,0.15)] flex items-center justify-between gap-3 text-left transition-all',
-        isClean ? 'max-h-0 opacity-0 overflow-hidden mt-0 py-0 px-0 border-none' : 'max-h-28 opacity-100',
+        'group mx-2 mt-3 p-3 rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50 to-orange-50/80 shadow-[0_2px_10px_rgba(251,191,36,0.15)] flex items-center justify-between gap-3 text-left transition-all duration-300',
+        isHidden ? 'max-h-0 opacity-0 overflow-hidden mt-0 py-0 px-0 border-none pointer-events-none' : 'max-h-28 opacity-100',
       )}
       onClick={(e) => {
         e.stopPropagation();

@@ -74,6 +74,10 @@ interface PostcardFrontProps {
   userId?: string;
   /** Callback when postcard is earned through game completion */
   onPostcardEarned?: (postcardId: string) => void;
+  /** Notify parent when game mode is active (to block zoom) */
+  onGameActiveChange?: (active: boolean) => void;
+  /** Called when the card body is tapped (not a button). Parent delegates here. */
+  onCardTap?: () => void;
 }
 
 export function PostcardFront({
@@ -91,7 +95,6 @@ export function PostcardFront({
   fallbackEnabled,
   onHeroLoad,
   hideActions = false,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isActive = true,
   isClean = false,
   onToggleClean,
@@ -102,6 +105,8 @@ export function PostcardFront({
   onClaimPostcard,
   userId,
   onPostcardEarned,
+  onGameActiveChange,
+  onCardTap,
 }: PostcardFrontProps) {
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
@@ -111,6 +116,19 @@ export function PostcardFront({
   const puzzle = usePostcardPuzzle(item);
   const stampHunt = useStampHunt(item);
   const isPlaying = playingMode !== null;
+
+  // ── Two-tap interaction: first tap shows excerpt, second tap flips ──
+  const [showExcerpt, setShowExcerpt] = useState(false);
+
+  // Notify parent when game mode or selector changes (so it can block zoom)
+  useEffect(() => {
+    onGameActiveChange?.(isPlaying || showSelector);
+  }, [isPlaying, showSelector, onGameActiveChange]);
+
+  // Reset excerpt when card goes out of view
+  useEffect(() => {
+    if (!isActive && showExcerpt) setShowExcerpt(false);
+  }, [isActive, showExcerpt]);
 
   // ── Game progress tracking (play-to-earn) ──
   const hasHuntMode_ = useMemo(() => {
@@ -383,6 +401,28 @@ export function PostcardFront({
                   WebkitBackfaceVisibility: 'hidden',
                 }}
                 onContextMenu={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  // Don't interfere with buttons, links, or game interactions
+                  if ((e.target as HTMLElement).closest('button, a')) return;
+                  if (isPlaying) return;
+
+                  e.stopPropagation(); // prevent parent Postcard handleClick
+
+                  // Two-tap state machine
+                  if (storytelling && !isTriviaLocked) {
+                    if (!showExcerpt) {
+                      // First tap → reveal the excerpt
+                      setShowExcerpt(true);
+                    } else {
+                      // Second tap → flip the card
+                      setShowExcerpt(false);
+                      onFlipCard('info');
+                    }
+                  } else {
+                    // No storytelling data → delegate to parent (toggle clean mode)
+                    onCardTap?.();
+                  }
+                }}
               >
 
                 {isAlbumGroup ? (
@@ -498,6 +538,9 @@ export function PostcardFront({
                   gameType="hunt"
                   totalObjects={game.totalObjects}
                   hintsUsed={game.hintsUsed}
+                  albumTitle={item.generation_metadata?.tripContext?.title}
+                  albumSequence={item.album_sequence}
+                  albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
                 />
               )}
               {playingMode === 'puzzle' && (
@@ -507,6 +550,9 @@ export function PostcardFront({
                   totalObjects={puzzle.total}
                   hintsUsed={puzzle.peeksUsed}
                   moves={puzzle.moves}
+                  albumTitle={item.generation_metadata?.tripContext?.title}
+                  albumSequence={item.album_sequence}
+                  albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
                 />
               )}
               {playingMode === 'stamp' && (
@@ -516,6 +562,9 @@ export function PostcardFront({
                   totalObjects={1}
                   hintsUsed={stampHunt.hintsUsed}
                   taps={stampHunt.tapsCount}
+                  albumTitle={item.generation_metadata?.tripContext?.title}
+                  albumSequence={item.album_sequence}
+                  albumTotal={item.generation_metadata?.tripContext?.totalStops || albumItems.length}
                 />
               )}
             </div>
@@ -525,7 +574,7 @@ export function PostcardFront({
         {/* Title + Buttons row — hidden in clean mode and game mode */}
         {!isPlaying ? (
           <>
-            {/* Storytelling preview — moved above ActionBar for more prominence */}
+            {/* Storytelling preview — appears on first tap, tapping it flips the card */}
             {storytelling && !isTriviaLocked && (
               <StorytellingPreview
                 storytelling={storytelling}
@@ -533,6 +582,7 @@ export function PostcardFront({
                   onFlipCard('info');
                 }}
                 isClean={isClean}
+                collapsed={!showExcerpt}
               />
             )}
 

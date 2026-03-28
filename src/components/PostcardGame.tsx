@@ -31,7 +31,7 @@ const NON_PLAYABLE = new Set([
 ]);
 
 const NON_PLAYABLE_TYPES = new Set(['style', 'scene_details', 'nature']);
-const MAX_GAME_OBJECTS = 6;
+const MAX_GAME_OBJECTS = 1;
 
 function isPlayableTag(tag: TagWithBox): boolean {
   if (tag.type && NON_PLAYABLE_TYPES.has(tag.type)) return false;
@@ -102,7 +102,7 @@ export function usePostcardGame(item: FeedItem) {
       if (!coords || !Array.isArray(coords) || coords.length !== 4) return false;
       return isPlayableTag(t);
     });
-    // Shuffle for variety, then cap at MAX_GAME_OBJECTS
+    // Shuffle for variety, then pick just 1 object for fast gameplay
     const shuffled = [...playable].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, MAX_GAME_OBJECTS);
   }, [item.illustration_tags]);
@@ -312,7 +312,7 @@ export function GameImageOverlay({ game }: GameImageOverlayProps) {
               <>
                 <span className="text-lg">🎉</span>
                 <span className="text-white font-bold text-sm tracking-tight">
-                  {t({ es: '¡Completado!', en: 'All Found!' })}
+                  {t({ es: '¡Encontrado!', en: 'Found it!' })}
                 </span>
               </>
             ) : (
@@ -415,7 +415,7 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
         >
           <div className="flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-stone-700 text-xs font-bold tabular-nums">{totalObjects}/{totalObjects}</span>
+            <span className="text-stone-700 text-xs font-bold">✓</span>
           </div>
           <div className="w-px h-3 bg-stone-200" />
           <div className="flex items-center gap-0.5">
@@ -493,13 +493,8 @@ export function GameBottomPanel({ item, game, onClose }: GameBottomPanelProps) {
             </motion.div>
           ) : null}
 
-          {/* Score + Exit */}
+          {/* Exit */}
           <div className="flex items-center gap-2 shrink-0">
-            {totalObjects > 0 && !isScanning && (
-              <span className="text-xs font-bold text-stone-500 tabular-nums">
-                {discoveredIndices.size}/{totalObjects}
-              </span>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

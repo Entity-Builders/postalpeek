@@ -96,7 +96,7 @@ export function TriviaBottomPanel({
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0 shadow-sm border border-amber-200/50">
-            <span className="text-2xl">🗺️</span>
+            <span className="text-2xl">✨</span>
           </div>
         </div>
 

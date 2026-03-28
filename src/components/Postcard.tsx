@@ -129,6 +129,8 @@ export function Postcard({
   const [heroReady, setHeroReady] = useState(false);
   /** Clean/expand mode — hides chrome, enables fullscreen overlay */
   const [isClean, setIsClean] = useState(false);
+  /** Track whether a game is active inside PostcardFront (ref to avoid re-renders) */
+  const isGameActiveRef = useRef(false);
   const isLiked = favoriteIds?.has(item.id) ?? false;
 
   // ── Animation primitives ──
@@ -179,6 +181,8 @@ export function Postcard({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if ((e.target as HTMLElement).closest('button, a')) return;
+      // Don't toggle zoom when a game is active
+      if (isGameActiveRef.current) return;
       if (onTap) {
         onTap();
       } else {
@@ -357,6 +361,20 @@ export function Postcard({
             allowPlay={Array.isArray(item.illustration_tags) && item.illustration_tags.length > 0}
             userId={userId}
             onPostcardEarned={onPostcardEarned}
+            onGameActiveChange={(active: boolean) => { isGameActiveRef.current = active; }}
+            onCardTap={() => {
+              // Two-tap logic is managed inside PostcardFront via showExcerpt state.
+              // This callback is a fallback for cards without storytelling.
+              setIsClean((prev) => {
+                const next = !prev;
+                localStorage.setItem('pp_clean_mode', String(next));
+                analytics.track(
+                  next ? 'postcard_clean_mode_on' : 'postcard_clean_mode_off',
+                  { postcard_id: item.id, country: item.country },
+                );
+                return next;
+              });
+            }}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

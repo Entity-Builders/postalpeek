@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 import type { FeedItem } from '../Postcard';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
-import { CityLabel } from './CityLabel';
 
 /* ── Storytelling fact helpers (shared with StorytellingPreview) ── */
 const FACT_EMOJI: Record<string, string> = {
@@ -16,7 +16,7 @@ const FACT_EMOJI: Record<string, string> = {
 import type { CardLayout } from './cardLayout';
 
 /* ──────────────────────────────────────────────────────────────────
-   Grid Card — memoized, with precalculated layout
+   Grid Card — postcard-style with white frame & chin
    ────────────────────────────────────────────────────────────────── */
 
 interface GridCardProps {
@@ -43,7 +43,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const trivia = item.generation_metadata?.trivia;
   const isTriviaLocked = !!trivia && !isClaimed;
 
-  const { aspectRatio, showCaption, monumental } = layout;
+  const { aspectRatio, monumental } = layout;
 
   /* Masonry breakpoints → column widths (approx):
      5 cols @ ≥1536 ≈ 20vw,  4 cols @ ≥1280 ≈ 25vw,
@@ -51,12 +51,9 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
   const sizes = '(min-width:1024px) 33vw, 50vw';
 
   // ── Scroll-vs-tap detection ───────────────────────────────────────
-  // Distance threshold: if the finger moves more than this many px, it's a drag.
   const DRAG_THRESHOLD = 8;
   const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const wasDragRef = React.useRef(false);
-  // Timestamp until which click events should be suppressed (covers edge cases
-  // where the browser fires a synthetic click AFTER touchend).
   const preventClickUntilRef = React.useRef(0);
 
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
@@ -77,15 +74,12 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
 
   const handleTouchEnd = React.useCallback(() => {
     if (wasDragRef.current) {
-      // Block any synthetic click the browser might fire for the next 400ms
       preventClickUntilRef.current = Date.now() + 400;
     }
   }, []);
 
   const handleClick = React.useCallback(() => {
-    // Block if this click comes from a touch-drag sequence
     if (wasDragRef.current) return;
-    // Block stray synthetic clicks after a detected drag
     if (Date.now() < preventClickUntilRef.current) return;
     onClick();
   }, [onClick]);
@@ -109,16 +103,21 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
       onTouchEnd={handleTouchEnd}
       {...animProps}
     >
+      {/* ── Postcard frame ── */}
       <div
-        className={`relative overflow-hidden rounded-xl bg-stone-200
-          transition-shadow duration-200 group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.22)]
+        className={`relative overflow-hidden rounded-lg bg-white
+          transition-shadow duration-200 group-hover:shadow-[0_6px_24px_rgba(0,0,0,0.18)]
           ${monumental
             ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
-            : 'shadow-[0_1px_8px_rgba(0,0,0,0.10)]'
+            : 'shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
           }`}
+        style={{
+          padding: '5px 5px 0 5px',
+        }}
       >
+        {/* ── Image area ── */}
         <div
-          className="relative w-full overflow-hidden"
+          className="relative w-full overflow-hidden rounded-sm bg-stone-200"
           style={{ aspectRatio }}
         >
           {placeholderUrl && !loaded && (
@@ -144,7 +143,7 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
               {isTriviaLocked && loaded && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/10">
                   <div className="bg-stone-900/60 backdrop-blur-md rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-2xl">
-                    <span className="text-xl" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>🗺️</span>
+                    <span className="text-xl" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>✨</span>
                   </div>
                 </div>
               )}
@@ -187,21 +186,27 @@ export const GridCard = React.memo(function GridCard({ item, index, layout, onCl
           )}
 
           <div className="absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
-            bg-gradient-to-t from-black/55 via-black/20 to-transparent">
-            <CityLabel city={item.city} variant='scrim' />
-          </div>
+            bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none" />
 
           {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>
 
-        {showCaption && (
-          <div className="px-2.5 py-2">
-            <p className="text-stone-600 text-[10px] font-semibold leading-tight truncate">
-              {categoryLabel}
+        {/* ── Postcard chin — city name + CTA ── */}
+        <div className="flex items-center justify-between px-1.5 py-2 min-h-[28px]">
+          {isTriviaLocked ? (
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-600">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              {t({ es: 'Descubrirla', en: 'Discover it' })}
+            </span>
+          ) : (
+            <p className="text-stone-500 text-[10px] font-medium leading-tight truncate">
+              {item.city}
             </p>
-            <CityLabel city={item.city} country={item.country} variant='caption' />
-          </div>
-        )}
+          )}
+          {!isTriviaLocked && !isClaimed && (
+            <Sparkles className="w-3 h-3 text-violet-400 opacity-60 animate-pulse flex-shrink-0" />
+          )}
+        </div>
       </div>
     </Wrapper>
   );
