@@ -25,6 +25,7 @@ import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 import { TriviaBottomPanel } from './TriviaRevealGame';
 import { GameProgressBar } from './GameProgressBar';
 import { useGameMode } from '../contexts/GameModeContext';
+import { useStampContext } from '../contexts/StampContext';
 
 // Map DB game types to UI game modes (module-level for stable reference)
 const DB_TO_MODE: Record<DbGameType, GameMode> = {
@@ -109,6 +110,7 @@ export function PostcardFront({
   onOpenCollection,
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
+  const { addLocalStamps } = useStampContext();
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
   const [showSelector, setShowSelector] = useState(false);
@@ -178,6 +180,7 @@ export function PostcardFront({
     const { allComplete: isLastGame, rewardedStamps } = await gameProgress.saveGameCompletion(dbType, 0);
 
     if (rewardedStamps > 0) {
+      addLocalStamps(rewardedStamps);
       setEarnedStampsStr(rewardedStamps);
       setTimeout(() => setEarnedStampsStr(null), 3500);
     }
@@ -194,7 +197,7 @@ export function PostcardFront({
       const nextGame = getNextGame(newCompletedGames);
       setPlayingMode(nextGame);
     }
-  }, [userId, gameProgress, item.id, onPostcardEarned, getNextGame]);
+  }, [userId, gameProgress, item.id, onPostcardEarned, getNextGame, addLocalStamps]);
 
   // Victory celebration state
   const [showVictory, setShowVictory] = useState(false);

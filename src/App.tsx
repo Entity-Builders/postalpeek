@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { initAnalytics, analytics } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
 import { GameModeProvider } from './contexts/GameModeContext';
+import { StampProvider } from './contexts/StampContext';
 
 import { FeedLayout } from './pages/feed/FeedLayout';
 import { FeedGridPage } from './pages/feed/FeedGridPage';
@@ -146,40 +147,42 @@ function App() {
   return (
     <ErrorBoundary>
       <GameModeProvider>
-        <Routes>
-          {/* SEO-friendly feed route */}
-          <Route path='/feed' element={feedElement}>
-            <Route index element={<FeedGridPage />} />
-            <Route path='country/:country' element={<FeedGridPage />} />
-            <Route path='carousel' element={<FeedCarouselPage />} />
-            <Route path='collection' element={<CollectionPage />} />
-            <Route path='album/:albumId' element={<AlbumPage />} />
-          </Route>
+        <StampProvider userId={user?.id}>
+          <Routes>
+            {/* SEO-friendly feed route */}
+            <Route path='/feed' element={feedElement}>
+              <Route index element={<FeedGridPage />} />
+              <Route path='country/:country' element={<FeedGridPage />} />
+              <Route path='carousel' element={<FeedCarouselPage />} />
+              <Route path='collection' element={<CollectionPage />} />
+              <Route path='album/:albumId' element={<AlbumPage />} />
+            </Route>
 
-          {/* Root redirects to /feed */}
-          <Route path='/' element={<Navigate to='/feed' replace />} />
+            {/* Root redirects to /feed */}
+            <Route path='/' element={<Navigate to='/feed' replace />} />
 
-          {/* Full-page admin (protected) */}
-          <Route
-            path='/admin'
-            element={
-              isAdmin ? (
-                <AdminPage user={user} onPostcardGenerated={() => {}} />
-              ) : (
-                <Navigate to='/feed' replace />
-              )
-            }
-          />
+            {/* Full-page admin (protected) */}
+            <Route
+              path='/admin'
+              element={
+                isAdmin ? (
+                  <AdminPage user={user} onPostcardGenerated={() => {}} />
+                ) : (
+                  <Navigate to='/feed' replace />
+                )
+              }
+            />
 
-          {/* Postcard admin detail — /p/:id only */}
-          <Route path='/p/:id' element={<PostcardDetailPage />} />
-          
-          {/* Public Postcard View — /postcard/:id */}
-          <Route path='/postcard/:id' element={<FeedCarouselPage />} />
+            {/* Postcard admin detail — /p/:id only */}
+            <Route path='/p/:id' element={<PostcardDetailPage />} />
+            
+            {/* Public Postcard View — /postcard/:id */}
+            <Route path='/postcard/:id' element={<FeedCarouselPage />} />
 
-          {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-          <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
-        </Routes>
+            {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
+            <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
+          </Routes>
+        </StampProvider>
       </GameModeProvider>
     </ErrorBoundary>
   );

@@ -23,6 +23,8 @@ interface DailyClaimResult {
   awarded?: number;
 }
 
+export type UseStampsReturn = ReturnType<typeof useStamps>;
+
 export function useStamps(userId: string | null | undefined) {
   const [balance, setBalance] = useState<StampBalance>({
     balance: 0,
@@ -47,6 +49,22 @@ export function useStamps(userId: string | null | undefined) {
         }
       });
   }, [userId]);
+
+  const refreshStamps = useCallback(async () => {
+    if (!userId) return;
+    const { data, error } = await supabase.rpc('postalpeek_get_stamp_balance');
+    if (!error && data) {
+      setBalance(data as StampBalance);
+    }
+  }, [userId]);
+
+  const addLocalStamps = useCallback((amount: number) => {
+    setBalance(prev => ({
+      ...prev,
+      balance: prev.balance + amount,
+      total_earned: prev.total_earned + amount
+    }));
+  }, []);
 
   /**
    * Award the daily login bonus (2 stamps once per calendar day).
@@ -133,5 +151,7 @@ export function useStamps(userId: string | null | undefined) {
     hasClaimedDaily,
     claimDailyStamps,
     spendStamps,
+    refreshStamps,
+    addLocalStamps,
   };
 }

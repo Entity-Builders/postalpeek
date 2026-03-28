@@ -6,8 +6,8 @@ import { useClaimPostcard } from '../../hooks/useClaimPostcard';
 import { useCollection } from '../../hooks/useCollection';
 import { useAlbums } from '../../hooks/useAlbums';
 import { useAlbumDetail } from '../../hooks/useAlbumDetail';
+import { useStampContext } from '../../contexts/StampContext';
 
-import { useStamps } from '../../hooks/useStamps';
 import type { FeedItem } from '../../components/Postcard';
 import { AlbumsModal } from '../../components/AlbumsModal';
 import { StatusBar } from '../../components/StatusBar';
@@ -226,8 +226,8 @@ export function FeedLayout({
     return set;
   }, [albums]);
 
-  const { stampBalance, claimDailyStamps } = useStamps(user?.id);
-  useEffect(() => { if (user?.id) claimDailyStamps(); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { stampBalance, claimDailyStamps } = useStampContext();
+  useEffect(() => { if (user?.id) claimDailyStamps(); }, [user?.id, claimDailyStamps]);
 
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
   
