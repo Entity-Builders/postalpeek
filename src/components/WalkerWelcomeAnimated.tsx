@@ -84,6 +84,7 @@ export function WalkerWelcomeAnimated({ previewCards, onStartOnboarding }: Walke
                   loop
                   autoplay
                   className='w-full h-full object-contain'
+                  renderConfig={{ devicePixelRatio: window.devicePixelRatio || 2 }}
                 />
               </div>
 

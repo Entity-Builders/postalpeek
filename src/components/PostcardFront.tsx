@@ -85,6 +85,8 @@ interface PostcardFrontProps {
   autoStartGame?: boolean;
   /** Disable blur filters during tutorial */
   isTutorial?: boolean;
+  /** Override the Play behavior */
+  onPlayGame?: () => void;
 }
 
 export function PostcardFront({
@@ -114,6 +116,7 @@ export function PostcardFront({
   onOpenCollection,
   autoStartGame = false,
   isTutorial = false,
+  onPlayGame,
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
   const { addLocalStamps } = useStampContext();
@@ -238,7 +241,7 @@ export function PostcardFront({
   const [albumStops, setAlbumStops] = useState<Record<number, { stop_name: string; stop_description?: string }>>({});
 
   React.useEffect(() => {
-    if (!item.album_id) return;
+    if (!item.album_id || isTutorial) return;
     let mounted = true;
 
     // Fetch postcards for this album
@@ -286,7 +289,7 @@ export function PostcardFront({
     return () => {
       mounted = false;
     };
-  }, [item]);
+  }, [item, isTutorial]);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false }, [
     WheelGesturesPlugin(),
@@ -316,7 +319,7 @@ export function PostcardFront({
 
   const activeSlideItem = albumItems[currentIndex] || item;
 
-  const isAlbumGroup = !!item.album_id;
+  const isAlbumGroup = !!item.album_id && !isTutorial;
   // storytelling is now derived inside PostcardChin from activeItem
   const trivia = activeSlideItem.generation_metadata?.trivia;
   const hasCompletedTrivia = gameProgress.completedGames.has('trivia');
@@ -631,9 +634,11 @@ export function PostcardFront({
               totalStops={activeSlideItem.generation_metadata?.tripContext?.totalStops || Object.keys(albumStops).length || albumItems.length}
               onPlay={
                 allowPlay && !isTriviaLocked && hasOwner
-                  ? autoStartGame
-                    ? () => setShowSelector(true) // In GamePage, just open the selector
-                    : undefined // Default CTAs to /game/:id navigation
+                  ? onPlayGame 
+                    ? onPlayGame
+                    : autoStartGame
+                      ? () => setShowSelector(true) // In GamePage, just open the selector
+                      : undefined // Default CTAs to /game/:id navigation
                   : undefined
               }
               onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? (cost) => onClaimPostcard(item.id, cost) : undefined}

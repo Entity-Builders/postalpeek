@@ -236,6 +236,23 @@ export function FeedLayout({
 
   const { claim, isClaiming, claimStatus, claimedIds } = useClaimPostcard(user?.id, addLocalStamps, setLocalStamps);
 
+  // ── Sync guest claim from tutorial ──
+  useEffect(() => {
+    if (user?.id && claim) {
+      const guestClaimedId = sessionStorage.getItem('postalpeek_guest_claim');
+      if (guestClaimedId) {
+        sessionStorage.removeItem('postalpeek_guest_claim');
+        // Assume 0 cost since it was the tutorial freebie
+        claim(guestClaimedId, 0).then((res: any) => {
+          if (res.success) {
+            refetchCollection();
+            refetchAlbums();
+          }
+        });
+      }
+    }
+  }, [user?.id, claim, refetchCollection, refetchAlbums]);
+
   const contextValue = useMemo<FeedLayoutContextType>(() => ({
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
     spotlightResults, spotlightQuery, isSpotlightSearching, handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,

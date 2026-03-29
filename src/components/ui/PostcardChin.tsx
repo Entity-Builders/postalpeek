@@ -299,13 +299,13 @@ export function PostcardChin({
             </button>
           )}
 
-          {/* ✨ Usar (Sellar) — unclaimed cards only */}
+          {/* ✨ Revelar — unclaimed cards only */}
           {!hasOwner && handleClaimClick && (
             <div className="relative isolate flex-shrink-0">
               <button
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black text-white font-bold shadow-sm transition-all text-xs border border-stone-800',
-                  showClaimGuide ? 'animate-pulse hover:bg-stone-800' : 'hover:bg-stone-800'
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 font-bold shadow-sm transition-all text-xs border border-indigo-200',
+                  showClaimGuide ? 'animate-pulse hover:bg-indigo-100' : 'hover:bg-indigo-100'
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -316,11 +316,11 @@ export function PostcardChin({
                     onClick(); // fallback
                   }
                 }}
-                title={t({ es: `Usar ${stampCost} Sellos`, en: `Use ${stampCost} Stamps` }, lang)}
+                title={t({ es: `Revelar por ${stampCost} Sellos`, en: `Reveal for ${stampCost} Stamps` }, lang)}
               >
-                <span>{t({ es: `Usar ${stampCost}`, en: `Use ${stampCost}` }, lang)}</span>
-                <div className="w-4 h-4 rounded-full border border-white/30 flex items-center justify-center bg-white/10 shrink-0 rotate-12">
-                   <span className="font-mono text-[4px] text-white uppercase tracking-tighter text-center leading-[1]">
+                <span>{t({ es: `Revelar por ${stampCost}`, en: `Reveal for ${stampCost}` }, lang)}</span>
+                <div className="w-4 h-4 rounded-full border border-indigo-300 flex items-center justify-center bg-indigo-100 shrink-0 rotate-12">
+                   <span className="font-mono text-[4px] text-indigo-700 uppercase tracking-tighter text-center leading-[1]">
                      Postal<br/>Peek
                    </span>
                 </div>
@@ -330,10 +330,10 @@ export function PostcardChin({
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ delay: 0.5, repeat: Infinity, repeatType: 'reverse', duration: 1.5 }}
-                  className="absolute bottom-full mb-3 right-0 bg-amber-400 text-amber-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_4px_20px_rgba(251,191,36,0.4)] whitespace-nowrap z-50 pointer-events-none"
+                  className="absolute bottom-full mb-3 right-0 bg-indigo-400 text-indigo-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_4px_20px_rgba(129,140,248,0.4)] whitespace-nowrap z-50 pointer-events-none"
                 >
-                  {t({ es: '✨ Sella para jugar', en: '✨ Stamp to play' }, lang)}
-                  <div className="absolute top-full right-6 -mt-px border-[6px] border-transparent border-t-amber-400" />
+                  {t({ es: '✨ Revela para jugar', en: '✨ Reveal to play' }, lang)}
+                  <div className="absolute top-full right-6 -mt-px border-[6px] border-transparent border-t-indigo-400" />
                 </motion.div>
               )}
             </div>

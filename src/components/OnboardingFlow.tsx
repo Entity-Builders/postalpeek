@@ -10,6 +10,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { AmbientBackground } from './ui/AmbientBackground';
 import confetti from 'canvas-confetti';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 const TUTORIAL_CARDS: FeedItem[] = [
   {
@@ -26,6 +27,7 @@ const TUTORIAL_CARDS: FeedItem[] = [
     illustration_url: 'https://img.postalpeek.app/illustrations/23f50142-e07f-4446-a13b-752d2cc31759.webp',
     description: 'Reflejos urbanos danzan en la fachada de cristal de un establecimiento vibrante.',
     stamp_cost: 100,
+    album_id: '63ce811c-2b7f-4cce-99e4-84713e75a950',
   },
   {
     id: '970a174f-91a6-4d5e-af4f-55e9b7896f60',
@@ -41,6 +43,7 @@ const TUTORIAL_CARDS: FeedItem[] = [
     illustration_url: 'https://img.postalpeek.app/illustrations/a33886c8-53c4-49ab-9c98-89c0609575bc.webp',
     description: 'La robusta piedra antigua custodia el ascenso de las modernas moles, un diálogo silencioso en el corazón de la urbe.',
     stamp_cost: 100,
+    album_id: '63ce811c-2b7f-4cce-99e4-84713e75a950',
   },
   {
     id: 'f0b9e45a-7f6c-4be6-ad1f-13a5e5518f4c',
@@ -56,6 +59,7 @@ const TUTORIAL_CARDS: FeedItem[] = [
     illustration_url: 'https://img.postalpeek.app/illustrations/0fdd983b-5385-49fc-9c7c-6af9a4b7d3ed.webp',
     description: 'Bajo un sol resplandeciente, la promesa de nuevas estructuras se entrelaza con la efímera belleza de las flores rosadas en la bulliciosa calle.',
     stamp_cost: 100,
+    album_id: '63ce811c-2b7f-4cce-99e4-84713e75a950',
   }
 ];
 
@@ -119,13 +123,31 @@ export function OnboardingFlow() {
           setTimeout(() => setTutorialStep('game'), 1500); // Transition to game after stamp animation
         }}
         showGame={tutorialStep === 'game'}
-        onGameComplete={() => {
+        onGameComplete={async () => {
           setTutorialStamps(prev => prev + 50);
-          setTimeout(() => {
-            navigate('/feed/collection');
-            completeOnboarding();
-          }, 2000);
+          completeOnboarding();
+          
+          if (claimedId) {
+            sessionStorage.setItem('postalpeek_guest_claim', claimedId);
+          }
+
+          // Look up the album this postcard belongs to (dynamic, works in all envs)
+          try {
+            const { supabase } = await import('@eb-packages/logic/src/supabase');
+            const { data } = await supabase
+              .from('postalpeek_album_slots')
+              .select('album_id')
+              .eq('postcard_id', claimedId)
+              .limit(1)
+              .single();
+            if (data?.album_id) {
+              navigate('/feed/album/' + data.album_id);
+              return;
+            }
+          } catch { /* fallback below */ }
+          navigate('/feed');
         }}
+        onPlayGame={() => setTutorialStep('game')}
       />
     </div>
   );
@@ -137,13 +159,15 @@ function TutorialCarousel({
   claimedId,
   onClaim,
   showGame,
-  onGameComplete
+  onGameComplete,
+  onPlayGame
 }: { 
   cards: FeedItem[], 
   claimedId: string | null,
   onClaim: (id: string) => void,
   showGame: boolean,
-  onGameComplete: () => void
+  onGameComplete: () => void,
+  onPlayGame: () => void
 }) {
   const { setGameActive } = useGameMode();
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y' });
@@ -191,20 +215,23 @@ function TutorialCarousel({
                 userId="tutorial-user"
                 showClaimGuide={index === currentIndex && !claimedId}
                 isTutorial={true}
+                onPlayGame={onPlayGame}
               />
-              
-              {showGame && index === currentIndex && (
-                <TutorialGameWrapper 
-                  key={`game-${retryKey}`} 
-                  item={item} 
-                  onComplete={onGameComplete} 
-                  onRetry={() => setRetryKey(k => k + 1)} 
-                />
-              )}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Portal the game overlay to document.body so Embla transforms don't break position:fixed */}
+      {showGame && claimedId && createPortal(
+        <TutorialGameWrapper 
+          key={`game-${retryKey}`} 
+          item={cards.find(c => c.id === claimedId)!} 
+          onComplete={onGameComplete} 
+          onRetry={() => setRetryKey(k => k + 1)} 
+        />,
+        document.body
+      )}
     </div>
   );
 }

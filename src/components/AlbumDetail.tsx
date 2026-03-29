@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Trophy, HelpCircle, Eye, Search, MapPin, Tag } from 'lucide-react';
+import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { AlbumSlot, AlbumDetailData, MatchRules } from '../hooks/useAlbumDetail';
@@ -92,8 +93,10 @@ function SlotCard({
   slot: AlbumSlot;
   index: number;
 }) {
+  // Load image for owned, claimed (by others), and hint slots
+  const hasImage = slot.is_owned || slot.is_claimed || slot.is_hint;
   const imgUrl = useSignedImage(
-    (slot.is_owned || slot.is_hint) ? slot.illustration_url : null,
+    hasImage ? slot.illustration_url : null,
     { width: WIDTHS.mobile },
   );
 
@@ -111,13 +114,35 @@ function SlotCard({
       >
         <div className='aspect-[3/4] overflow-hidden rounded-[2px] bg-stone-100 relative flex items-center justify-center'>
           {slot.is_owned && imgUrl ? (
-            <img
-              src={imgUrl}
-              alt={slot.slot_label}
-              loading='lazy'
-              decoding='async'
-              className='w-full h-full object-cover'
-            />
+            <div className='w-full h-full relative'>
+              <img
+                src={imgUrl}
+                alt={slot.slot_label}
+                loading='lazy'
+                decoding='async'
+                className='w-full h-full object-cover'
+              />
+              {/* PostalPeek seal */}
+              <div className='absolute bottom-1 right-1 w-7 h-7 text-red-800/50 rotate-[-12deg] pointer-events-none'>
+                <PostalPeekStampSVG className='w-full h-full' />
+              </div>
+            </div>
+          ) : slot.is_claimed && imgUrl ? (
+            /* Someone else has it — show the image with a subtle overlay */
+            <div className='w-full h-full relative'>
+              <img
+                src={imgUrl}
+                alt={slot.slot_label}
+                loading='lazy'
+                decoding='async'
+                className='w-full h-full object-cover saturate-50 brightness-90'
+              />
+              <div className='absolute inset-0 bg-stone-900/20 flex flex-col items-center justify-center gap-1'>
+                <span className='bg-black/40 backdrop-blur-sm text-white/90 text-[8px] font-semibold px-2 py-0.5 rounded-full'>
+                  Adquirida
+                </span>
+              </div>
+            </div>
           ) : slot.is_hint && imgUrl ? (
             /* Hint slot — greyed-out example postcard */
             <div className='w-full h-full relative'>
@@ -133,14 +158,8 @@ function SlotCard({
                 <span className='text-[8px] text-stone-500/80 font-semibold'>Pista</span>
               </div>
             </div>
-          ) : slot.is_claimed ? (
-            /* Someone else has it — show dimmed silhouette */
-            <div className='w-full h-full bg-gradient-to-br from-stone-200 to-stone-300 flex flex-col items-center justify-center gap-1'>
-              <HelpCircle className='w-6 h-6 text-stone-400' />
-              <span className='text-[8px] text-stone-400'>Adquirida</span>
-            </div>
           ) : (
-            /* Nobody has it yet */
+            /* Nobody has it yet — mystery blur */
             <div className='w-full h-full bg-gradient-to-br from-amber-50 to-stone-100 flex flex-col items-center justify-center gap-1'>
               <HelpCircle className='w-6 h-6 text-amber-400/60' />
               <span className='text-[8px] text-amber-500/60'>???</span>
@@ -164,10 +183,23 @@ function SlotCard({
 
 export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
   const { album, slots, completed_at } = detail;
-  const ownedCount = slots.filter((s) => s.is_owned).length;
-  const totalSlots = slots.length;
+
+  let optimisticSlots = slots;
+  try {
+    const guestClaimedId = sessionStorage.getItem('postalpeek_guest_claim');
+    if (guestClaimedId) {
+      optimisticSlots = slots.map(s => 
+        s.postcard_id === guestClaimedId ? { ...s, is_owned: true } : s
+      );
+    }
+  } catch {
+    // Ignore session storage errors
+  }
+
+  const ownedCount = optimisticSlots.filter((s) => s.is_owned).length;
+  const totalSlots = optimisticSlots.length;
   const progress = totalSlots > 0 ? Math.round((ownedCount / totalSlots) * 100) : 0;
-  const isComplete = completed_at !== null;
+  const isComplete = completed_at !== null || (totalSlots > 0 && ownedCount === totalSlots);
 
   return (
     <motion.div
@@ -229,7 +261,7 @@ export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
           </div>
         ) : (
           <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3'>
-            {slots.map((slot, i) => (
+            {optimisticSlots.map((slot, i) => (
               <SlotCard key={slot.slot_order} slot={slot} index={i} />
             ))}
           </div>

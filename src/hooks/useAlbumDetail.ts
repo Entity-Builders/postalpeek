@@ -25,7 +25,11 @@ export interface AlbumDetailData {
   album: {
     id: string;
     title: string;
+    title_es?: string;
+    title_en?: string;
     description: string | null;
+    description_es?: string | null;
+    description_en?: string | null;
     cover_image_url: string | null;
     category: string;
     country: string | null;

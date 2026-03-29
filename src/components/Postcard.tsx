@@ -97,6 +97,8 @@ interface PostcardProps {
   autoStartGame?: boolean;
   /** Disable blur filters during tutorial */
   isTutorial?: boolean;
+  /** Override the Play behavior */
+  onPlayGame?: () => void;
 }
 
 const springFlip = {
@@ -134,6 +136,7 @@ export function Postcard({
   onOpenCollection,
   autoStartGame = false,
   isTutorial = false,
+  onPlayGame,
 }: PostcardProps) {
   const { isGameActive } = useGameMode();
   const [isFlipped, setIsFlipped] = useState(false);
@@ -360,6 +363,7 @@ export function Postcard({
             onOpenCollection={onOpenCollection}
             autoStartGame={autoStartGame}
             isTutorial={isTutorial}
+            onPlayGame={onPlayGame}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon

@@ -91,7 +91,7 @@ export function useGameProgress(
 
   // Fetch existing progress on mount
   useEffect(() => {
-    if (!postcardId || !userId) return;
+    if (!postcardId || !userId || userId === 'tutorial-user') return;
     let cancelled = false;
 
     async function fetchProgress() {
@@ -120,7 +120,7 @@ export function useGameProgress(
   // Save a game completion
   const saveGameCompletion = useCallback(
     async (gameType: DbGameType, timeSeconds: number, won: boolean = true): Promise<{ allComplete: boolean; rewardedStamps: number }> => {
-      if (!postcardId || !userId) return { allComplete: false, rewardedStamps: 0 };
+      if (!postcardId || !userId || userId === 'tutorial-user') return { allComplete: false, rewardedStamps: 0 };
 
       // Optimistic update
       setCompletedRows((prev) => {

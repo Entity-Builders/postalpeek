@@ -38,11 +38,13 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
   const isRevealed = found || isLost;
   const containerRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLImageElement>(null);
+  const loupeStampRef = useRef<HTMLDivElement>(null);
 
   // ── Loupe lens tracking (ref-based, zero re-renders) ──
   const updateLens = useCallback((clientX: number, clientY: number) => {
     const container = containerRef.current;
     const lens = lensRef.current;
+    const loupeStamp = loupeStampRef.current;
     if (!container || !lens || isRevealed) return;
 
     const rect = container.getBoundingClientRect();
@@ -51,6 +53,7 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
 
     if (rx < 0 || rx > 1 || ry < 0 || ry > 1) {
       lens.style.opacity = '0';
+      if (loupeStamp) loupeStamp.style.opacity = '0';
       return;
     }
 
@@ -59,16 +62,30 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
     const tx = (clientX - rect.left) - ox * LOUPE_ZOOM;
     const ty = (clientY - rect.top) - oy * LOUPE_ZOOM;
 
+    const clipPath = `circle(${LOUPE_RADIUS}px at ${clientX - rect.left}px ${clientY - rect.top}px)`;
+    const transform = `translate(${tx}px, ${ty}px) scale(${LOUPE_ZOOM})`;
+
     lens.style.opacity = '1';
     lens.style.width = `${rect.width}px`;
     lens.style.height = `${rect.height}px`;
-    lens.style.clipPath = `circle(${LOUPE_RADIUS}px at ${clientX - rect.left}px ${clientY - rect.top}px)`;
-    lens.style.transform = `translate(${tx}px, ${ty}px) scale(${LOUPE_ZOOM})`;
+    lens.style.clipPath = clipPath;
+    lens.style.transform = transform;
     lens.style.transformOrigin = '0 0';
+
+    // Mirror the same transform onto the loupe stamp layer
+    if (loupeStamp) {
+      loupeStamp.style.opacity = '1';
+      loupeStamp.style.width = `${rect.width}px`;
+      loupeStamp.style.height = `${rect.height}px`;
+      loupeStamp.style.clipPath = clipPath;
+      loupeStamp.style.transform = transform;
+      loupeStamp.style.transformOrigin = '0 0';
+    }
   }, [isRevealed]);
 
   const hideLens = useCallback(() => {
     if (lensRef.current) lensRef.current.style.opacity = '0';
+    if (loupeStampRef.current) loupeStampRef.current.style.opacity = '0';
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -98,6 +115,7 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
   }, []);
 
   // Stamp rendered as a percentage-positioned element
+  // z-index must be ABOVE the loupe lens (15) so it's never covered
   const stampStyle: React.CSSProperties = {
     position: 'absolute',
     left: `${placement.x * 100}%`,
@@ -110,7 +128,7 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
     opacity: isRevealed ? 1 : 0.25,
     transition: isRevealed ? 'opacity 0.3s ease, transform 0.5s ease, filter 0.3s ease' : 'none',
     pointerEvents: 'none',
-    zIndex: 25,
+    zIndex: 20,
     aspectRatio: '1',
   };
 
@@ -125,7 +143,48 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
       onTouchEnd={hideLens}
       style={{ touchAction: 'none' }}
     >
-      {/* The hidden stamp */}
+      {/* Loupe lens — zoomed background image */}
+      {!isRevealed && imageUrl && (
+        <img
+          ref={lensRef}
+          src={imageUrl}
+          alt=""
+          draggable={false}
+          className="absolute top-0 left-0 pointer-events-none select-none will-change-transform"
+          style={{
+            opacity: 0,
+            transition: 'opacity 0.15s ease-out',
+            objectFit: 'cover',
+            zIndex: 15,
+          }}
+        />
+      )}
+
+      {/* Loupe stamp — same transform/clip as loupe but renders the stamp magnified */}
+      {!isRevealed && (
+        <div
+          ref={loupeStampRef}
+          className="absolute top-0 left-0 pointer-events-none select-none will-change-transform"
+          style={{ opacity: 0, zIndex: 16 }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: `${placement.x * 100}%`,
+              top: `${placement.y * 100}%`,
+              width: `${placement.size * 100}%`,
+              transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`,
+              mixBlendMode: 'multiply',
+              opacity: 0.25,
+              aspectRatio: '1',
+            }}
+          >
+            <PostalPeekStampSVG className="w-full h-full" />
+          </div>
+        </div>
+      )}
+
+      {/* The hidden stamp — rendered AFTER loupe so it always paints on top */}
       <div style={stampStyle}>
         <motion.div
           animate={isRevealed ? {
@@ -138,23 +197,6 @@ export function StampHuntOverlay({ hunt, imageUrl }: StampHuntOverlayProps) {
           <PostalPeekStampSVG className="w-full h-full" />
         </motion.div>
       </div>
-
-      {/* Loupe lens — zoomed image clipped to circle following cursor */}
-      {!isRevealed && imageUrl && (
-        <img
-          ref={lensRef}
-          src={imageUrl}
-          alt=""
-          draggable={false}
-          className="absolute top-0 left-0 pointer-events-none select-none will-change-transform"
-          style={{
-            opacity: 0,
-            transition: 'opacity 0.15s ease-out',
-            objectFit: 'cover',
-            zIndex: 22,
-          }}
-        />
-      )}
 
       {/* Hint glow */}
       {hintActive && !found && (

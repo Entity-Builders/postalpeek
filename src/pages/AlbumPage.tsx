@@ -18,6 +18,7 @@ import {
   Tag,
   Share2,
 } from 'lucide-react';
+import { PostalPeekStampSVG } from '../components/ui/PostalPeekStampSVG';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
 import type { AlbumSlot, MatchRules } from '../hooks/useAlbumDetail';
 import { useSignedImage } from '../utils/useSignedImage';
@@ -155,8 +156,10 @@ function CriteriaBanner({
 
 function SlotCard({ slot, index }: { slot: AlbumSlot; index: number }) {
   const lang = useLang();
+  // Load image for owned, claimed (by others), and hint slots
+  const hasImage = slot.is_owned || slot.is_claimed || slot.is_hint;
   const imgUrl = useSignedImage(
-    slot.is_owned || slot.is_hint ? slot.illustration_url : null,
+    hasImage ? slot.illustration_url : null,
     { width: WIDTHS.mobile },
   );
 
@@ -174,13 +177,35 @@ function SlotCard({ slot, index }: { slot: AlbumSlot; index: number }) {
       >
         <div className="aspect-[3/4] overflow-hidden rounded-[2px] bg-stone-100 relative flex items-center justify-center">
           {slot.is_owned && imgUrl ? (
-            <img
-              src={imgUrl}
-              alt={slot.slot_label}
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover"
-            />
+            <div className="w-full h-full relative">
+              <img
+                src={imgUrl}
+                alt={slot.slot_label}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
+              {/* PostalPeek seal */}
+              <div className="absolute bottom-1 right-1 w-7 h-7 text-red-800/50 rotate-[-12deg] pointer-events-none">
+                <PostalPeekStampSVG className="w-full h-full" />
+              </div>
+            </div>
+          ) : slot.is_claimed && imgUrl ? (
+            /* Someone else has it — show image with subtle overlay */
+            <div className="w-full h-full relative">
+              <img
+                src={imgUrl}
+                alt={slot.slot_label}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover saturate-50 brightness-90"
+              />
+              <div className="absolute inset-0 bg-stone-900/20 flex flex-col items-center justify-center gap-1">
+                <span className="bg-black/40 backdrop-blur-sm text-white/90 text-[8px] font-semibold px-2 py-0.5 rounded-full">
+                  {t({ es: 'Adquirida', en: 'Claimed' }, lang)}
+                </span>
+              </div>
+            </div>
           ) : slot.is_hint && imgUrl ? (
             <div className="w-full h-full relative">
               <img
@@ -197,14 +222,8 @@ function SlotCard({ slot, index }: { slot: AlbumSlot; index: number }) {
                 </span>
               </div>
             </div>
-          ) : slot.is_claimed ? (
-            <div className="w-full h-full bg-gradient-to-br from-stone-200 to-stone-300 flex flex-col items-center justify-center gap-1">
-              <HelpCircle className="w-6 h-6 text-stone-400" />
-              <span className="text-[8px] text-stone-400">
-                {t({ es: 'Adquirida', en: 'Claimed' }, lang)}
-              </span>
-            </div>
           ) : (
+            /* Nobody has it yet — mystery */
             <div className="w-full h-full bg-gradient-to-br from-amber-50 to-stone-100 flex flex-col items-center justify-center gap-1">
               <HelpCircle className="w-6 h-6 text-amber-400/60" />
               <span className="text-[8px] text-amber-500/60">???</span>
@@ -242,6 +261,18 @@ export function AlbumPage() {
     }
   }, [albumId, fetchDetail]);
 
+  let optimisticSlots = detail?.slots || [];
+  try {
+    const guestClaimedId = sessionStorage.getItem('postalpeek_guest_claim');
+    if (guestClaimedId) {
+      optimisticSlots = optimisticSlots.map(s => 
+        s.postcard_id === guestClaimedId ? { ...s, is_owned: true } : s
+      );
+    }
+  } catch {
+    // Ignore session storage errors
+  }
+
   // ── Loading state ──
   if (isLoading || !detail) {
     return (
@@ -251,12 +282,17 @@ export function AlbumPage() {
     );
   }
 
-  const { album, slots, completed_at } = detail;
-  const ownedCount = slots.filter((s) => s.is_owned).length;
-  const totalSlots = slots.length;
+  const { album, completed_at } = detail;
+
+  const albumTitle = t({ es: album.title_es || album.title, en: album.title_en || album.title }, lang);
+  const albumDescription = album.description_es || album.description_en
+    ? t({ es: album.description_es || album.description || '', en: album.description_en || album.description || '' }, lang)
+    : album.description;
+  const ownedCount = optimisticSlots.filter((s) => s.is_owned).length;
+  const totalSlots = optimisticSlots.length;
   const progress =
     totalSlots > 0 ? Math.round((ownedCount / totalSlots) * 100) : 0;
-  const isComplete = completed_at !== null;
+  const isComplete = completed_at !== null || (totalSlots > 0 && ownedCount === totalSlots);
 
   const coverUrl = album.cover_image_url;
 
@@ -264,7 +300,7 @@ export function AlbumPage() {
     const url = window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({ title: album.title, url });
+        await navigator.share({ title: albumTitle, url });
       } catch {
         /* user cancelled */
       }
@@ -278,7 +314,7 @@ export function AlbumPage() {
     <div className="h-[100dvh] bg-[#e6e2da] flex flex-col overflow-y-auto">
       {/* ── Hero Cover ── */}
       <AlbumHero
-        title={album.title}
+        title={albumTitle}
         coverUrl={coverUrl}
         isComplete={isComplete}
         ownedCount={ownedCount}
@@ -293,9 +329,9 @@ export function AlbumPage() {
       {/* ── Content ── */}
       <div className="flex-1 px-4 pb-10 max-w-3xl mx-auto w-full">
         {/* Description */}
-        {album.description && (
+        {albumDescription && (
           <p className="text-sm text-stone-500 mt-4 mb-3 leading-relaxed italic">
-            {album.description}
+            {albumDescription}
           </p>
         )}
 
@@ -309,7 +345,7 @@ export function AlbumPage() {
 
         {/* Slot grid */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {slots.map((slot, i) => (
+          {optimisticSlots.map((slot, i) => (
             <SlotCard key={slot.slot_order} slot={slot} index={i} />
           ))}
         </div>

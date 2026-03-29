@@ -134,22 +134,32 @@ export function usePostcardGame(item: FeedItem) {
       setIsScanning(true);
       setScanError(null);
       try {
+        /* [TEMPORALMENTE DESACTIVADO] 
+        Evitamos llamadas continuas a la API de segmentación.
         const { data, error } = await supabase.functions.invoke('postalpeek-semantic-segment', {
           body: { image_url: item.illustration_url, postcard_id: item.id }
         });
         if (error) throw error;
+        */
+        
+        // Simular que no encontró tags
+        throw new Error('Auto-scan desactivado (faltan tags de ilustración)');
+        
+        /*
         if (cancelled) return;
         const scanned = (data.layers || []).filter((t: TagWithBox) => {
           const coords = t.box_2d ?? t.bbox;
           return coords && Array.isArray(coords) && coords.length === 4;
         });
         setLiveTags(scanned);
+        */
       } catch (err) {
         if (!cancelled) setScanError(err instanceof Error ? err.message : 'Scan failed');
       } finally {
         if (!cancelled) {
           setIsScanning(false);
-          if (engine.status === 'idle') engine.start();
+          // Opcional: Si da error, no empezamos el motor o lo pasamos a algún estado
+          // if (engine.status === 'idle') engine.start(); 
         }
       }
     }
