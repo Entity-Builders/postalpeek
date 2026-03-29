@@ -193,9 +193,9 @@ export function PostcardChin({
       )}
 
       {/* ── Bottom row: context + actions ───────────────────────── */}
-      <div className='flex justify-between items-end px-1 pb-1 mt-2'>
+      <div className='flex flex-wrap justify-between items-center gap-y-2 gap-x-1 px-1 pb-1 mt-2'>
         {/* Left: album stop indicator or city */}
-        <div className='flex-1 min-w-0 mr-2'>
+        <div className='mr-auto max-w-full'>
           {hasAlbumStop ? (
             <AlbumStopIndicator
               sequence={active.album_sequence!}
@@ -204,14 +204,14 @@ export function PostcardChin({
               stopDescription={stopMeta?.stop_description}
             />
           ) : (
-            <p className='text-[10px] md:text-xs text-stone-500 font-medium truncate'>
+            <p className='text-[10px] md:text-xs text-stone-500 font-medium leading-tight'>
               {active.city || item.city}
             </p>
           )}
         </div>
 
         {/* Right: action buttons */}
-        <div className='flex items-center gap-1.5 shrink-0'>
+        <div className='flex flex-wrap items-center justify-end gap-1.5'>
           {/* Claimed by another user */}
           {hasOwner && !isClaimedByMe && (
             <span className='flex items-center gap-1.5 bg-stone-100/90 text-stone-500 text-[10px] font-semibold pl-0.5 pr-2 py-0.5 rounded-full border border-stone-200/60 shadow-sm'>

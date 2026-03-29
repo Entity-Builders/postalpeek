@@ -50,7 +50,8 @@ export function FeedCarouselPage() {
       spotlightResults, isSpotlightMode,
       user, isAdmin, favoriteIds, toggleFavorite,
       claimedIds, claim, isClaiming,
-      refetchCollection, refetchAlbums
+      refetchCollection, refetchAlbums, handleAuthRequiredAction,
+      showWelcome, setShowWelcome
   } = useFeedContext();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -123,31 +124,38 @@ export function FeedCarouselPage() {
           selectedCountry={selectedCountry}
           user={user}
           isAdmin={isAdmin}
-          showWelcome={false}
+          showWelcome={showWelcome}
+          setShowWelcome={setShowWelcome}
           isOnWelcome={false}
           setIsOnWelcome={() => {}}
           favoriteIds={user ? favoriteIds : new Set()}
-          toggleFavorite={user ? (id: string) => toggleFavorite(id, !favoriteIds.has(id)) : async () => {}}
+          toggleFavorite={user ? (id: string) => toggleFavorite(id) : async () => {}}
           setShowAuthGate={() => {}}
           setPendingFavoriteId={() => {}}
           hasSharedCard={false}
           claimedIds={user ? claimedIds : new Set()}
-          onClaimPostcard={user ? handleClaimPostcard : undefined}
+          onClaimPostcard={(id, cost) => handleAuthRequiredAction(() => {
+            if (user) handleClaimPostcard(id, cost);
+          })}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}
           packCards={user ? packCards : []}
           isPackAvailable={user ? isPackAvailable : false}
           isPackLoading={isPackLoading}
-          onOpenPack={user ? handleOpenPack : undefined}
-          onPackComplete={user ? () => {
-             setShowPackDoneToast(true);
-             setTimeout(() => {
-                setShowPackDoneToast(false);
-                clearPack();
-                refetchCollection();
-                refetchAlbums();
-             }, 5000);
-          } : undefined}
+          onOpenPack={() => handleAuthRequiredAction(() => {
+            if (user) handleOpenPack();
+          })}
+          onPackComplete={() => handleAuthRequiredAction(() => {
+            if (user) {
+               setShowPackDoneToast(true);
+               setTimeout(() => {
+                  setShowPackDoneToast(false);
+                  clearPack();
+                  refetchCollection();
+                  refetchAlbums();
+               }, 5000);
+            }
+          })}
       />
 
       {/* Claim Result Toast */}

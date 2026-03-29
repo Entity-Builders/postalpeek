@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import { useOnboarding } from '../contexts/OnboardingContext';
 import { useGameMode } from '../contexts/GameModeContext';
 import { WalkerWelcomeAnimated } from './WalkerWelcomeAnimated';
@@ -130,6 +131,13 @@ export function OnboardingFlow() {
           if (claimedId) {
             sessionStorage.setItem('postalpeek_guest_claim', claimedId);
           }
+          
+          try {
+            const { markWelcomeSeen } = await import('../utils/welcomeStorage');
+            markWelcomeSeen();
+          } catch (e) {
+            console.error('Failed to mark welcome seen', e);
+          }
 
           // Look up the album this postcard belongs to (dynamic, works in all envs)
           try {
@@ -221,6 +229,27 @@ function TutorialCarousel({
           </div>
         ))}
       </div>
+
+      {/* Swipe indicator */}
+      {!showGame && !claimedId && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2, duration: 1 }}
+          className="absolute bottom-8 left-0 right-0 z-40 pointer-events-none flex flex-col items-center"
+        >
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+            className="flex flex-col items-center text-white/90 drop-shadow-lg"
+          >
+            <ChevronDown className="w-7 h-7 mb-1" strokeWidth={2.5} />
+            <span className="text-sm font-medium tracking-wide drop-shadow-md">
+              Desliza para ver otras
+            </span>
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Portal the game overlay to document.body so Embla transforms don't break position:fixed */}
       {showGame && claimedId && createPortal(

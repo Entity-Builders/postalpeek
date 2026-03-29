@@ -4,14 +4,14 @@ import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../../hooks/useWalkerFeed';
 import { useClaimPostcard } from '../../hooks/useClaimPostcard';
 import { useCollection } from '../../hooks/useCollection';
-import { useAlbums } from '../../hooks/useAlbums';
+import { useAlbums, type Album } from '../../hooks/useAlbums';
 import { useAlbumDetail } from '../../hooks/useAlbumDetail';
 import { useStampContext } from '../../contexts/StampContext';
 
 import type { FeedItem } from '../../components/Postcard';
 import { AlbumsModal } from '../../components/AlbumsModal';
 import { StatusBar } from '../../components/StatusBar';
-import { PostcardGameSelector, type GameMode } from '../../components/PostcardGameSelector';
+import { PostcardGameSelector } from '../../components/PostcardGameSelector';
 import { hasSeenWelcome } from '../../utils/welcomeStorage';
 import { WelcomeToast } from '../../components/WelcomeToast';
 import { SearchX } from 'lucide-react';
@@ -22,6 +22,7 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SmartSearchResult } from '../../hooks/useSmartSearch';
 import { LanguageToggle } from '../../components/ui/LanguageToggle';
+import { AuthGateModal } from '../../components/AuthGateModal';
 
 // --- Types ---
 export type FeedLayoutContextType = {
@@ -42,37 +43,39 @@ export type FeedLayoutContextType = {
   handleSpotlightDismiss: () => void;
   isSpotlightMode: boolean;
   
-  claim: any;
+  claim: (id: string, cost: number) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   isClaiming: boolean;
   claimStatus: any;
   claimedIds: Set<string>;
   
-  collection: any[];
+  collection: unknown[];
   isCollectionLoading: boolean;
   refetchCollection: () => void;
   
-  albums: any[];
+  albums: Album[];
   isLoadingAlbums: boolean;
   refetchAlbums: () => void;
-  albumDetail: any;
+  albumDetail: unknown;
   isAlbumDetailLoading: boolean;
   fetchAlbumDetail: (id: string) => void;
   resetAlbumDetail: () => void;
   unlockedCountries: Set<string>;
   
   favoriteIds: Set<string>;
-  favoriteItems: any[];
-  toggleFavorite: (id: string, isFav: boolean) => Promise<void>;
+  favoriteItems: unknown[];
+  toggleFavorite: (id: string) => Promise<void>;
   
   user: User | null;
   isAdmin: boolean;
   isIdle: boolean;
   showWelcome: boolean;
+  setShowWelcome: React.Dispatch<React.SetStateAction<boolean>>;
   
   viewMode: 'grid' | 'feed';
   setViewMode: React.Dispatch<React.SetStateAction<'grid' | 'feed'>>;
   isAlbumsModalOpen: boolean;
   setIsAlbumsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  handleAuthRequiredAction: (action: () => void) => void;
 };
 
 export function useFeedContext() {
@@ -95,6 +98,10 @@ export function FeedLayout({
   const [viewMode, setViewMode] = useState<'grid' | 'feed'>('grid');
   const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
   const [statusBarGameOpen, setStatusBarGameOpen] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+
+  // Read guest claim status for optimistic UI
+  const hasGuestClaim = Boolean(sessionStorage.getItem('postalpeek_guest_claim'));
 
   const {
     items,
@@ -112,7 +119,7 @@ export function FeedLayout({
   const [spotlightResults, setSpotlightResults] = useState<FeedItem[]>([]);
   const [spotlightQuery, setSpotlightQuery] = useState('');
   const [isSpotlightSearching, setIsSpotlightSearching] = useState(false);
-  const [smartSearchIntent, setSmartSearchIntent] = useState<SmartSearchResult | null>(null);
+
   const [showNoResultsToast, setShowNoResultsToast] = useState(false);
   const spotlightAbortRef = useRef<AbortController | null>(null);
   const SPOTLIGHT_PAGE_SIZE = 30;
@@ -126,7 +133,7 @@ export function FeedLayout({
       setSpotlightQuery(query);
       setIsSpotlightSearching(true);
       setSpotlightResults([]);
-      setSmartSearchIntent(null);
+
 
       try {
         const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -135,7 +142,7 @@ export function FeedLayout({
         const tagSet = new Set<string>();
         items.forEach((item) => {
           if (item.detailed_tags?.length) {
-            item.detailed_tags.forEach((dt: any) => {
+            item.detailed_tags.forEach((dt: { label: string | { es?: string; en?: string } }) => {
                 const lbl = dt.label;
                 const name = typeof lbl === 'object' && lbl !== null ? lbl.en || lbl.es || '' : String(lbl || '');
                 if (name) tagSet.add(name);
@@ -186,7 +193,7 @@ export function FeedLayout({
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return;
         setSpotlightResults([]);
-        setSmartSearchIntent(null);
+
       } finally {
         setIsSpotlightSearching(false);
       }
@@ -198,12 +205,18 @@ export function FeedLayout({
     if (spotlightAbortRef.current) spotlightAbortRef.current.abort();
     setSpotlightResults([]);
     setSpotlightQuery('');
-    setSmartSearchIntent(null);
+
     setIsSpotlightSearching(false);
     setShowNoResultsToast(false);
   }, []);
 
-  const [showWelcome] = useState(() => !hasSeenWelcome());
+  const [showWelcome, setShowWelcome] = useState(() => !hasSeenWelcome());
+
+  useEffect(() => {
+    const handleWelcomeSeen = () => setShowWelcome(false);
+    window.addEventListener('postalpeek_welcome_seen', handleWelcomeSeen);
+    return () => window.removeEventListener('postalpeek_welcome_seen', handleWelcomeSeen);
+  }, []);
 
   useEffect(() => {
     onWelcomeChange?.(showWelcome);
@@ -243,7 +256,7 @@ export function FeedLayout({
       if (guestClaimedId) {
         sessionStorage.removeItem('postalpeek_guest_claim');
         // Assume 0 cost since it was the tutorial freebie
-        claim(guestClaimedId, 0).then((res: any) => {
+        claim(guestClaimedId, 0).then((res) => {
           if (res.success) {
             refetchCollection();
             refetchAlbums();
@@ -253,6 +266,62 @@ export function FeedLayout({
     }
   }, [user?.id, claim, refetchCollection, refetchAlbums]);
 
+  const handleAuthRequiredAction = useCallback((action: () => void) => {
+    if (!user) {
+      setShowAuthGate(true);
+    } else {
+      action();
+    }
+  }, [user]);
+
+  // ── Mock data for guest optimistic UI ──
+
+  const displayAlbums = useMemo(() => {
+    if (user) return albums;
+    if (hasGuestClaim) {
+      return [{
+        id: 'guest-album',
+        title: t({ es: 'Primer Álbum', en: 'First Album' }, lang),
+        description: null,
+        cover_image_url: null,
+        category: 'general',
+        country: 'Global',
+        city: null,
+        difficulty: 'easy' as const,
+        total_slots: 6,
+        collected_slots: 1,
+        reward_claims: 2,
+        completed_at: null,
+      }];
+    }
+    return [{
+      id: 'guest-album',
+      title: t({ es: 'Primer Álbum', en: 'First Album' }, lang),
+      description: null,
+      cover_image_url: null,
+      category: 'general',
+      country: 'Global',
+      city: null,
+      difficulty: 'easy' as const,
+      total_slots: 6,
+      collected_slots: 0,
+      reward_claims: 2,
+      completed_at: null,
+    }];
+  }, [user, hasGuestClaim, albums, lang]);
+
+  const displayCollectionCount = useMemo(() => {
+    if (user) return collection.length;
+    if (hasGuestClaim) return 1;
+    return 0;
+  }, [user, hasGuestClaim, collection.length]);
+
+  const displayStampBalance = useMemo(() => {
+    if (user) return stampBalance;
+    if (hasGuestClaim) return 17;
+    return 20;
+  }, [user, hasGuestClaim, stampBalance]);
+
   const contextValue = useMemo<FeedLayoutContextType>(() => ({
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
     spotlightResults, spotlightQuery, isSpotlightSearching, handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
@@ -260,8 +329,9 @@ export function FeedLayout({
     collection, isCollectionLoading, refetchCollection,
     albums, isLoadingAlbums, refetchAlbums, albumDetail, isAlbumDetailLoading, fetchAlbumDetail, resetAlbumDetail, unlockedCountries,
     favoriteIds, favoriteItems, toggleFavorite,
-    user, isAdmin, isIdle, showWelcome,
-    viewMode, setViewMode, isAlbumsModalOpen, setIsAlbumsModalOpen
+    user, isAdmin, isIdle, showWelcome, setShowWelcome,
+    viewMode, setViewMode, isAlbumsModalOpen, setIsAlbumsModalOpen,
+    handleAuthRequiredAction
   }), [
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
     spotlightResults, spotlightQuery, isSpotlightSearching, handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
@@ -269,9 +339,27 @@ export function FeedLayout({
     collection, isCollectionLoading, refetchCollection,
     albums, isLoadingAlbums, refetchAlbums, albumDetail, isAlbumDetailLoading, fetchAlbumDetail, resetAlbumDetail, unlockedCountries,
     favoriteIds, favoriteItems, toggleFavorite,
-    user, isAdmin, isIdle, showWelcome,
-    viewMode, setViewMode, isAlbumsModalOpen, setIsAlbumsModalOpen
+    user, isAdmin, isIdle, showWelcome, setShowWelcome,
+    viewMode, isAlbumsModalOpen,
+    handleAuthRequiredAction
   ]);
+
+  const effectiveViewedItems = useMemo(() => {
+    const ad = albumDetail as any;
+    if (ad?.slots?.length > 0) {
+      // We are in an album, extract the items shown here.
+      return ad.slots
+        .filter((s: any) => s.illustration_url)
+        .map((s: any) => ({
+          id: s.postcard_id || s.slot_label,
+          illustration_url: s.illustration_url,
+          city: s.city || '',
+          country: s.country || '',
+          category: s.category || '',
+        })) as FeedItem[];
+    }
+    return items;
+  }, [albumDetail, items]);
 
   return (
     <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
@@ -334,24 +422,27 @@ export function FeedLayout({
       </AnimatePresence>
 
       <AnimatePresence>
-        {user && !isSpotlightMode && !showWelcome && (
+        {!isSpotlightMode && !showWelcome && (
           <StatusBar
-            albums={albums}
-            collectionCount={collection.length}
-            stampBalance={stampBalance}
-            onAlbumTap={(album) => {
+            albums={displayAlbums}
+            collectionCount={displayCollectionCount}
+            stampBalance={displayStampBalance}
+            onAlbumTap={(album) => handleAuthRequiredAction(() => {
               navigate(`/feed/album/${album.id}`);
               analytics.track('statusbar_album_tapped', { album_id: album.id });
-            }}
-            onPlayTap={() => {
+            })}
+            onPlayTap={() => handleAuthRequiredAction(() => {
               setStatusBarGameOpen(true);
               analytics.track('statusbar_play_tapped');
-            }}
-            onCollectionTap={() => {
+            })}
+            onCollectionTap={() => handleAuthRequiredAction(() => {
               navigate('/feed/collection');
               refetchCollection();
               analytics.track('statusbar_collection_tapped');
-            }}
+            })}
+            onStampTap={() => handleAuthRequiredAction(() => {
+              analytics.track('statusbar_stamp_tapped');
+            })}
           />
         )}
       </AnimatePresence>
@@ -370,11 +461,23 @@ export function FeedLayout({
             analytics.track('statusbar_game_started', { mode: 'random' });
           }
         }}
-        onSelect={(mode: GameMode) => {}}
+        onSelect={() => {}}
         onClose={() => setStatusBarGameOpen(false)}
       />
 
       <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+
+      {/* ── Auth Gate ── */}
+      <AnimatePresence>
+        {showAuthGate && (
+          <AuthGateModal
+            onSuccess={() => setShowAuthGate(false)}
+            onClose={() => setShowAuthGate(false)}
+            viewedItems={effectiveViewedItems}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+

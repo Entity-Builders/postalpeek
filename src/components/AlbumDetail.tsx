@@ -5,6 +5,8 @@ import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import type { AlbumSlot, AlbumDetailData, MatchRules } from '../hooks/useAlbumDetail';
+import { useFeedContext } from '../pages/feed/FeedLayout';
+import { AuthGateModal } from './AuthGateModal';
 
 interface AlbumDetailProps {
   detail: AlbumDetailData;
@@ -89,9 +91,11 @@ function CriteriaBanner({ rules, difficulty }: { rules: MatchRules; difficulty?:
 function SlotCard({
   slot,
   index,
+  onClick,
 }: {
   slot: AlbumSlot;
   index: number;
+  onClick?: () => void;
 }) {
   // Load image for owned, claimed (by others), and hint slots
   const hasImage = slot.is_owned || slot.is_claimed || slot.is_hint;
@@ -102,10 +106,11 @@ function SlotCard({
 
   return (
     <motion.div
-      className='relative'
+      className={`relative ${onClick ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.04 }}
+      onClick={onClick}
     >
       <div
         className={`bg-white p-1.5 pb-3 rounded-sm shadow-md transition-all ${
@@ -183,6 +188,8 @@ function SlotCard({
 
 export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
   const { album, slots, completed_at } = detail;
+  const { user } = useFeedContext();
+  const [showAuthGate, setShowAuthGate] = React.useState(false);
 
   let optimisticSlots = slots;
   try {
@@ -262,7 +269,16 @@ export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
         ) : (
           <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3'>
             {optimisticSlots.map((slot, i) => (
-              <SlotCard key={slot.slot_order} slot={slot} index={i} />
+              <SlotCard
+                key={slot.slot_order}
+                slot={slot}
+                index={i}
+                onClick={() => {
+                  if (!slot.is_owned && !user) {
+                    setShowAuthGate(true);
+                  }
+                }}
+              />
             ))}
           </div>
         )}
@@ -277,6 +293,13 @@ export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
             </span>
           </div>
         </div>
+      )}
+
+      {/* ── Auth Gate ── */}
+      {showAuthGate && (
+        <AuthGateModal
+          onSuccess={() => setShowAuthGate(false)}
+        />
       )}
     </motion.div>
   );

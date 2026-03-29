@@ -16,7 +16,7 @@ export function FeedGridPage() {
       showWelcome, spotlightResults, spotlightQuery, isSpotlightSearching,
       handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
       user, claimedIds, unlockedCountries, setIsAlbumsModalOpen,
-      claim, refetchCollection, refetchAlbums
+      claim, refetchCollection, refetchAlbums, handleAuthRequiredAction
   } = useFeedContext();
 
   const [claimToast, setClaimToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -70,7 +70,7 @@ export function FeedGridPage() {
           sessionStorage.removeItem(AUTH_GATE_KEY);
           sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
         }}
-        onCardClick={(index) => {
+        onCardClick={(index) => handleAuthRequiredAction(() => {
           const sourceItems =
             isSpotlightMode && spotlightResults.length > 0
               ? spotlightResults
@@ -79,7 +79,7 @@ export function FeedGridPage() {
           if (clickedItem) {
             navigate(`/feed/carousel?index=${index}${isSpotlightMode ? '&spotlight=1' : ''}`);
           }
-        }}
+        })}
         viewedItems={items.slice(0, 5)}
         user={user}
         claimedIds={user ? claimedIds : new Set()}
@@ -90,7 +90,9 @@ export function FeedGridPage() {
         }}
         viewMode="grid"
         onToggleViewMode={() => navigate('/feed/carousel')}
-        onClaimPostcard={user ? handleClaimPostcard : undefined}
+        onClaimPostcard={(id, cost) => handleAuthRequiredAction(() => {
+          if (user) handleClaimPostcard(id, cost);
+        })}
       />
 
       {/* Claim Result Toast */}

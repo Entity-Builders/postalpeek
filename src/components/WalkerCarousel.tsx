@@ -16,6 +16,7 @@ import { useStampContext } from '../contexts/StampContext';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import { PackRevealSlide } from './PackRevealSlide';
 import { EnvelopeSlide } from './EnvelopeSlide';
+import { AuthCTASection } from './AuthCTASection';
 import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { AmbientBackground } from './ui/AmbientBackground';
@@ -36,6 +37,7 @@ interface WalkerCarouselProps {
   user: User | null;
   isAdmin: boolean;
   showWelcome: boolean;
+  setShowWelcome?: (val: boolean) => void;
   isOnWelcome: boolean;
   setIsOnWelcome: (val: boolean) => void;
   favoriteIds: Set<string>;
@@ -69,6 +71,7 @@ export function WalkerCarousel({
   user,
   isAdmin,
   showWelcome,
+  setShowWelcome,
   setIsOnWelcome,
   favoriteIds,
   toggleFavorite,
@@ -174,6 +177,7 @@ export function WalkerCarousel({
     | { type: 'welcome' }
     | { type: 'envelope' }
     | { type: 'pack_reveal' }
+    | { type: 'auth_cta' }
     | { type: 'postcard'; item: FeedItem; index: number; isFirstShared?: boolean };
 
   const slides = React.useMemo((): SlideEntry[] => {
@@ -190,26 +194,33 @@ export function WalkerCarousel({
     }
 
     // ── Normal feed follows ──
+    const cardsToRender = user ? staggeredItems : staggeredItems.slice(0, FREE_CARD_LIMIT);
+
     if (showWelcome && !isPackMode) {
-      if (hasSharedCard && staggeredItems.length > 0) {
-        arr.push({ type: 'postcard', item: staggeredItems[0], index: 0, isFirstShared: true });
+      if (hasSharedCard && cardsToRender.length > 0) {
+        arr.push({ type: 'postcard', item: cardsToRender[0], index: 0, isFirstShared: true });
         arr.push({ type: 'welcome' });
-        for (let i = 1; i < staggeredItems.length; i++) {
-          arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+        for (let i = 1; i < cardsToRender.length; i++) {
+          arr.push({ type: 'postcard', item: cardsToRender[i], index: i });
         }
       } else {
         arr.push({ type: 'welcome' });
-        for (let i = 0; i < staggeredItems.length; i++) {
-          arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+        for (let i = 0; i < cardsToRender.length; i++) {
+          arr.push({ type: 'postcard', item: cardsToRender[i], index: i });
         }
       }
     } else {
-      for (let i = 0; i < staggeredItems.length; i++) {
-        arr.push({ type: 'postcard', item: staggeredItems[i], index: i });
+      for (let i = 0; i < cardsToRender.length; i++) {
+        arr.push({ type: 'postcard', item: cardsToRender[i], index: i });
       }
     }
+
+    if (!user && cardsToRender.length > 0) {
+      arr.push({ type: 'auth_cta' });
+    }
+
     return arr;
-  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, isPackAvailable]);
+  }, [staggeredItems, showWelcome, hasSharedCard, isPackMode, isPackAvailable, user]);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -263,32 +274,11 @@ export function WalkerCarousel({
       }
 
       if (itemIndex >= items.length - 2) {
-        if (hasMore && !isFetchingRef.current) {
+        if (hasMore && !isFetchingRef.current && user) {
           fetchMoreFeed();
         }
       }
 
-      if (!user && itemIndex >= FREE_CARD_LIMIT - 1) {
-        setShowAuthGate(true);
-        sessionStorage.setItem(AUTH_GATE_KEY, 'true');
-        try {
-          const heroCards = items.slice(0, 3).map((c) => ({
-            id: c.id,
-            illustration_url: c.illustration_url,
-            city: c.city,
-            country: c.country,
-            category: t(c.category),
-          }));
-          sessionStorage.setItem(
-            AUTH_GATE_CARDS_KEY,
-            JSON.stringify(heroCards),
-          );
-        } catch {
-          /* quota exceeded */
-        }
-        window.history.replaceState(null, '', '/');
-        analytics.track('auth_gate_shown', { items_viewed: itemIndex + 1 });
-      }
     };
 
     emblaApi.on('select', onSelect);
@@ -377,7 +367,7 @@ export function WalkerCarousel({
   const ambientUrl = useMemo(() => {
     const slide = slides[currentSlideIndex];
     if (!slide) return null;
-    if (slide.type === 'welcome' || slide.type === 'envelope' || slide.type === 'pack_reveal') return null;
+    if (slide.type === 'welcome' || slide.type === 'envelope' || slide.type === 'pack_reveal' || slide.type === 'auth_cta') return null;
     const item = slide.item;
     return cdnImage(item.illustration_url, { width: WIDTHS.blur, quality: 50 }) || null;
   }, [slides, currentSlideIndex]);
@@ -386,13 +376,14 @@ export function WalkerCarousel({
 
   const handleStartOnboarding = useCallback(() => {
     markWelcomeSeen();
+    setShowWelcome?.(false);
     addLocalStamps(50);
     analytics.track('welcome_onboarding_started', { initial_stamps: 50 });
     
     if (emblaApi) {
       emblaApi.scrollNext();
     }
-  }, [addLocalStamps, emblaApi]);
+  }, [addLocalStamps, emblaApi, setShowWelcome]);
 
   return (
     <div className='absolute inset-0 w-full h-full overflow-hidden'>
@@ -447,6 +438,20 @@ export function WalkerCarousel({
             );
           }
 
+
+          /* ── Auth CTA slide (guests only) ── */
+          if (slide.type === 'auth_cta') {
+            return (
+              <div
+                key='auth-cta-slide'
+                className='embla__slide w-full h-[100dvh] shrink-0 flex flex-col items-center justify-start relative overflow-y-auto bg-[#e6e2da]'
+              >
+                <div className="w-full flex-grow min-h-screen">
+                  <AuthCTASection onSuccess={() => window.location.reload()} viewedItems={items} />
+                </div>
+              </div>
+            );
+          }
 
           /* ── Normal postcard slide (unchanged) ── */
           const { item, index: itemIndex, isFirstShared } = slide;
@@ -595,7 +600,7 @@ export function WalkerCarousel({
           );
         })}
 
-        {isFetchingMore && (
+        {isFetchingMore && user && (
           <div className='embla__slide w-full h-[30vh] shrink-0 flex items-center justify-center relative'>
             <Loader2 className='w-6 h-6 text-indigo-900/50 animate-spin' />
           </div>

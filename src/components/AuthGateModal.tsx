@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Mail, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, ArrowLeft, X } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import { useSignedImage } from '../utils/useSignedImage';
@@ -11,9 +11,16 @@ import { analytics } from '../lib/analytics';
 
 interface AuthGateModalProps {
   onSuccess: () => void;
+  onClose?: () => void;
   /** Postcards the user has already seen — we use them in the hero showcase */
   viewedItems?: FeedItem[];
 }
+
+const FALLBACK_ITEMS: FeedItem[] = [
+  { id: 'fb1', illustration_url: 'postalpeek/seed/france_1.webp', original_image_url: '', city: 'Paris', country: 'France', category: 'architecture', lat: 48.8566, lng: 2.3522, description: '', created_at: new Date().toISOString() },
+  { id: 'fb2', illustration_url: 'postalpeek/seed/japan_1.png', original_image_url: '', city: 'Tokyo', country: 'Japan', category: 'culture', lat: 35.6762, lng: 139.6503, description: '', created_at: new Date().toISOString() },
+  { id: 'fb3', illustration_url: 'postalpeek/seed/italy_1.webp', original_image_url: '', city: 'Rome', country: 'Italy', category: 'architecture', lat: 41.9028, lng: 12.4964, description: '', created_at: new Date().toISOString() },
+];
 
 /**
  * Immersive auth gate styled as a continuation of the warm welcome screen.
@@ -22,6 +29,7 @@ interface AuthGateModalProps {
  */
 export function AuthGateModal({
   onSuccess,
+  onClose,
   viewedItems = [],
 }: AuthGateModalProps) {
   const [step, setStep] = useState<'email' | 'otp'>('email');
@@ -39,7 +47,8 @@ export function AuthGateModal({
     return () => clearTimeout(timer);
   }, []);
 
-  const heroCards = viewedItems.slice(0, 3);
+  const effectiveItems = viewedItems.length >= 3 ? viewedItems : FALLBACK_ITEMS;
+  const heroCards = effectiveItems.slice(0, 3);
   const mainCard = heroCards[0];
 
   // Feature flag to disable social logins for now
@@ -158,6 +167,14 @@ export function AuthGateModal({
       transition={{ duration: 0.6 }}
     >
       <div className='w-full h-full flex flex-col items-center select-none overflow-hidden'>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className='absolute top-4 right-4 z-[110] p-2 rounded-full bg-stone-200/50 text-stone-600 hover:bg-stone-300/50 transition-colors'
+          >
+            <X size={24} />
+          </button>
+        )}
 
         {/* ─── ZONE 1: Postcards (same as welcome) ─── */}
         <motion.div

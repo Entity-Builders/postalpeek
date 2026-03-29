@@ -11,10 +11,10 @@ export function hasSeenWelcome(): boolean {
   }
 }
 
-/** Mark the welcome as seen so it doesn't show again */
 export function markWelcomeSeen(): void {
   try {
     localStorage.setItem(STORAGE_KEY, '1');
+    window.dispatchEvent(new Event('postalpeek_welcome_seen'));
   } catch {
     // localStorage may be unavailable (private browsing, etc.)
   }

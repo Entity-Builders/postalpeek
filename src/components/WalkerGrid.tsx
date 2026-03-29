@@ -121,11 +121,12 @@ export function WalkerGrid({
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries;
-      if (entry.isIntersecting && hasMore && !isFetchingRef.current) {
+      const canFetchMore = user ? hasMore : false;
+      if (entry.isIntersecting && canFetchMore && !isFetchingRef.current) {
         fetchMoreFeed();
       }
     },
-    [hasMore, fetchMoreFeed],
+    [hasMore, fetchMoreFeed, user],
   );
 
   useEffect(() => {
@@ -260,7 +261,7 @@ export function WalkerGrid({
         {/* Fetch more sentinel */}
         <div ref={sentinelRef} className="h-4" />
 
-        {isFetchingMore && (
+        {isFetchingMore && user && (
           <div className="flex justify-center py-4">
             <Loader2 className="w-5 h-5 text-stone-400 animate-spin" />
           </div>

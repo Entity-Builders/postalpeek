@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Trophy,
@@ -21,6 +21,9 @@ import {
 import { PostalPeekStampSVG } from '../components/ui/PostalPeekStampSVG';
 import { useAlbumDetail } from '../hooks/useAlbumDetail';
 import type { AlbumSlot, MatchRules } from '../hooks/useAlbumDetail';
+import { useFeedContext } from './feed/FeedLayout';
+import { AuthGateModal } from '../components/AuthGateModal';
+import type { FeedItem } from '../components/Postcard';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import { useLang, t } from '../utils/i18n';
@@ -154,7 +157,7 @@ function CriteriaBanner({
 
 // ── Slot Card ──────────────────────────────────────────────────────────
 
-function SlotCard({ slot, index }: { slot: AlbumSlot; index: number }) {
+function SlotCard({ slot, index, onClick }: { slot: AlbumSlot; index: number; onClick?: () => void }) {
   const lang = useLang();
   // Load image for owned, claimed (by others), and hint slots
   const hasImage = slot.is_owned || slot.is_claimed || slot.is_hint;
@@ -165,10 +168,11 @@ function SlotCard({ slot, index }: { slot: AlbumSlot; index: number }) {
 
   return (
     <motion.div
-      className="relative"
+      className={`relative ${onClick ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: Math.min(index * 0.04, 0.4) }}
+      onClick={onClick}
     >
       <div
         className={`bg-white p-1.5 pb-3 rounded-sm shadow-md transition-all ${
@@ -251,6 +255,8 @@ export function AlbumPage() {
   const { albumId } = useParams<{ albumId: string }>();
   const navigate = useNavigate();
   const lang = useLang();
+  const { user } = useFeedContext();
+  const [showAuthGate, setShowAuthGate] = React.useState(false);
 
   const { detail, isLoading, fetchDetail } = useAlbumDetail();
 
@@ -346,7 +352,16 @@ export function AlbumPage() {
         {/* Slot grid */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
           {optimisticSlots.map((slot, i) => (
-            <SlotCard key={slot.slot_order} slot={slot} index={i} />
+            <SlotCard
+              key={slot.slot_order}
+              slot={slot}
+              index={i}
+              onClick={() => {
+                if (!slot.is_owned && !user) {
+                  setShowAuthGate(true);
+                }
+              }}
+            />
           ))}
         </div>
 
@@ -389,6 +404,25 @@ export function AlbumPage() {
           </motion.div>
         )}
       </div>
+
+      {/* ── Auth Gate ── */}
+      <AnimatePresence>
+        {showAuthGate && (
+          <AuthGateModal
+            onSuccess={() => setShowAuthGate(false)}
+            onClose={() => setShowAuthGate(false)}
+            viewedItems={optimisticSlots
+              .filter((s) => s.illustration_url)
+              .map((s) => ({
+                id: s.postcard_id || s.slot_label,
+                illustration_url: s.illustration_url!,
+                city: s.city || '',
+                country: s.country || '',
+                category: s.category || '',
+              })) as FeedItem[]}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
