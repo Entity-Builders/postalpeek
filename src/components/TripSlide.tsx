@@ -39,6 +39,8 @@ interface TripSlideProps {
   isTriviaLocked?: boolean;
   /** Whether anyone owns this postcard */
   hasOwner?: boolean;
+  /** Disable blur filters during tutorial */
+  isTutorial?: boolean;
 }
 
 /** Scale factor applied to the image in clean/loupe mode */
@@ -65,6 +67,7 @@ export function TripSlide({
   isTagGenerating,
   isTriviaLocked = false,
   hasOwner = true,
+  isTutorial = false,
 }: TripSlideProps) {
   const pUrl = useSignedImage(
     preloadedMainUrl ? null : slideItem.illustration_url,
@@ -249,7 +252,7 @@ export function TripSlide({
               ? 'scale-[1.35] opacity-0'
               : !slideItem.video_url && 'hover:scale-105',
             isTriviaLocked && 'blur-md scale-110 saturate-50 brightness-90',
-            !hasOwner && !isTriviaLocked && 'grayscale blur-[4px] scale-105'
+            !hasOwner && !isTriviaLocked && !isTutorial && 'grayscale blur-[4px] scale-105'
           )}
         />
       )}

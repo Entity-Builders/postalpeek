@@ -62,6 +62,8 @@ export interface PostcardChinProps {
   isClean?: boolean;
   /** Hide share + extra action buttons */
   hideActions?: boolean;
+  /** Tutorial: show a pulsing guide tooltip on the claim button */
+  showClaimGuide?: boolean;
   /** Album stop metadata keyed by sequence */
   albumStops?: Record<number, { stop_name: string; stop_description?: string }>;
   totalStops?: number;
@@ -91,6 +93,7 @@ export function PostcardChin({
   isTriviaLocked = false,
   isClean = false,
   hideActions = false,
+  showClaimGuide = false,
   albumStops,
   totalStops,
   onPlay,
@@ -296,28 +299,44 @@ export function PostcardChin({
             </button>
           )}
 
-          {/* ✨ Sellar — unclaimed cards only */}
+          {/* ✨ Usar (Sellar) — unclaimed cards only */}
           {!hasOwner && handleClaimClick && (
-            <button
-              className='flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm ring-1 ring-violet-400/30 animate-[pulse_3s_ease-in-out_infinite]'
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onClaim) {
-                  onClaim(stampCost);
-                  analytics.track('buy_intention', { postcard_id: item.id });
-                } else if (onClick) {
-                  onClick(); // fallback
-                }
-              }}
-              title={t({ es: `Sellar (${stampCost} Sellos)`, en: `Buy (${stampCost} Stamps)` }, lang)}
-            >
-              <div className="w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center bg-white/10 shrink-0 rotate-12">
-                 <span className="font-mono text-[5px] text-white uppercase tracking-wider text-center leading-[1.1]">
-                   Postal<br/>Peek
-                 </span>
-              </div>
-              {t({ es: `Sellar (${stampCost})`, en: `Buy (${stampCost})` }, lang)}
-            </button>
+            <div className="relative isolate flex-shrink-0">
+              <button
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black text-white font-bold shadow-sm transition-all text-xs border border-stone-800',
+                  showClaimGuide ? 'animate-pulse hover:bg-stone-800' : 'hover:bg-stone-800'
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onClaim) {
+                    onClaim(stampCost);
+                    analytics.track('buy_intention', { postcard_id: item.id });
+                  } else if (onClick) {
+                    onClick(); // fallback
+                  }
+                }}
+                title={t({ es: `Usar ${stampCost} Sellos`, en: `Use ${stampCost} Stamps` }, lang)}
+              >
+                <span>{t({ es: `Usar ${stampCost}`, en: `Use ${stampCost}` }, lang)}</span>
+                <div className="w-4 h-4 rounded-full border border-white/30 flex items-center justify-center bg-white/10 shrink-0 rotate-12">
+                   <span className="font-mono text-[4px] text-white uppercase tracking-tighter text-center leading-[1]">
+                     Postal<br/>Peek
+                   </span>
+                </div>
+              </button>
+              {showClaimGuide && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ delay: 0.5, repeat: Infinity, repeatType: 'reverse', duration: 1.5 }}
+                  className="absolute bottom-full mb-3 right-0 bg-amber-400 text-amber-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_4px_20px_rgba(251,191,36,0.4)] whitespace-nowrap z-50 pointer-events-none"
+                >
+                  {t({ es: '✨ Sella para jugar', en: '✨ Stamp to play' }, lang)}
+                  <div className="absolute top-full right-6 -mt-px border-[6px] border-transparent border-t-amber-400" />
+                </motion.div>
+              )}
+            </div>
           )}
 
           {/* Share */}

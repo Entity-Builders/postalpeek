@@ -9,8 +9,12 @@ import { SkeletonGrid } from './ui/SkeletonCard';
 import { GridCard } from './ui/GridCard';
 import { type CardLayout, computeCardLayout } from './ui/cardLayout';
 import { WalkerWelcome } from './WalkerWelcome';
+import { WalkerWelcomeAnimated } from './WalkerWelcomeAnimated';
+
+const USE_NEW_WELCOME = true; // Temporary flag for A/B testing onboarding UX
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import { motion } from 'framer-motion';
+import { useStampContext } from '../contexts/StampContext';
 
 /* ──────────────────────────────────────────────────────────────────
    Walker Grid — main component
@@ -76,6 +80,8 @@ export function WalkerGrid({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isFetchingRef = useRef(false);
 
+  const { addLocalStamps } = useStampContext();
+
   // ── Reset scroll to top when filter/search changes ──
   useEffect(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -137,7 +143,6 @@ export function WalkerGrid({
     return () => observer.disconnect();
   }, [handleObserver]);
 
-  // ── Mark welcome as seen when grid scrolls into view ──
   const gridSentinelRef = useRef<HTMLDivElement>(null);
   const [gridRevealed, setGridRevealed] = useState(!showWelcome);
   useEffect(() => {
@@ -147,6 +152,7 @@ export function WalkerGrid({
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          // Fallback scroll listener just in case they swipe
           markWelcomeSeen();
           setGridRevealed(true);
           analytics.track('welcome_scroll_started');
@@ -159,13 +165,29 @@ export function WalkerGrid({
     return () => obs.disconnect();
   }, [showWelcome]);
 
+  const handleStartOnboarding = useCallback(() => {
+    markWelcomeSeen();
+    setGridRevealed(true);
+    addLocalStamps(50);
+    analytics.track('welcome_onboarding_started', { initial_stamps: 50 });
+    
+    // Scroll past welcome screen
+    setTimeout(() => {
+      gridSentinelRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  }, [addLocalStamps]);
+
   return (
     <div ref={scrollContainerRef} className="w-full h-full overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
 
       {/* ── Welcome Hero Section ── */}
       {showWelcome && (
         <div className="w-full h-[100dvh] flex items-center justify-center bg-[#e6e2da]">
-          <WalkerWelcome previewCards={previewCards} />
+          {USE_NEW_WELCOME ? (
+            <WalkerWelcomeAnimated previewCards={previewCards} onStartOnboarding={handleStartOnboarding} />
+          ) : (
+            <WalkerWelcome previewCards={previewCards} />
+          )}
         </div>
       )}
 

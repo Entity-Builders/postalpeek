@@ -81,6 +81,8 @@ interface PostcardFrontProps {
   onOpenCollection?: () => void;
   /** Automatically start the game on mount */
   autoStartGame?: boolean;
+  /** Disable blur filters during tutorial */
+  isTutorial?: boolean;
 }
 
 export function PostcardFront({
@@ -109,6 +111,7 @@ export function PostcardFront({
   onOpenAlbum,
   onOpenCollection,
   autoStartGame = false,
+  isTutorial = false,
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
   const { addLocalStamps } = useStampContext();
@@ -431,6 +434,7 @@ export function PostcardFront({
                             isTagDiscovered={isDiscovered}
                             isTagGenerating={isGenerating}
                             hasOwner={!!slideItem.owner_id}
+                            isTutorial={isTutorial}
                           />
                         ))}
                       </div>
@@ -471,6 +475,7 @@ export function PostcardFront({
                     isTagDiscovered={isDiscovered}
                     isTagGenerating={isGenerating}
                     hasOwner={hasOwner}
+                    isTutorial={isTutorial}
                   />
                 )}
 

@@ -12,6 +12,8 @@ import { initAnalytics, analytics } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
 import { GameModeProvider } from './contexts/GameModeContext';
 import { StampProvider } from './contexts/StampContext';
+import { OnboardingProvider, useOnboarding } from './contexts/OnboardingContext';
+import { OnboardingFlow } from './components/OnboardingFlow';
 
 import { FeedLayout } from './pages/feed/FeedLayout';
 import { FeedGridPage } from './pages/feed/FeedGridPage';
@@ -106,6 +108,24 @@ function FeedApp({
   );
 }
 
+// ── Onboarding Gate ──────────────────────────────────────────────────────
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const { hasCompleted } = useOnboarding();
+  
+  if (hasCompleted === false) {
+    return <OnboardingFlow />;
+  }
+  if (hasCompleted === null) {
+    return (
+      <div className='h-screen w-screen flex items-center justify-center' style={{ background: '#0a0a12' }}>
+        <div className='w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin' />
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+}
+
 // ── App root ───────────────────────────────────────────────────────────
 
 function App() {
@@ -149,45 +169,49 @@ function App() {
     <ErrorBoundary>
       <GameModeProvider>
         <StampProvider userId={user?.id}>
-          <Routes>
-            {/* SEO-friendly feed route AND Postcard view use the same layout */}
-            <Route element={feedElement}>
-              <Route path='/feed'>
-                <Route index element={<FeedGridPage />} />
-                <Route path='country/:country' element={<FeedGridPage />} />
-                <Route path='carousel' element={<FeedCarouselPage />} />
-                <Route path='collection' element={<CollectionPage />} />
-                <Route path='album/:albumId' element={<AlbumPage />} />
-              </Route>
-              
-              {/* Public Postcard View — needs the FeedLayout context */}
-              <Route path='/postcard/:id' element={<FeedCarouselPage />} />
-            </Route>
-
-            {/* Root redirects to /feed */}
-            <Route path='/' element={<Navigate to='/feed' replace />} />
-
-            {/* Dedicated Game Route */}
-            <Route path='/game/:shortcode' element={<GamePage />} />
-
-            {/* Full-page admin (protected) */}
-            <Route
-              path='/admin'
-              element={
-                isAdmin ? (
-                  <AdminPage user={user} onPostcardGenerated={() => {}} />
-                ) : (
-                  <Navigate to='/feed' replace />
-                )
-              }
-            />
-
-            {/* Postcard admin detail — /p/:id only */}
-            <Route path='/p/:id' element={<PostcardDetailPage />} />
-
-            {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-            <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
-          </Routes>
+          <OnboardingProvider>
+            <OnboardingGate>
+              <Routes>
+                {/* SEO-friendly feed route AND Postcard view use the same layout */}
+                <Route element={feedElement}>
+                  <Route path='/feed'>
+                    <Route index element={<FeedGridPage />} />
+                    <Route path='country/:country' element={<FeedGridPage />} />
+                    <Route path='carousel' element={<FeedCarouselPage />} />
+                    <Route path='collection' element={<CollectionPage />} />
+                    <Route path='album/:albumId' element={<AlbumPage />} />
+                  </Route>
+                  
+                  {/* Public Postcard View — needs the FeedLayout context */}
+                  <Route path='/postcard/:id' element={<FeedCarouselPage />} />
+                </Route>
+  
+                {/* Root redirects to /feed */}
+                <Route path='/' element={<Navigate to='/feed' replace />} />
+  
+                {/* Dedicated Game Route */}
+                <Route path='/game/:shortcode' element={<GamePage />} />
+  
+                {/* Full-page admin (protected) */}
+                <Route
+                  path='/admin'
+                  element={
+                    isAdmin ? (
+                      <AdminPage user={user} onPostcardGenerated={() => {}} />
+                    ) : (
+                      <Navigate to='/feed' replace />
+                    )
+                  }
+                />
+  
+                {/* Postcard admin detail — /p/:id only */}
+                <Route path='/p/:id' element={<PostcardDetailPage />} />
+  
+                {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
+                <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
+              </Routes>
+            </OnboardingGate>
+          </OnboardingProvider>
         </StampProvider>
       </GameModeProvider>
     </ErrorBoundary>

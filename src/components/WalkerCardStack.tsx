@@ -6,6 +6,9 @@ import { useLang, t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
 import { WalkerWelcome } from './WalkerWelcome';
+import { WalkerWelcomeAnimated } from './WalkerWelcomeAnimated';
+
+const USE_NEW_WELCOME = true; // Temporary flag for A/B testing onboarding UX
 import { markWelcomeSeen } from '../utils/welcomeStorage';
 import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
@@ -301,7 +304,11 @@ function SwipeableCard({
         <div className='w-full h-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-2 pb-8 md:p-3 md:pb-10 rounded-xl md:rounded-2xl relative border border-slate-200 flex flex-col'>
             {isWelcome ? (
               <div className='w-full h-full flex items-center justify-center bg-transparent rounded-lg overflow-hidden relative'>
-                 <WalkerWelcome previewCards={items.slice(0, 3)} />
+                 {USE_NEW_WELCOME ? (
+                   <WalkerWelcomeAnimated previewCards={items.slice(0, 10)} />
+                 ) : (
+                   <WalkerWelcome previewCards={items.slice(0, 3)} />
+                 )}
               </div>
             ) : item.album_id && !openedAlbums.has(item.album_id) ? (
               <div 

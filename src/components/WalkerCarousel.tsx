@@ -8,7 +8,11 @@ import { Postcard, FeedItem } from './Postcard';
 import { AlbumCover } from './AlbumCover';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WalkerWelcome } from './WalkerWelcome';
+import { WalkerWelcomeAnimated } from './WalkerWelcomeAnimated';
+
+const USE_NEW_WELCOME = true; // Temporary flag for A/B testing onboarding UX
 import { markWelcomeSeen } from '../utils/welcomeStorage';
+import { useStampContext } from '../contexts/StampContext';
 import { cdnImage, WIDTHS } from '../utils/imageUtils';
 import { PackRevealSlide } from './PackRevealSlide';
 import { EnvelopeSlide } from './EnvelopeSlide';
@@ -91,6 +95,8 @@ export function WalkerCarousel({
   // Ref so handlers always see the latest value without stale closures
   const isGameActiveRef = useRef(false);
   const isPackMode = packCards.length > 0;
+  
+  const { addLocalStamps } = useStampContext();
 
   // Sync ref when game state changes
   useEffect(() => {
@@ -224,6 +230,7 @@ export function WalkerCarousel({
 
       const welcomeIndex = slides.findIndex(s => s.type === 'welcome');
       if (showWelcome && welcomeIndex !== -1 && currentIndex > welcomeIndex) {
+        // Fallback: if user manually swipes down, we mark it seen
         markWelcomeSeen();
       }
 
@@ -377,6 +384,15 @@ export function WalkerCarousel({
 
   // Keep track of previous ambient URL for crossfade
 
+  const handleStartOnboarding = useCallback(() => {
+    markWelcomeSeen();
+    addLocalStamps(50);
+    analytics.track('welcome_onboarding_started', { initial_stamps: 50 });
+    
+    if (emblaApi) {
+      emblaApi.scrollNext();
+    }
+  }, [addLocalStamps, emblaApi]);
 
   return (
     <div className='absolute inset-0 w-full h-full overflow-hidden'>
@@ -406,7 +422,11 @@ export function WalkerCarousel({
           if (slide.type === 'welcome') {
             return (
               <div key="welcome-slide" className='embla__slide w-full h-[100dvh] shrink-0 flex items-center justify-center relative'>
-                <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
+                {USE_NEW_WELCOME ? (
+                  <WalkerWelcomeAnimated previewCards={staggeredItems.slice(0, 3)} onStartOnboarding={handleStartOnboarding} />
+                ) : (
+                  <WalkerWelcome previewCards={staggeredItems.slice(0, 3)} />
+                )}
               </div>
             );
           }

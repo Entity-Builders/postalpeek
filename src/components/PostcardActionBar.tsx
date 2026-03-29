@@ -24,6 +24,7 @@ interface PostcardActionBarProps {
   onPlay?: () => void;
   onClaim?: (cost?: number) => void;
   onTrade?: () => void;
+  showClaimGuide?: boolean;
   isOwned?: boolean;
   hasOwner?: boolean;
   onOpenAlbum?: (albumId: string) => void;
@@ -42,6 +43,7 @@ export function PostcardActionBar({
   onPlay,
   onClaim,
   onTrade,
+  showClaimGuide = false,
   isOwned = false,
   hasOwner = false,
   onOpenAlbum,
@@ -62,6 +64,7 @@ export function PostcardActionBar({
       onTrade={onTrade}
       onOpenAlbum={onOpenAlbum}
       onFlipCard={onFlipCard}
+      showClaimGuide={showClaimGuide}
       isBusiness={isBusiness}
     />
   );
