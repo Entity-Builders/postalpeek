@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Maximize2,
   X,
@@ -12,6 +12,7 @@ import type { FeedItem } from './Postcard';
 import { t, useLang } from '../utils/i18n';
 import useEmblaCarousel from 'embla-carousel-react';
 import { WheelGesturesPlugin } from 'embla-carousel-wheel-gestures';
+import confetti from 'canvas-confetti';
 import { TripSlide } from './TripSlide';
 import { useDiscoveries } from '../hooks/useDiscoveries';
 import { AlbumStackEffect } from './ui/AlbumStackEffect';
@@ -20,7 +21,8 @@ import { PostcardActionBar } from './PostcardActionBar';
 import { usePostcardGame, GameImageOverlay, GameBottomPanel } from './PostcardGame';
 import { PostcardGameResults } from './PostcardGameResults';
 import { usePostcardPuzzle, PuzzleImageOverlay, PuzzleBottomPanel } from './PostcardPuzzle';
-import { useStampHunt, StampHuntOverlay, StampHuntBottomPanel } from './StampHuntGame';
+import { StampHuntOverlay, StampHuntBottomPanel } from './StampHuntGame';
+import { useStampHunt } from '../hooks/useStampHunt';
 import { PostcardGameSelector, type GameMode } from './PostcardGameSelector';
 import { TriviaBottomPanel } from './TriviaRevealGame';
 import { GameProgressBar } from './GameProgressBar';
@@ -129,6 +131,27 @@ export function PostcardFront({
   useEffect(() => {
     setGameActive(isPlaying || showSelector);
   }, [isPlaying, showSelector, setGameActive]);
+
+  // ── Stamp Purchase Celebration ──
+  const prevClaimed = useRef(isClaimedByMe);
+  const [showStampAnimation, setShowStampAnimation] = useState(false);
+
+  useEffect(() => {
+    // If the card wasn't claimed before, and now it is, trigger celebration!
+    if (!prevClaimed.current && isClaimedByMe) {
+      setShowStampAnimation(true);
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.5 },
+        colors: ['#ef4444', '#f59e0b', '#10b981'], // Stamp colors
+        zIndex: 1000,
+      });
+      const t = setTimeout(() => setShowStampAnimation(false), 2000);
+      return () => clearTimeout(t);
+    }
+    prevClaimed.current = isClaimedByMe;
+  }, [isClaimedByMe]);
 
   // ── Game progress tracking (play-to-earn) ──
   const hasHuntMode_ = useMemo(() => {
@@ -483,6 +506,23 @@ export function PostcardFront({
                 {playingMode === 'hunt' && <GameImageOverlay game={game} />}
                 {playingMode === 'puzzle' && <PuzzleImageOverlay puzzle={puzzle} imageUrl={mainImgUrl} />}
                 {playingMode === 'stamp' && <StampHuntOverlay hunt={stampHunt} imageUrl={mainImgUrl ?? ''} />}
+
+                {/* Stamp Purchase Animation Overlay */}
+                <AnimatePresence>
+                  {showStampAnimation && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 3, rotate: -20 }}
+                      animate={{ opacity: 1, scale: 1, rotate: 10 }}
+                      exit={{ opacity: 0, scale: 1.1 }}
+                      transition={{ type: 'spring', damping: 12, stiffness: 180 }}
+                      className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                    >
+                      <div className="w-48 h-48 filter drop-shadow-[0_15px_25px_rgba(0,0,0,0.5)]">
+                        <PostalPeekStampSVG className="w-full h-full" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Expand to fullscreen / Minimize — hidden during game */}
                 {!isPlaying && (
