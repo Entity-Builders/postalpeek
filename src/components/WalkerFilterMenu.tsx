@@ -85,12 +85,12 @@ export function WalkerFilterMenu({
     <div
       className={cn(
         'absolute top-3 left-0 right-0 z-50 px-3 md:px-8 transition-opacity duration-1000',
-        isIdle ? 'opacity-0' : 'opacity-100',
+        isIdle ? 'opacity-0 pointer-events-none' : 'opacity-100',
       )}
     >
       <div
         ref={containerRef}
-        className='flex items-center gap-2 w-full max-w-5xl mx-auto'
+        className='flex items-center gap-2 w-full max-w-5xl mx-auto pr-[52px]'
       >
         {/* ── Unified Search Bar with inline country chip ── */}
         <div className={cn(

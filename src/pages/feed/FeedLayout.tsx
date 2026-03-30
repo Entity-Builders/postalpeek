@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../../hooks/useWalkerFeed';
-import { useClaimPostcard } from '../../hooks/useClaimPostcard';
+import { useClaimPostcard, type ClaimResult } from '../../hooks/useClaimPostcard';
 import { useCollection } from '../../hooks/useCollection';
 import { useAlbums, type Album } from '../../hooks/useAlbums';
 import { useAlbumDetail } from '../../hooks/useAlbumDetail';
@@ -23,6 +23,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { SmartSearchResult } from '../../hooks/useSmartSearch';
 import { LanguageToggle } from '../../components/ui/LanguageToggle';
 import { AuthGateModal } from '../../components/AuthGateModal';
+import { ProfileWidget } from '../../components/ProfileWidget';
 
 // --- Types ---
 export type FeedLayoutContextType = {
@@ -43,12 +44,12 @@ export type FeedLayoutContextType = {
   handleSpotlightDismiss: () => void;
   isSpotlightMode: boolean;
   
-  claim: (id: string, cost: number) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  claim: (id: string, cost: number) => Promise<ClaimResult>;
   isClaiming: boolean;
   claimStatus: any;
   claimedIds: Set<string>;
   
-  collection: unknown[];
+  collection: FeedItem[];
   isCollectionLoading: boolean;
   refetchCollection: () => void;
   
@@ -62,7 +63,7 @@ export type FeedLayoutContextType = {
   unlockedCountries: Set<string>;
   
   favoriteIds: Set<string>;
-  favoriteItems: unknown[];
+  favoriteItems: FeedItem[];
   toggleFavorite: (id: string) => Promise<void>;
   
   user: User | null;
@@ -466,6 +467,8 @@ export function FeedLayout({
       />
 
       <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
+      
+      <ProfileWidget handleAuthRequiredAction={handleAuthRequiredAction} isIdle={isIdle} />
 
       {/* ── Auth Gate ── */}
       <AnimatePresence>
