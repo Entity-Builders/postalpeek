@@ -409,11 +409,11 @@ function MatchRulesEditor({
   rules,
   onChange,
 }: {
-  rules: MatchRules;
+  rules: MatchRules | null;
   onChange: (rules: MatchRules) => void;
 }) {
   const handleChange = (key: keyof MatchRules, value: string) => {
-    const newRules = { ...rules };
+    const newRules = { ...(rules || {}) };
     if (key === 'required_tags' || key === 'any_tags') {
       const arr = value
         .split(',')
@@ -446,7 +446,7 @@ function MatchRulesEditor({
         <div>
           <Label>Country (exact)</Label>
           <TextInput
-            value={rules.country || ''}
+            value={rules?.country || ''}
             onChange={(v) => handleChange('country', v)}
             placeholder="e.g. Argentina"
           />
@@ -454,7 +454,7 @@ function MatchRulesEditor({
         <div>
           <Label>City (exact)</Label>
           <TextInput
-            value={rules.city || ''}
+            value={rules?.city || ''}
             onChange={(v) => handleChange('city', v)}
             placeholder="e.g. Buenos Aires"
           />
@@ -463,7 +463,7 @@ function MatchRulesEditor({
       <div>
         <Label>Required tags (ALL must match, comma-separated)</Label>
         <TextInput
-          value={(rules.required_tags || []).join(', ')}
+          value={(rules?.required_tags || []).join(', ')}
           onChange={(v) => handleChange('required_tags', v)}
           placeholder="e.g. colectivo, graffiti"
         />
@@ -471,7 +471,7 @@ function MatchRulesEditor({
       <div>
         <Label>Any tags (at least ONE must match, comma-separated)</Label>
         <TextInput
-          value={(rules.any_tags || []).join(', ')}
+          value={(rules?.any_tags || []).join(', ')}
           onChange={(v) => handleChange('any_tags', v)}
           placeholder="e.g. bus, transport, taxi"
         />
@@ -479,7 +479,7 @@ function MatchRulesEditor({
       {/* Live preview of the JSON */}
       <div className="pt-1">
         <p className="text-white/20 text-[9px] font-mono break-all">
-          {JSON.stringify(rules)}
+          {JSON.stringify(rules || {})}
         </p>
       </div>
     </div>
