@@ -8,6 +8,7 @@ import { analytics } from '../../lib/analytics';
 import { FeatureFlags } from '../../lib/featureFlags';
 import { useGameMode } from '../../contexts/GameModeContext';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ProfileWidget } from '../../components/ProfileWidget';
 
 function FeedBackButton({
   isFullscreen,
@@ -92,15 +93,15 @@ export function FeedCarouselPage() {
   
   const albumPostcardIds = new Set<string>();
 
-  const handleClaimPostcard = useCallback(async (id: string, cost?: number) => {
-     const res = await claim(id, cost);
+  const handleClaimPostcard = useCallback(async (id: string, rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common') => {
+     const res = await claim(id, rarity);
      if (res.success) {
-         setClaimToast({ type: 'success', message: `¡Postal Sellada! Costo: ${res.stamp_cost ?? 2} Sellos` });
+         setClaimToast({ type: 'success', message: `¡Postal Sellada!` });
          refetchCollection();
          refetchAlbums();
      } else {
          if (res.error === 'INSUFFICIENT_STAMPS') {
-             setClaimToast({ type: 'error', message: `Necesitas ${res.stamp_cost ?? 2} Sellos (Tienes ${res.balance ?? 0}). ¡A Jugar!` });
+             setClaimToast({ type: 'error', message: `No tienes sellos ${rarity}s. ¡A Jugar!` });
          } else if (res.error === 'ALREADY_CLAIMED') {
              setClaimToast({ type: 'error', message: 'Ya tienes esta postal.' });
          } else {
@@ -113,6 +114,13 @@ export function FeedCarouselPage() {
   return (
     <div className='w-full h-full flex flex-col relative bg-[#e6e2da] overflow-hidden'>
       <FeedBackButton isFullscreen={isFullscreen} navigate={navigate} lang={lang} />
+      {!isFullscreen && (
+        <div className="absolute top-3 right-3 z-[60]">
+          <ProfileWidget 
+            handleAuthRequiredAction={handleAuthRequiredAction} 
+          />
+        </div>
+      )}
       
       <WalkerCarousel
           items={feedItems}
@@ -134,8 +142,8 @@ export function FeedCarouselPage() {
           setPendingFavoriteId={() => {}}
           hasSharedCard={false}
           claimedIds={user ? claimedIds : new Set()}
-          onClaimPostcard={(id, cost) => handleAuthRequiredAction(() => {
-            if (user) handleClaimPostcard(id, cost);
+          onClaimPostcard={(id, rarity) => handleAuthRequiredAction(() => {
+            if (user) handleClaimPostcard(id, rarity);
           })}
           isClaimLoading={isClaiming}
           albumPostcardIds={albumPostcardIds}

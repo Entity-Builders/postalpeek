@@ -73,7 +73,7 @@ interface PostcardProps {
   /** Collectibles */
   isClaimedByMe?: boolean;
   hasOwner?: boolean;
-  onClaimPostcard?: (postcardId: string, cost?: number) => void;
+  onClaimPostcard?: (postcardId: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
   isClaimLoading?: boolean;
   /** Dev-only: whether this postcard is in an album */
   isInAlbum?: boolean;
@@ -99,6 +99,8 @@ interface PostcardProps {
   isTutorial?: boolean;
   /** Override the Play behavior */
   onPlayGame?: () => void;
+  /** Current user metadata */
+  user?: import('@supabase/supabase-js').User | null;
 }
 
 const springFlip = {
@@ -137,6 +139,7 @@ export function Postcard({
   autoStartGame = false,
   isTutorial = false,
   onPlayGame,
+  user,
 }: PostcardProps) {
   const { isGameActive } = useGameMode();
   const [isFlipped, setIsFlipped] = useState(false);
@@ -364,6 +367,7 @@ export function Postcard({
             autoStartGame={autoStartGame}
             isTutorial={isTutorial}
             onPlayGame={onPlayGame}
+            user={user}
           />
           {backView === 'coupon' ? (
             <PostcardCoupon
@@ -377,6 +381,9 @@ export function Postcard({
               handleImageError={handleImageError}
               onFlipBack={() => flipTo(false)}
               isActive={isActive}
+              isClaimedByMe={isClaimedByMe}
+              onClaimPostcard={onClaimPostcard}
+              isClaimLoading={isClaimLoading}
             />
           )}
         </div>

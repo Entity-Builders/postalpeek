@@ -1,6 +1,6 @@
 import React, { useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Play } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, CircleUserRound } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import type { FeedItem } from './Postcard';
@@ -41,6 +41,10 @@ interface TripSlideProps {
   hasOwner?: boolean;
   /** Disable blur filters during tutorial */
   isTutorial?: boolean;
+  /** Whether the user owns this */
+  isClaimedByMe?: boolean;
+  /** Current user metadata */
+  user?: import('@supabase/supabase-js').User | null;
 }
 
 /** Scale factor applied to the image in clean/loupe mode */
@@ -68,6 +72,8 @@ export function TripSlide({
   isTriviaLocked = false,
   hasOwner = true,
   isTutorial = false,
+  isClaimedByMe,
+  user,
 }: TripSlideProps) {
   const pUrl = useSignedImage(
     preloadedMainUrl ? null : slideItem.illustration_url,
@@ -101,6 +107,10 @@ export function TripSlide({
   const debugBbox =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('debug');
+
+  const avatarUrl = user?.user_metadata?.avatar_url;
+  const name = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0];
+  const initial = typeof name === 'string' && name.length > 0 ? name.charAt(0).toUpperCase() : '?';
 
   // ── Loupe zoom — ref-based for zero re-renders ──
   // We render a second <img> (the "lens") on top of the base image.
@@ -252,16 +262,45 @@ export function TripSlide({
               ? 'scale-[1.35] opacity-0'
               : !slideItem.video_url && 'hover:scale-105',
             isTriviaLocked && 'blur-md scale-110 saturate-50 brightness-90',
-            !hasOwner && !isTriviaLocked && !isTutorial && 'grayscale blur-[4px] scale-105'
           )}
         />
       )}
 
       {/* Scarcity lock badge — unclaimed only */}
-      {!hasOwner && !isClean && (
-        <div className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[11px] font-semibold px-2 py-0.5 rounded-full pointer-events-none z-20'>
-          🔒 {t({ es: 'Sin sellar', en: 'Unsealed' })}
-        </div>
+      {!isClean && (
+        <AnimatePresence>
+          {!hasOwner ? (
+            <motion.div
+              key="unowned"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              className='absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-white/90 text-[11px] font-semibold px-2.5 py-1.5 rounded-full pointer-events-none z-20'
+            >
+              <CircleUserRound className='w-4 h-4 opacity-80' /> {t({ es: 'Sin dueño', en: 'Unowned' })}
+            </motion.div>
+          ) : isClaimedByMe && user ? (
+            <motion.div
+              key="owned"
+              initial={{ opacity: 0, scale: 0.8, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.25, type: 'spring', stiffness: 400, damping: 25 }}
+              className='absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur-md text-white/90 text-[11px] font-semibold pr-2.5 pl-1.5 py-1.5 rounded-full pointer-events-none z-20 border border-white/10 shadow-lg'
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+              ) : (
+                <div className="w-5 h-5 shadow-inner rounded-full bg-amber-500 flex items-center justify-center text-[10px] text-white">
+                  {initial}
+                </div>
+              )}
+              <span className="truncate max-w-[100px]">
+                {name}
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       )}
 
       {/* Loupe lens — disabled for now (TODO: revisit later) */}

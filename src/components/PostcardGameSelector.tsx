@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Puzzle, Stamp, Trophy, Check, X } from 'lucide-react';
+import { Search, Puzzle, Trophy, Check, X } from 'lucide-react';
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import { t } from '../utils/i18n';
 import type { DbGameType } from '../hooks/useGameProgress';
@@ -31,7 +31,7 @@ interface PostcardGameSelectorProps {
   onSelect?: (mode: GameMode) => void;
 }
 
-const GAMES: { type: DbGameType; icon: typeof Search; label: { es: string; en: string }; desc: { es: string; en: string }; color: string }[] = [
+const GAMES: { type: DbGameType; icon: React.ElementType; label: { es: string; en: string }; desc: { es: string; en: string }; color: string }[] = [
   {
     type: 'find_objects',
     icon: Search,
@@ -48,7 +48,7 @@ const GAMES: { type: DbGameType; icon: typeof Search; label: { es: string; en: s
   },
   {
     type: 'stamp_hunt',
-    icon: Stamp,
+    icon: PostalPeekStampSVG,
     label: { es: 'Encontrar el sello', en: 'Find the stamp' },
     desc: { es: '¿Dónde se escondió el sello?', en: 'Where is the stamp hiding?' },
     color: 'red',

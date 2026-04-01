@@ -6,6 +6,10 @@ interface StampBalance {
   balance: number;
   total_earned: number;
   total_spent: number;
+  common: number;
+  rare: number;
+  epic: number;
+  legendary: number;
 }
 
 type SpendError = 'INSUFFICIENT_STAMPS' | 'AUTH_REQUIRED' | 'UNKNOWN';
@@ -30,6 +34,10 @@ export function useStamps(userId: string | null | undefined) {
     balance: 0,
     total_earned: 0,
     total_spent: 0,
+    common: 0,
+    rare: 0,
+    epic: 0,
+    legendary: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [hasClaimedDaily, setHasClaimedDaily] = useState(false);
@@ -37,7 +45,7 @@ export function useStamps(userId: string | null | undefined) {
   // Fetch balance on mount / when user changes
   useEffect(() => {
     if (!userId) {
-      setBalance({ balance: 0, total_earned: 0, total_spent: 0 });
+      setBalance({ balance: 0, total_earned: 0, total_spent: 0, common: 0, rare: 0, epic: 0, legendary: 0 });
       return;
     }
 
@@ -58,19 +66,22 @@ export function useStamps(userId: string | null | undefined) {
     }
   }, [userId]);
 
-  const addLocalStamps = useCallback((amount: number) => {
+  const addLocalStamps = useCallback((common: number = 0, rare: number = 0, epic: number = 0, legendary: number = 0) => {
     setBalance(prev => ({
       ...prev,
-      balance: prev.balance + amount,
-      total_earned: amount > 0 ? prev.total_earned + amount : prev.total_earned,
-      total_spent: amount < 0 ? prev.total_spent - amount : prev.total_spent
+      common: prev.common + common,
+      rare: prev.rare + rare,
+      epic: prev.epic + epic,
+      legendary: prev.legendary + legendary,
+      // For legacy compatibility
+      balance: prev.balance + common + rare + epic + legendary,
     }));
   }, []);
 
-  const setLocalStamps = useCallback((balance: number) => {
+  const setLocalStamps = useCallback((updates: Partial<StampBalance>) => {
     setBalance(prev => ({
       ...prev,
-      balance,
+      ...updates,
     }));
   }, []);
 
@@ -152,9 +163,7 @@ export function useStamps(userId: string | null | undefined) {
   );
 
   return {
-    stampBalance: balance.balance,
-    totalEarned: balance.total_earned,
-    totalSpent: balance.total_spent,
+    stampBalances: balance,
     isLoading,
     hasClaimedDaily,
     claimDailyStamps,

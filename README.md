@@ -1,3 +1,19 @@
+---
+name: 'PostalPeek'
+tagline: 'Your digital passport to the world — collect postcards through walking.'
+platform: 'iOS / Android'
+status: 'active'
+category: 'lifestyle'
+icon: '📮'
+features:
+  - 'Real-world walking progression'
+  - 'Collectible postcards & albums'
+  - 'Gacha mechanics'
+  - 'Vibe-based location discovery'
+downloadUrl: ''
+visible: true
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

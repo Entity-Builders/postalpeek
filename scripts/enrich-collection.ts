@@ -25,7 +25,7 @@ const MIN_VISUAL_TAG_WEIGHT = 7;
 const MIN_VISUAL_TAG_CONFIDENCE = 7;
 
 const TAXONOMY_INSTRUCTIONS = `
-"detailed_tags": An array of JSON objects describing EVERY visible element. Each object MUST have:
+"detailed_tags": An array of JSON objects describing EVERY distinct visible element in the scene. This powers our search index, so be exhaustive (feel free to list 20-40 items if present), but prioritize meaningful objects over individual leaves or bricks. Each object MUST have:
   - "label": { "en": "English lowercase tag with underscores (e.g. 'apartment_building', 'stray_cat', 'neon_sign'). Use the MOST SPECIFIC term. If you tag 'apartment_building', do NOT also tag 'building'.", "es": "Spanish translation (e.g. 'edificio de departamentos', 'gato callejero', 'cartel de neón')." }
   - "type": A semantic category. Common ones: "architecture", "vehicle", "nature", "object", "person", "animal", "food", "signage". You MAY invent new types if nothing fits well (e.g. "urban_art", "infrastructure", "weather_element", "street_furniture", "public_transport", "religious", "sports", "water_feature"). Use lowercase with underscores.
   - "weight": 1-10 integer. How PROMINENT is this element in the frame? 10 = the main subject/fills most of the image. 1 = tiny background detail barely visible.
@@ -93,14 +93,16 @@ const INPUT_COST_PER_M = 0.15;
 const OUTPUT_COST_PER_M = 0.6;
 const RATE_LIMIT_DELAY_S = 1;
 
+const CATEGORY_INSTRUCTIONS = `"category": { "es": "A short category with an emoji in Spanish. MUST be ONE OF these core themes based on the dominant setting: 🏙️ Paisaje Urbano, 🏘️ Barrio Residencial, 🌿 Naturaleza y Parques, 🏛️ Histórico y Monumentos, 🏖️ Costa y Agua, 🛣️ Autopista y Ruta, 🏭 Zona Industrial, 🏪 Zona Comercial, 🎨 Escena Cultural, ⛰️ Montañas y Colinas, 🏜️ Paisaje Árido, 🏚️ Abandonado. DO NOT invent highly specific categories.", "en": "Same category in English (e.g. 🏙️ Urban Cityscape, 🌿 Nature & Parks)" }`;
+
 // --- Taxonomy prompt: uses shared constants from prompt-constants.ts ---
 const taxonomyPrompt = `Analyze this street view image carefully. Respond with a JSON object:
 {
-  "category": { "es": "A short 2-3 word category with an emoji in Spanish, e.g. \ud83c\udf06 Atardecer", "en": "Same category in English, e.g. \ud83c\udf06 Sunset" },
+  ${CATEGORY_INSTRUCTIONS},
   "description": { "es": "A short, atmospheric, poetic sentence describing the vibe in Spanish", "en": "The same sentence translated to English" },
   ${TAXONOMY_INSTRUCTIONS}
-  "aesthetic_vibes": ["1-3 mood tags like cyberpunk, melancholic, cottagecore. Lowercase with underscores."],
-  "architecture_style": "Dominant style or none",
+  "aesthetic_vibes": ["1-3 mood tags like cyberpunk, melancholic, cottagecore. PRIORITIZE THOSE OVER INVENTING NEW ONES. Lowercase with underscores."],
+  "architecture_style": "Dominant style or none. PRIORITIZE common ones over inventing.",
   "color_palette": "One of: monochromatic, pastel, neon, earthy, vibrant, moody, warm_terracotta, cool_blues"
 }`;
 

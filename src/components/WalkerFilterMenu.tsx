@@ -36,13 +36,13 @@ interface WalkerFilterMenuProps {
   selectedCountry: string | null;
   onSelectCountry: (country: string | null) => void;
   isLoggedIn: boolean;
-  onOpenAlbumsModal: () => void;
   spotlightQuery?: string;
   isSpotlightSearching?: boolean;
   onSpotlightSearch?: (query: string) => void;
   onSpotlightDismiss?: () => void;
   viewMode: 'grid' | 'feed';
   onToggleViewMode: () => void;
+  profileWidgetNode?: React.ReactNode;
 }
 
 export function WalkerFilterMenu({
@@ -57,6 +57,7 @@ export function WalkerFilterMenu({
   onSpotlightDismiss,
   viewMode,
   onToggleViewMode,
+  profileWidgetNode,
 }: WalkerFilterMenuProps) {
   const lang = useLang();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +91,7 @@ export function WalkerFilterMenu({
     >
       <div
         ref={containerRef}
-        className='flex items-center gap-2 w-full max-w-5xl mx-auto pr-[52px]'
+        className='flex items-center gap-2 w-full max-w-5xl mx-auto'
       >
         {/* ── Unified Search Bar with inline country chip ── */}
         <div className={cn(
@@ -192,6 +193,8 @@ export function WalkerFilterMenu({
             )}
           </button>
         )}
+
+        {profileWidgetNode}
       </div>
     </div>
   );

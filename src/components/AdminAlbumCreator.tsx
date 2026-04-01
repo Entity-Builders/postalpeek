@@ -3,7 +3,6 @@
  *
  * Features:
  * - Create albums with all DB fields exposed
- * - Structured match_rules editor
  * - Postcard picker with search
  * - Slot builder (add, remove, reorder, edit labels)
  * - Edit existing albums
@@ -39,13 +38,6 @@ import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
 type Difficulty = 'easy' | 'medium' | 'hard' | 'epic';
 
-interface MatchRules {
-  country?: string;
-  city?: string;
-  required_tags?: string[];
-  any_tags?: string[];
-}
-
 interface AlbumFormData {
   title: string;
   description: string;
@@ -54,7 +46,6 @@ interface AlbumFormData {
   city: string;
   difficulty: Difficulty;
   reward_claims: number;
-  match_rules: MatchRules;
   cover_image_url: string;
   is_active: boolean;
 }
@@ -78,7 +69,6 @@ interface ExistingAlbum {
   city: string | null;
   difficulty: string;
   reward_claims: number;
-  match_rules: MatchRules;
   cover_image_url: string | null;
   is_active: boolean;
   source: string | null;
@@ -111,7 +101,6 @@ const EMPTY_FORM: AlbumFormData = {
   city: '',
   difficulty: 'easy',
   reward_claims: 5,
-  match_rules: {},
   cover_image_url: '',
   is_active: true,
 };
@@ -403,88 +392,7 @@ function PickerThumb({ url, alt }: { url: string | null; alt: string }) {
   return <img src={signedUrl} alt={alt} className="w-full h-full object-cover" loading="lazy" />;
 }
 
-// ── Match Rules Editor ─────────────────────────────────────────────────
 
-function MatchRulesEditor({
-  rules,
-  onChange,
-}: {
-  rules: MatchRules | null;
-  onChange: (rules: MatchRules) => void;
-}) {
-  const handleChange = (key: keyof MatchRules, value: string) => {
-    const newRules = { ...(rules || {}) };
-    if (key === 'required_tags' || key === 'any_tags') {
-      const arr = value
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (arr.length > 0) {
-        newRules[key] = arr;
-      } else {
-        delete newRules[key];
-      }
-    } else {
-      if (value.trim()) {
-        newRules[key] = value.trim();
-      } else {
-        delete newRules[key];
-      }
-    }
-    onChange(newRules);
-  };
-
-  return (
-    <div
-      className="rounded-xl p-3 space-y-2 border"
-      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(99,102,241,0.15)' }}
-    >
-      <p className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1">
-        🎯 Match Rules (dynamic slot matching)
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label>Country (exact)</Label>
-          <TextInput
-            value={rules?.country || ''}
-            onChange={(v) => handleChange('country', v)}
-            placeholder="e.g. Argentina"
-          />
-        </div>
-        <div>
-          <Label>City (exact)</Label>
-          <TextInput
-            value={rules?.city || ''}
-            onChange={(v) => handleChange('city', v)}
-            placeholder="e.g. Buenos Aires"
-          />
-        </div>
-      </div>
-      <div>
-        <Label>Required tags (ALL must match, comma-separated)</Label>
-        <TextInput
-          value={(rules?.required_tags || []).join(', ')}
-          onChange={(v) => handleChange('required_tags', v)}
-          placeholder="e.g. colectivo, graffiti"
-        />
-      </div>
-      <div>
-        <Label>Any tags (at least ONE must match, comma-separated)</Label>
-        <TextInput
-          value={(rules?.any_tags || []).join(', ')}
-          onChange={(v) => handleChange('any_tags', v)}
-          placeholder="e.g. bus, transport, taxi"
-        />
-      </div>
-      {/* Live preview of the JSON */}
-      <div className="pt-1">
-        <p className="text-white/20 text-[9px] font-mono break-all">
-          {JSON.stringify(rules || {})}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 // ── Slot Row ───────────────────────────────────────────────────────────
 
@@ -553,7 +461,7 @@ function SlotRow({
           placeholder="Slot label…"
         />
         <p className="text-white/25 text-[9px] truncate">
-          {slot.city}{slot.country ? `, ${slot.country}` : ''} · {slot.postcard_id.slice(0, 8)}
+          {slot.city}{slot.country ? `, ${slot.country}` : ''} · {(slot.postcard_id || '').slice(0, 8)}
         </p>
       </div>
 
@@ -662,7 +570,7 @@ export function AdminAlbumCreator() {
     try {
       const { data, error } = await supabase
         .from('postalpeek_albums')
-        .select('id, title, description, category, country, city, difficulty, reward_claims, match_rules, cover_image_url, is_active, source, created_at')
+        .select('id, title, description, category, country, city, difficulty, reward_claims, cover_image_url, is_active, source, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -682,7 +590,6 @@ export function AdminAlbumCreator() {
       setExistingAlbums(
         (data || []).map((a) => ({
           ...a,
-          match_rules: (a.match_rules as MatchRules) || {},
           slot_count: countMap[a.id] || 0,
         })) as ExistingAlbum[],
       );
@@ -708,7 +615,6 @@ export function AdminAlbumCreator() {
       city: album.city || '',
       difficulty: (album.difficulty as Difficulty) || 'easy',
       reward_claims: album.reward_claims,
-      match_rules: album.match_rules || {},
       cover_image_url: album.cover_image_url || '',
       is_active: album.is_active,
     });
@@ -816,13 +722,6 @@ export function AdminAlbumCreator() {
         form.cover_image_url.trim() ||
         (slots.length > 0 ? slots[0].illustration_url : null);
 
-      // Clean up match_rules: remove empty fields
-      const cleanRules: MatchRules = {};
-      if (form.match_rules.country) cleanRules.country = form.match_rules.country;
-      if (form.match_rules.city) cleanRules.city = form.match_rules.city;
-      if (form.match_rules.required_tags?.length) cleanRules.required_tags = form.match_rules.required_tags;
-      if (form.match_rules.any_tags?.length) cleanRules.any_tags = form.match_rules.any_tags;
-
       const albumPayload = {
         title: form.title.trim(),
         description: form.description.trim() || null,
@@ -831,7 +730,6 @@ export function AdminAlbumCreator() {
         city: form.city.trim() || null,
         difficulty: form.difficulty,
         reward_claims: form.reward_claims,
-        match_rules: Object.keys(cleanRules).length > 0 ? cleanRules : {},
         cover_image_url: coverUrl,
         is_active: form.is_active,
         source: 'curated',
@@ -1111,8 +1009,6 @@ export function AdminAlbumCreator() {
             </div>
           </div>
 
-          {/* Match Rules */}
-          <MatchRulesEditor rules={form.match_rules} onChange={(r) => updateForm('match_rules', r)} />
 
           {/* Slots */}
           <div

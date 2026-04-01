@@ -47,7 +47,7 @@ interface WalkerCarouselProps {
   hasSharedCard: boolean;
   /** Collectibles */
   claimedIds: Set<string>;
-  onClaimPostcard?: (postcardId: string, cost?: number) => void;
+  onClaimPostcard?: (postcardId: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
   isClaimLoading?: boolean;
   albumPostcardIds?: Set<string>;
   /** Daily Pack inline mode */

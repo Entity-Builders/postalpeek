@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 
+import type { BilingualText } from '../utils/i18n';
+
 export interface Album {
   id: string;
-  title: string;
-  description: string | null;
+  title: string | BilingualText;
+  description: string | BilingualText | null;
   cover_image_url: string | null;
   category: string;
   country: string | null;

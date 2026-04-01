@@ -19,6 +19,7 @@ import { FeedLayout } from './pages/feed/FeedLayout';
 import { FeedGridPage } from './pages/feed/FeedGridPage';
 import { FeedCarouselPage } from './pages/feed/FeedCarouselPage';
 import { CollectionPage } from './pages/feed/CollectionPage';
+import { ProfilePage } from './pages/feed/ProfilePage';
 import { GamePage } from './pages/GamePage';
 
 // ── Feed (main app) ────────────────────────────────────────────────────
@@ -180,6 +181,7 @@ function App() {
                     <Route path='carousel' element={<FeedCarouselPage />} />
                     <Route path='collection' element={<CollectionPage />} />
                     <Route path='album/:albumId' element={<AlbumPage />} />
+                    <Route path='profile' element={<ProfilePage />} />
                   </Route>
                   
                   {/* Public Postcard View — needs the FeedLayout context */}

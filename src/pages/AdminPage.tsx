@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
-import { ILLUSTRATION_STYLES, ACTIVE_STYLE_KEY } from '../../../../eb-infra/supabase/functions/_shared/postcard-engine/illustration-styles.ts';
+import { PipelineConfigurator } from '../components/PipelineConfigurator';
 import type { User } from '@supabase/supabase-js';
 import { useGenerationLog } from '../hooks/useGenerationLog';
 import { useSignedImage } from '../utils/useSignedImage';
@@ -163,6 +163,255 @@ function BrowserCard({ pc, onClick }: { pc: BrowserPostcard; onClick: (id: strin
         </p>
       </div>
     </div>
+  );
+}
+// ── Postcard Detail Panel helpers (must be outside component) ──────────
+
+const TAG_COLORS: Record<string, { bg: string; fg: string }> = {
+  indigo:  { bg: 'rgba(99,102,241,0.15)',  fg: 'rgb(165,180,252)' },
+  emerald: { bg: 'rgba(16,185,129,0.15)',  fg: 'rgb(110,231,183)' },
+  amber:   { bg: 'rgba(245,158,11,0.15)',  fg: 'rgb(252,211,77)' },
+  rose:    { bg: 'rgba(244,63,94,0.15)',   fg: 'rgb(251,113,133)' },
+  sky:     { bg: 'rgba(14,165,233,0.15)',  fg: 'rgb(125,211,252)' },
+  violet:  { bg: 'rgba(139,92,246,0.15)',  fg: 'rgb(196,181,253)' },
+};
+
+function TagPill({ children, color = 'indigo' }: { children: React.ReactNode; color?: string }) {
+  const c = TAG_COLORS[color] || TAG_COLORS.indigo;
+  return (
+    <span
+      className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium mr-1 mb-1"
+      style={{ background: c.bg, color: c.fg }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailSection({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <h4 className="text-[11px] font-semibold text-white/40 uppercase tracking-widest">{icon} {title}</h4>
+      <div>{children}</div>
+    </div>
+  );
+}
+// ── Postcard Detail Panel (AI Insights viewer) ─────────────────────────
+
+interface PostcardDetail {
+  id: string;
+  city: string;
+  country: string;
+  location_name: string;
+  category: { es: string; en: string } | string | null;
+  description: { es: string; en: string } | string | null;
+  visual_tags: string[] | null;
+  detailed_tags: Array<{ label: string; confidence?: number }> | null;
+  illustration_tags: string[] | null;
+  aesthetic_vibes: string[] | null;
+  architecture_style: string | null;
+  color_palette: string | null;
+  scene_type: string | null;
+  time_of_day: string | null;
+  weather: string | null;
+  human_activity: string | null;
+  original_image_url: string | null;
+  illustration_url: string | null;
+  generation_metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<PostcardDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('postalpeek_postcards')
+        .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, created_at')
+        .eq('id', postcardId)
+        .single();
+      if (error) console.error('[DetailPanel]', error);
+      setDetail(data as PostcardDetail | null);
+      setLoading(false);
+    };
+    fetch();
+  }, [postcardId]);
+
+  const origImg = useSignedImage(detail?.original_image_url ?? null, { width: 400 });
+  const illusImg = useSignedImage(detail?.illustration_url ?? null, { width: 400 });
+
+  const meta = detail?.generation_metadata;
+  const storytelling = meta?.storytelling as { did_you_know?: { es?: string; en?: string }; historical?: { es?: string; en?: string }; local_culture?: { es?: string; en?: string } } | undefined;
+  const trivia = meta?.trivia as { es?: string; en?: string } | undefined;
+  const vibeInjected = meta?.vibe_injected as string | undefined;
+  const strategy = meta?.strategy as string | undefined;
+
+  const bilingualText = (val: { es: string; en: string } | string | null | undefined): string => {
+    if (!val) return '—';
+    if (typeof val === 'string') return val;
+    return val.en || val.es || '—';
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="fixed top-0 right-0 h-full w-[420px] z-50 overflow-y-auto"
+      style={{ background: 'rgba(15,15,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}
+    >
+      {/* Header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between p-4" style={{ background: 'rgba(15,15,25,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <p className="text-white/80 text-sm font-semibold">{detail?.city}, {detail?.country}</p>
+          <p className="text-white/25 text-[10px] font-mono">{postcardId.slice(0, 12)}… · {detail?.created_at ? timeAgo(detail.created_at) : ''}</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.open(`/p/${encodeUuidToHash(postcardId)}`, '_blank')}
+            className="px-2 py-1 rounded-lg text-[10px] font-medium"
+            style={{ background: 'rgba(99,102,241,0.15)', color: 'rgb(165,180,252)', border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            Open ↗
+          </button>
+          <button onClick={onClose} className="text-white/30 hover:text-white/60 text-lg transition-colors">✕</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-white/30">
+          <Loader className="w-5 h-5 animate-spin" />
+        </div>
+      ) : !detail ? (
+        <div className="p-6 text-white/30 text-sm">Postcard not found</div>
+      ) : (
+        <div className="p-4 space-y-5">
+          {/* Images side by side */}
+          <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden">
+            <div className="aspect-[3/4] bg-white/5">
+              {origImg ? <img src={origImg} alt="Original" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/10 text-[10px]">No photo</div>}
+              <p className="text-[9px] text-white/25 text-center mt-1">📸 Original</p>
+            </div>
+            <div className="aspect-[3/4] bg-white/5">
+              {illusImg ? <img src={illusImg} alt="Illustration" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/10 text-[10px]">No illustration</div>}
+              <p className="text-[9px] text-white/25 text-center mt-1">🎨 Illustration</p>
+            </div>
+          </div>
+
+          {/* Category + Description */}
+          <DetailSection title="Categoría & Descripción" icon="📋">
+            <div className="rounded-lg p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-2">
+                <TagPill color="amber">{bilingualText(detail.category)}</TagPill>
+                {vibeInjected && <TagPill color="violet">✨ {vibeInjected}</TagPill>}
+                {strategy && <TagPill color="sky">🧭 {strategy}</TagPill>}
+              </div>
+              <p className="text-white/60 text-xs leading-relaxed">{bilingualText(detail.description)}</p>
+            </div>
+          </DetailSection>
+
+          {/* Scene Metadata */}
+          <DetailSection title="Escena" icon="🎬">
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { label: 'Scene Type', value: detail.scene_type, icon: '🏙️' },
+                { label: 'Time of Day', value: detail.time_of_day, icon: '🕐' },
+                { label: 'Weather', value: detail.weather, icon: '☀️' },
+                { label: 'Human Activity', value: detail.human_activity, icon: '👥' },
+                { label: 'Architecture', value: detail.architecture_style, icon: '🏛️' },
+                { label: 'Color Palette', value: detail.color_palette, icon: '🎨' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <p className="text-white/25 text-[9px] uppercase tracking-wider">{item.icon} {item.label}</p>
+                  <p className="text-white/70 text-xs font-medium mt-0.5">{item.value || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </DetailSection>
+
+          {/* Aesthetic Vibes */}
+          {detail.aesthetic_vibes && detail.aesthetic_vibes.length > 0 && (
+            <DetailSection title="Aesthetic Vibes" icon="✨">
+              <div className="flex flex-wrap">
+                {detail.aesthetic_vibes.map((v, i) => <TagPill key={i} color="violet">{v}</TagPill>)}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Visual Tags */}
+          {detail.visual_tags && detail.visual_tags.length > 0 && (
+            <DetailSection title="Visual Tags" icon="👁️">
+              <div className="flex flex-wrap">
+                {detail.visual_tags.map((t, i) => <TagPill key={i} color="indigo">{t}</TagPill>)}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Detailed Tags */}
+          {detail.detailed_tags && detail.detailed_tags.length > 0 && (
+            <DetailSection title={`Detailed Tags (${detail.detailed_tags.length})`} icon="🔍">
+              <div className="flex flex-wrap">
+                {detail.detailed_tags.map((t, i) => (
+                  <TagPill key={i} color="emerald">
+                    {t.label}{t.confidence ? ` (${Math.round(t.confidence * 100)}%)` : ''}
+                  </TagPill>
+                ))}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Illustration Tags */}
+          {detail.illustration_tags && detail.illustration_tags.length > 0 && (
+            <DetailSection title={`Illustration Tags (${detail.illustration_tags.length})`} icon="🏷️">
+              <div className="flex flex-wrap">
+                {detail.illustration_tags.map((t, i) => <TagPill key={i} color="rose">{t}</TagPill>)}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Storytelling */}
+          {storytelling && (
+            <DetailSection title="Storytelling" icon="📖">
+              <div className="space-y-2">
+                {storytelling.did_you_know && (
+                  <div className="rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                    <p className="text-amber-300/60 text-[9px] uppercase tracking-wider mb-1">💡 ¿Sabías que…?</p>
+                    <p className="text-amber-100/80 text-xs leading-relaxed">{storytelling.did_you_know.en || storytelling.did_you_know.es}</p>
+                  </div>
+                )}
+                {storytelling.historical && (
+                  <div className="rounded-lg p-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                    <p className="text-violet-300/60 text-[9px] uppercase tracking-wider mb-1">🏛️ Historia</p>
+                    <p className="text-violet-100/80 text-xs leading-relaxed">{storytelling.historical.en || storytelling.historical.es}</p>
+                  </div>
+                )}
+                {storytelling.local_culture && (
+                  <div className="rounded-lg p-3" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <p className="text-emerald-300/60 text-[9px] uppercase tracking-wider mb-1">🎭 Cultura local</p>
+                    <p className="text-emerald-100/80 text-xs leading-relaxed">{storytelling.local_culture.en || storytelling.local_culture.es}</p>
+                  </div>
+                )}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Trivia */}
+          {trivia && (
+            <DetailSection title="Trivia" icon="🎲">
+              <div className="rounded-lg p-3" style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                <p className="text-sky-100/80 text-xs leading-relaxed">{trivia.en || trivia.es || JSON.stringify(trivia)}</p>
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Bottom spacer */}
+          <div className="h-8" />
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -539,36 +788,18 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Main Component ─────────────────────────────────────────────────────
 
-const HUNT_THEME_OPTIONS = [
-  { slug: 'monuments',   label: '🏛️ Monumentos Históricos' },
-  { slug: 'skyscrapers', label: '🏙️ Rascacielos' },
-  { slug: 'bridges',     label: '🌉 Puentes' },
-  { slug: 'markets',     label: '🛒 Mercados y Bazares' },
-  { slug: 'churches',    label: '⛪ Iglesias y Catedrales' },
-  { slug: 'street_art',  label: '🎨 Arte Urbano' },
-  { slug: 'staircases',  label: '🪜 Escaleras y Callejones' },
-];
+
 
 export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<NavSection>('generation');
+  const [selectedPostcardId, setSelectedPostcardId] = useState<string | null>(null);
 
   // Stats
   const [stats, setStats] = useState<UserStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Generation
-  const [genStatus, setGenStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
-  const [illustrationStyleKeys, setIllustrationStyleKeys] = useState<string[]>([ACTIVE_STYLE_KEY]);
-  const [huntTheme, setHuntTheme] = useState('monuments');
-  const [huntCountry, setHuntCountry] = useState('');
-  const [huntLat, setHuntLat] = useState('');
-  const [huntLng, setHuntLng] = useState('');
-  const [huntStatus, setHuntStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
-  // Dynamic hunt
-  const [dynSubject, setDynSubject] = useState('');
-  const [dynCountry, setDynCountry] = useState('');
-  const [dynStatus, setDynStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+
 
   // Postcard actions
   const [postcardId, setPostcardId] = useState('');
@@ -619,16 +850,17 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     setStatsLoading(true);
     try {
       const userId = user?.id;
-      const [colRes, totalRes, unenrichedRes, noTagsRes, albumsRes] = await Promise.all([
+      const [colRes, totalRes, unenrichedRes, noTagsRes, albumsRes, albumsCompletedRes] = await Promise.all([
         userId
           ? supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).eq('owner_id', userId)
           : Promise.resolve({ count: 0 }),
         supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }),
         supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).is('detailed_tags', null),
         supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).not('illustration_url', 'is', null).or('illustration_tags.is.null,illustration_tags.eq.[]'),
-        supabase.from('postalpeek_albums').select('id, completed_at', { count: 'exact' }),
+        supabase.from('postalpeek_albums').select('id', { count: 'exact', head: true }),
+        supabase.from('postalpeek_album_progress').select('album_id', { count: 'exact', head: true }).not('completed_at', 'is', null),
       ]);
-      const albumsCompleted = (albumsRes.data as { id: string; completed_at: string | null }[] | null)?.filter(a => a.completed_at).length ?? 0;
+      const albumsCompleted = (albumsCompletedRes as { count: number | null }).count ?? 0;
       setStats({
         collectionCount: (colRes as { count: number | null }).count ?? 0,
         totalPostcards: (totalRes as { count: number | null }).count ?? 0,
@@ -659,73 +891,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     return data;
   }, []);
 
-  // ── Generation ──
 
-  const getRandomStyle = useCallback(() => {
-    return illustrationStyleKeys[Math.floor(Math.random() * illustrationStyleKeys.length)];
-  }, [illustrationStyleKeys]);
-
-  const triggerWander = useCallback(async () => {
-    setGenStatus({ status: 'loading', message: 'Generating wander postcard…' });
-    try {
-      const data = await callEdgeFunction('postalpeek-walker-wander', '', { illustration_style_key: getRandomStyle() });
-      setGenStatus({ status: 'success', message: `✅ ${data?.data?.location || 'done'}` });
-      onPostcardGenerated?.();
-      setTimeout(refetchLog, 2000);
-    } catch (err: unknown) {
-      setGenStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-    }
-  }, [callEdgeFunction, getRandomStyle, onPostcardGenerated, refetchLog]);
-
-  const triggerTrip = useCallback(async () => {
-    setGenStatus({ status: 'loading', message: 'Generating trip postcard…' });
-    try {
-      const data = await callEdgeFunction('postalpeek-walker-trip', '', { illustration_style_key: getRandomStyle() });
-      setGenStatus({ status: 'success', message: `✅ Trip: ${data?.postcards_created ?? 0} created` });
-      onPostcardGenerated?.();
-      setTimeout(refetchLog, 2000);
-    } catch (err: unknown) {
-      setGenStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-    }
-  }, [callEdgeFunction, getRandomStyle, onPostcardGenerated, refetchLog]);
-
-  const triggerHunt = useCallback(async () => {
-    setHuntStatus({ status: 'loading', message: `Hunting ${huntTheme}${huntCountry ? ` in ${huntCountry}` : ''}…` });
-    try {
-      // Build query params
-      const params: string[] = [`theme=${huntTheme}`];
-      const hasCoords = huntLat.trim() && huntLng.trim();
-      if (hasCoords) {
-        params.push(`lat=${huntLat.trim()}`, `lng=${huntLng.trim()}`);
-      } else if (huntCountry.trim()) {
-        params.push(`country=${encodeURIComponent(huntCountry.trim())}`);
-      }
-      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: getRandomStyle() });
-      const attempts = data?.attempts ?? 1;
-      const visible = data?.data?.theme_visible !== false;
-      setHuntStatus({ status: 'success', message: `✅ ${data?.data?.location} · ${attempts} attempt${attempts > 1 ? 's' : ''}${visible ? '' : ' (theme not visible)'}` });
-      onPostcardGenerated?.();
-      setTimeout(refetchLog, 2000);
-    } catch (err: unknown) {
-      setHuntStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-    }
-  }, [huntTheme, huntCountry, huntLat, huntLng, getRandomStyle, callEdgeFunction, onPostcardGenerated, refetchLog]);
-
-  const triggerDynamicHunt = useCallback(async () => {
-    if (!dynSubject.trim()) return;
-    setDynStatus({ status: 'loading', message: `🤖 Generating locations for "${dynSubject}"${dynCountry ? ` in ${dynCountry}` : ''}…` });
-    try {
-      const params: string[] = [`subject=${encodeURIComponent(dynSubject.trim())}`, 'theme=monuments'];
-      if (dynCountry.trim()) params.push(`country=${encodeURIComponent(dynCountry.trim())}`);
-      const data = await callEdgeFunction('postalpeek-walker-hunt', params.join('&'), { illustration_style_key: getRandomStyle() });
-      const attempts = data?.attempts ?? 1;
-      setDynStatus({ status: 'success', message: `✅ ${data?.data?.location} · ${attempts} attempt${attempts > 1 ? 's' : ''}` });
-      onPostcardGenerated?.();
-      setTimeout(refetchLog, 2000);
-    } catch (err: unknown) {
-      setDynStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-    }
-  }, [dynSubject, dynCountry, getRandomStyle, callEdgeFunction, onPostcardGenerated, refetchLog]);
 
   // ── Postcard Actions ──
 
@@ -735,7 +901,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     try {
       const { data, error } = await supabase.functions.invoke('postalpeek-regenerate-illustration', { body: { postcard_id: postcardId.trim() } });
       if (error) throw error;
-      setPostcardStatus({ status: 'success', message: data?.message || 'Illustration regenerated ✅' });
+      setPostcardStatus({ status: 'success', message: data?.message || 'Illustration regenerated' });
       onPostcardGenerated?.();
     } catch (err: unknown) {
       setPostcardStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -749,7 +915,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     try {
       const { error } = await supabase.rpc('postalpeek_admin_delete_postcard', { p_postcard_id: postcardId.trim() });
       if (error) throw error;
-      setPostcardStatus({ status: 'success', message: `Deleted ✅` });
+      setPostcardStatus({ status: 'success', message: `Deleted` });
       setPostcardId('');
       fetchStats();
       setTimeout(refetchLog, 500);
@@ -788,7 +954,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
         .eq('id', postcardId.trim());
       if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
 
-      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (real photo) & saved` });
+      setDetectStatus({ status: 'success', message: `${tags.length} objects found (real photo) & saved` });
     } catch (err: unknown) {
       setDetectStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -819,7 +985,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       setDetectedTags(tags);
       setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
 
-      setDetectStatus({ status: 'success', message: `✅ ${tags.length} objects found (illustration) & saved` });
+      setDetectStatus({ status: 'success', message: `${tags.length} objects found (illustration) & saved` });
     } catch (err: unknown) {
       setDetectStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -837,7 +1003,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       setDinoBoxes(boxes);
       // Update segments to match DINO detections
       setSegments(boxes.map((b: DinoBox) => ({ label: b.label, mask_url: '', status: 'pending' as const })));
-      setDinoStatus({ status: 'success', message: `✅ ${boxes.length} precise boxes` });
+      setDinoStatus({ status: 'success', message: `${boxes.length} precise boxes` });
     } catch (err: unknown) {
       setDinoStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -891,7 +1057,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
       await runSegmentOne(i);
       if (i < detectedTags.length - 1) await new Promise(r => setTimeout(r, 2000));
     }
-    setSegmentStatus({ status: 'success', message: `✅ Done` });
+    setSegmentStatus({ status: 'success', message: `Done` });
   }, [detectedTags, runSegmentOne]);
 
   // ── One-Click Grounded SAM (self-contained) ──
@@ -929,7 +1095,7 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
         .eq('id', postcardId.trim());
       if (updateErr) console.warn('[Segment] DB save error:', updateErr.message);
 
-      setGsamStatus({ status: 'success', message: `✅ Done & saved — ${data.outputs?.length || 0} output images` });
+      setGsamStatus({ status: 'success', message: `Done & saved — ${data.outputs?.length || 0} output images` });
     } catch (err: unknown) {
       setGsamStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -974,35 +1140,37 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
     }
   }, [user?.id]);
 
-  // ── Grant Stamps ──
-  const [grantTargetEmail, setGrantTargetEmail] = useState('');
-  const [grantAmount, setGrantAmount] = useState('10');
-  const [grantReason, setGrantReason] = useState('Admin grant');
-  const [grantStatus, setGrantStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  // ── Manage Stamps ──
+  const [stampTargetEmail, setStampTargetEmail] = useState('');
+  const [stampRarity, setStampRarity] = useState<'common' | 'rare' | 'epic' | 'legendary'>('common');
+  const [stampAmount, setStampAmount] = useState('10');
+  const [stampReason, setStampReason] = useState('Admin manual adjustment');
+  const [stampStatus, setStampStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
 
-  const grantStamps = useCallback(async () => {
-    if (!grantTargetEmail.trim() || !grantAmount.trim()) return;
-    const amount = parseInt(grantAmount.trim(), 10);
+  const manageStamps = useCallback(async (isDeduct: boolean) => {
+    if (!stampTargetEmail.trim() || !stampAmount.trim()) return;
+    const amount = parseInt(stampAmount.trim(), 10);
     if (isNaN(amount) || amount <= 0) {
-      setGrantStatus({ status: 'error', message: 'Amount must be a positive number' });
+      setStampStatus({ status: 'error', message: 'Amount must be a positive number' });
       return;
     }
-    setGrantStatus({ status: 'loading', message: `Granting ${amount} stamps to ${grantTargetEmail.trim()}…` });
+    const finalAmount = isDeduct ? -amount : amount;
+    const actionLabel = isDeduct ? 'Deducting' : 'Granting';
+    setStampStatus({ status: 'loading', message: `${actionLabel} ${amount} ${stampRarity} stamps for ${stampTargetEmail.trim()}…` });
     try {
-      const { data, error } = await supabase.rpc('postalpeek_admin_grant_stamps', {
-        p_user_email: grantTargetEmail.trim(),
-        p_amount: amount,
-        p_reason: grantReason.trim() || 'Admin grant',
+      const { error } = await supabase.rpc('postalpeek_admin_manage_typed_stamps', {
+        p_user_email: stampTargetEmail.trim(),
+        p_rarity: stampRarity,
+        p_amount: finalAmount,
+        p_reason: stampReason.trim() || 'Admin manual adjustment',
       });
       if (error) throw error;
-      const result = data as { success: boolean; new_balance?: number; error?: string };
-      if (!result.success) throw new Error(result.error || 'Grant failed');
-      setGrantStatus({ status: 'success', message: `✅ ${amount} sellos otorgados. Nuevo saldo: ${result.new_balance}` });
-      setGrantTargetEmail('');
+      setStampStatus({ status: 'success', message: `✅ ${amount} ${stampRarity} sellos ${isDeduct ? 'eliminados' : 'otorgados'}.` });
+      setStampTargetEmail('');
     } catch (err: unknown) {
-      setGrantStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+      setStampStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [grantTargetEmail, grantAmount, grantReason]);
+  }, [stampTargetEmail, stampRarity, stampAmount, stampReason]);
 
   // ── Sidebar links ──
 
@@ -1161,199 +1329,30 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
 
           {/* ── Generation ── */}
           {activeSection === 'generation' && (
-            <div className="max-w-lg space-y-8">
-              <h2 className="text-xl font-semibold">Generation</h2>
-
-              {/* Illustration style selector — applies to ALL pipelines below */}
-              <div className="rounded-xl p-4 border" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(99,102,241,0.2)' }}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">🎨 Illustration Style</span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                      style={{ background: 'rgba(99,102,241,0.2)', color: 'rgb(165,180,252)' }}
-                    >
-                      {illustrationStyleKeys.length > 1 ? 'multi-override' : (illustrationStyleKeys[0] === ACTIVE_STYLE_KEY ? 'default' : 'override')}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="space-y-1.5 max-h-[140px] overflow-y-auto px-1 -mx-1 custom-scrollbar">
-                  {Object.entries(ILLUSTRATION_STYLES).map(([key, style]) => {
-                    const isSelected = illustrationStyleKeys.includes(key);
-                    return (
-                      <label 
-                        key={key} 
-                        className="flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-all border"
-                        style={{ 
-                          background: isSelected ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)',
-                          borderColor: isSelected ? 'rgba(99,102,241,0.3)' : 'transparent',
-                        }}
-                      >
-                        <input 
-                          type="checkbox"
-                          className="mt-1 flex-shrink-0 cursor-pointer"
-                          style={{ accentColor: 'rgba(99,102,241,1)' }}
-                          checked={isSelected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setIllustrationStyleKeys(prev => [...prev, key]);
-                            } else if (illustrationStyleKeys.length > 1) {
-                              setIllustrationStyleKeys(prev => prev.filter(k => k !== key));
-                            }
-                          }}
-                        />
-                        <div className="flex flex-col">
-                          <span style={{ color: isSelected ? 'white' : 'rgba(255,255,255,0.7)' }} className="text-sm font-medium">
-                            {key === ACTIVE_STYLE_KEY ? `✓ ` : ''}{style.label}
-                          </span>
-                          <span className="text-[10px] text-white/30 leading-tight mt-0.5">
-                            {style.description}
-                          </span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Standard pipelines */}
-              <div>
-                <SectionTitle>Standard Pipelines</SectionTitle>
-                <div className="space-y-2">
-                  <ActionBtn onClick={triggerWander} disabled={genStatus.status === 'loading'}>
-                    <span>🌍</span><span>Wander — Random global postcard</span>
-                  </ActionBtn>
-                  <ActionBtn onClick={triggerTrip} disabled={genStatus.status === 'loading'} variant="success">
-                    <span>✈️</span><span>Trip — Next album stop</span>
-                  </ActionBtn>
-                </div>
-                <StatusMsg status={genStatus.status} message={genStatus.message} />
-              </div>
-
-              {/* Hunt mode */}
-              <div>
-                <SectionTitle>🎯 Hunt Mode — Themed</SectionTitle>
-                <div className="space-y-2">
-                  <select
-                    value={huntTheme}
-                    onChange={(e) => setHuntTheme(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm transition-all"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
-                  >
-                    {HUNT_THEME_OPTIONS.map((opt) => (
-                      <option key={opt.slug} value={opt.slug} style={{ background: '#1a1a2e', color: 'white' }}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Country filter */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={huntCountry}
-                      onChange={(e) => setHuntCountry(e.target.value)}
-                      placeholder="Country filter (e.g. Italy, France)   — optional"
-                      className="w-full px-3 py-2.5 rounded-xl text-sm"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
-                    />
-                  </div>
-
-                  {/* OR exact coordinates */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={huntLat}
-                      onChange={(e) => setHuntLat(e.target.value)}
-                      placeholder="Lat (e.g. 48.8584)"
-                      className="flex-1 px-3 py-2.5 rounded-xl text-sm font-mono"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
-                    />
-                    <input
-                      type="text"
-                      value={huntLng}
-                      onChange={(e) => setHuntLng(e.target.value)}
-                      placeholder="Lng (e.g. 2.2945)"
-                      className="flex-1 px-3 py-2.5 rounded-xl text-sm font-mono"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
-                    />
-                  </div>
-                  <p className="text-white/20 text-[10px] leading-relaxed">
-                    Country filters the curated list · Lat/Lng overrides with exact coordinates
-                  </p>
-
-                  <ActionBtn onClick={triggerHunt} disabled={huntStatus.status === 'loading'} variant="amber">
-                    <span>🎯</span>
-                    <span>Hunt {HUNT_THEME_OPTIONS.find(o => o.slug === huntTheme)?.label.split(' ').slice(1).join(' ')}{huntCountry ? ` in ${huntCountry}` : ''}{huntLat && huntLng ? ` @ ${huntLat},${huntLng}` : ''}</span>
-                  </ActionBtn>
-                </div>
-                <StatusMsg status={huntStatus.status} message={huntStatus.message} />
-              </div>
-
-              {/* Dynamic Hunt */}
-              <div>
-                <SectionTitle>🤖 Dynamic Hunt — Powered by Gemini</SectionTitle>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={dynSubject}
-                    onChange={(e) => setDynSubject(e.target.value)}
-                    placeholder="Subject: estadios de fútbol, plazas, mercados de flores…"
-                    className="w-full px-3 py-2.5 rounded-xl text-sm"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', outline: 'none' }}
-                  />
-                  <input
-                    type="text"
-                    value={dynCountry}
-                    onChange={(e) => setDynCountry(e.target.value)}
-                    placeholder="Country: Argentina, Japón, Brasil… (opcional)"
-                    className="w-full px-3 py-2.5 rounded-xl text-sm"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
-                  />
-                  <p className="text-white/20 text-[10px] leading-relaxed">
-                    Gemini genera la lista de coords · cualquier tema + país funciona
-                  </p>
-                  <ActionBtn
-                    onClick={triggerDynamicHunt}
-                    disabled={!dynSubject.trim() || dynStatus.status === 'loading'}
-                    variant="amber"
-                  >
-                    <span>🤖</span>
-                    <span>
-                      {dynSubject.trim()
-                        ? `Hunt: ${dynSubject}${dynCountry ? ` en ${dynCountry}` : ''}`
-                        : 'Escribí un subject para empezar'}
-                    </span>
-                  </ActionBtn>
-                </div>
-                <StatusMsg status={dynStatus.status} message={dynStatus.message} />
-              </div>
-
-              {/* Enrichment */}
-              <div>
-                <SectionTitle>Enrichment</SectionTitle>
-                <div className="rounded-xl p-4 border" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.06)' }}>
-                  <p className="text-white/50 text-xs mb-2">Run from the terminal:</p>
-                  <code className="text-xs font-mono text-indigo-300 break-all">
-                    yarn workspace postalpeek enrich:collection
-                  </code>
-                  {stats && stats.unenrichedCount > 0 && (
-                    <p className="text-amber-400 text-xs mt-2">⚠️ {stats.unenrichedCount} postcards need enrichment</p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <PipelineConfigurator
+              onPostcardGenerated={onPostcardGenerated}
+              onRefetchLog={refetchLog}
+            />
           )}
 
           {/* ── Browser ── */}
           {activeSection === 'browser' && (
             <div className="max-w-[1200px]">
               <PostcardsBrowser
-                onSelectPostcard={(id) => window.open(`/p/${encodeUuidToHash(id)}`, '_blank')}
+                onSelectPostcard={(id) => setSelectedPostcardId(id)}
               />
             </div>
           )}
+
+          {/* ── Detail Slideout ── */}
+          <AnimatePresence>
+            {selectedPostcardId && (
+              <PostcardDetailPanel
+                postcardId={selectedPostcardId}
+                onClose={() => setSelectedPostcardId(null)}
+              />
+            )}
+          </AnimatePresence>
 
           {/* ── Postcards ── */}
           {activeSection === 'postcards' && (
@@ -1650,14 +1649,14 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
             </div>
           )}
 
-          {/* ── Grant Stamps ── */}
+          {/* ── Manage Stamps ── */}
           {activeSection === 'stamps' && (
             <div className="max-w-lg space-y-6">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Stamp className="w-5 h-5 text-amber-400" />
-                Grant Stamps
+                Manage Stamps (Typed)
               </h2>
-              <p className="text-white/40 text-sm">Otorgar sellos a cualquier usuario por su email.</p>
+              <p className="text-white/40 text-sm">Grant or deduct specific rarity stamps for any user.</p>
 
               <div
                 className="rounded-xl p-5 space-y-4 border"
@@ -1673,8 +1672,8 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
                       <input
                         type="email"
-                        value={grantTargetEmail}
-                        onChange={(e) => setGrantTargetEmail(e.target.value)}
+                        value={stampTargetEmail}
+                        onChange={(e) => setStampTargetEmail(e.target.value)}
                         placeholder="user@example.com"
                         className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-mono"
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
@@ -1682,22 +1681,40 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                     </div>
                   </div>
 
-                  {/* Amount */}
                   <div className="flex gap-3">
+                    {/* Rarity */}
+                    <div className="w-1/3">
+                      <label className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1 block">
+                        Rarity
+                      </label>
+                      <select
+                        value={stampRarity}
+                        onChange={(e) => setStampRarity(e.target.value as any)}
+                        className="w-full px-3 py-1.5 rounded-lg text-sm transition-all h-[34px]"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
+                      >
+                        <option value="common">Common</option>
+                        <option value="rare">Rare</option>
+                        <option value="epic">Epic</option>
+                        <option value="legendary">Legendary</option>
+                      </select>
+                    </div>
+
+                    {/* Amount */}
                     <div className="flex-1">
                       <label className="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1 block">
                         Amount (Sellos)
                       </label>
                       <div className="flex gap-2">
-                        {[5, 10, 25, 50].map((preset) => (
+                        {[1, 5, 25].map((preset) => (
                           <button
                             key={preset}
-                            onClick={() => setGrantAmount(String(preset))}
-                            className="px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all"
+                            onClick={() => setStampAmount(String(preset))}
+                            className="px-2 py-1.5 rounded-lg text-xs font-mono font-medium transition-all h-[34px]"
                             style={{
-                              background: grantAmount === String(preset) ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.05)',
-                              border: `1px solid ${grantAmount === String(preset) ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                              color: grantAmount === String(preset) ? '#fbbf24' : 'rgba(255,255,255,0.5)',
+                              background: stampAmount === String(preset) ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${stampAmount === String(preset) ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                              color: stampAmount === String(preset) ? '#fbbf24' : 'rgba(255,255,255,0.5)',
                             }}
                           >
                             {preset}
@@ -1706,9 +1723,9 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                         <input
                           type="number"
                           min="1"
-                          value={grantAmount}
-                          onChange={(e) => setGrantAmount(e.target.value)}
-                          className="w-20 px-3 py-1.5 rounded-lg text-xs font-mono text-center"
+                          value={stampAmount}
+                          onChange={(e) => setStampAmount(e.target.value)}
+                          className="flex-1 px-3 py-1.5 rounded-lg text-sm font-mono text-center h-[34px]"
                           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', outline: 'none' }}
                         />
                       </div>
@@ -1722,28 +1739,39 @@ export function AdminPage({ user, onPostcardGenerated }: AdminPageProps) {
                     </label>
                     <input
                       type="text"
-                      value={grantReason}
-                      onChange={(e) => setGrantReason(e.target.value)}
-                      placeholder="Admin grant"
+                      value={stampReason}
+                      onChange={(e) => setStampReason(e.target.value)}
+                      placeholder="Admin manual adjustment"
                       className="w-full px-3 py-2.5 rounded-xl text-sm"
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
                     />
                   </div>
                 </div>
 
-                <ActionBtn
-                  onClick={grantStamps}
-                  disabled={grantStatus.status === 'loading' || !grantTargetEmail.trim()}
-                  variant="amber"
-                >
-                  {grantStatus.status === 'loading'
-                    ? <Loader className="w-3.5 h-3.5 animate-spin" />
-                    : <Stamp className="w-3.5 h-3.5" />
-                  }
-                  <span>Otorgar {grantAmount} sellos</span>
-                </ActionBtn>
+                <div className="flex gap-2 pt-2">
+                  <div className="flex-1">
+                    <ActionBtn
+                      onClick={() => manageStamps(false)}
+                      disabled={stampStatus.status === 'loading' || !stampTargetEmail.trim()}
+                      variant="success"
+                    >
+                      {stampStatus.status === 'loading' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <span>✅</span>}
+                      <span>Otorgar</span>
+                    </ActionBtn>
+                  </div>
+                  <div className="flex-1">
+                    <ActionBtn
+                      onClick={() => manageStamps(true)}
+                      disabled={stampStatus.status === 'loading' || !stampTargetEmail.trim()}
+                      variant="danger"
+                    >
+                      {stampStatus.status === 'loading' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <span>❌</span>}
+                      <span>Eliminar</span>
+                    </ActionBtn>
+                  </div>
+                </div>
 
-                <StatusMsg status={grantStatus.status} message={grantStatus.message} />
+                <StatusMsg status={stampStatus.status} message={stampStatus.message} />
               </div>
 
               {/* Rarity reference */}

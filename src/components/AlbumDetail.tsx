@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Trophy, HelpCircle, Eye, Search, MapPin, Tag } from 'lucide-react';
+import { ArrowLeft, Trophy, HelpCircle, Eye } from 'lucide-react';
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
-import type { AlbumSlot, AlbumDetailData, MatchRules } from '../hooks/useAlbumDetail';
+import type { AlbumSlot, AlbumDetailData } from '../hooks/useAlbumDetail';
 import { useFeedContext } from '../pages/feed/FeedLayout';
+import { useLang, t } from '../utils/i18n';
 import { AuthGateModal } from './AuthGateModal';
 
 interface AlbumDetailProps {
@@ -21,72 +22,6 @@ const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; icon: st
   epic:   { label: 'Épica',   color: 'bg-purple-100 text-purple-700',   icon: '💎' },
 };
 
-/** Build a human-readable description of what to look for */
-function CriteriaBanner({ rules, difficulty }: { rules: MatchRules; difficulty?: string }) {
-  const hasRules = rules && (rules.country || rules.city || rules.required_tags?.length || rules.any_tags?.length);
-  if (!hasRules && !difficulty) return null;
-
-  const parts: string[] = [];
-  if (rules.required_tags?.length) parts.push(rules.required_tags.join(', '));
-  if (rules.any_tags?.length) parts.push(rules.any_tags.join(' / '));
-
-  const locationParts: string[] = [];
-  if (rules.city) locationParts.push(rules.city);
-  if (rules.country) locationParts.push(rules.country);
-
-  const diff = difficulty ? DIFFICULTY_CONFIG[difficulty] : null;
-
-  return (
-    <div className='mt-3 bg-white/50 border border-stone-200/60 rounded-xl px-3.5 py-2.5 space-y-1.5'>
-      {/* Difficulty badge */}
-      {diff && (
-        <div className='flex items-center gap-1.5'>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${diff.color}`}>
-            {diff.icon} {diff.label}
-          </span>
-        </div>
-      )}
-
-      {/* What to look for */}
-      {parts.length > 0 && (
-        <div className='flex items-start gap-2'>
-          <Search className='w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0' />
-          <p className='text-[11px] text-stone-600'>
-            <span className='text-stone-400'>Buscá:</span>{' '}
-            <span className='font-semibold text-stone-700'>{parts.join(', ')}</span>
-          </p>
-        </div>
-      )}
-
-      {/* Location */}
-      {locationParts.length > 0 && (
-        <div className='flex items-start gap-2'>
-          <MapPin className='w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0' />
-          <p className='text-[11px] text-stone-600'>
-            <span className='text-stone-400'>En:</span>{' '}
-            <span className='font-semibold text-stone-700'>{locationParts.join(', ')}</span>
-          </p>
-        </div>
-      )}
-
-      {/* Tag pills */}
-      {(rules.required_tags?.length || rules.any_tags?.length) ? (
-        <div className='flex flex-wrap gap-1 pt-0.5'>
-          {rules.required_tags?.map(t => (
-            <span key={t} className='inline-flex items-center gap-0.5 bg-amber-100/80 text-amber-700 text-[9px] font-medium px-2 py-0.5 rounded-full'>
-              <Tag className='w-2.5 h-2.5' />{t}
-            </span>
-          ))}
-          {rules.any_tags?.map(t => (
-            <span key={t} className='inline-flex items-center gap-0.5 bg-stone-100 text-stone-500 text-[9px] font-medium px-2 py-0.5 rounded-full'>
-              <Tag className='w-2.5 h-2.5' />{t}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 function SlotCard({
   slot,
@@ -97,10 +32,9 @@ function SlotCard({
   index: number;
   onClick?: () => void;
 }) {
-  // Load image for owned, claimed (by others), and hint slots
-  const hasImage = slot.is_owned || slot.is_claimed || slot.is_hint;
+  // Load image for all slots — mystery slots get the URL too for blur effect
   const imgUrl = useSignedImage(
-    hasImage ? slot.illustration_url : null,
+    slot.illustration_url,
     { width: WIDTHS.mobile },
   );
 
@@ -118,16 +52,20 @@ function SlotCard({
         }`}
       >
         <div className='aspect-[3/4] overflow-hidden rounded-[2px] bg-stone-100 relative flex items-center justify-center'>
-          {slot.is_owned && imgUrl ? (
+          {slot.is_owned ? (
             <div className='w-full h-full relative'>
-              <img
-                src={imgUrl}
-                alt={slot.slot_label}
-                loading='lazy'
-                decoding='async'
-                className='w-full h-full object-cover'
-              />
-              {/* PostalPeek seal */}
+              {imgUrl ? (
+                <img
+                  src={imgUrl}
+                  alt={slot.slot_label}
+                  loading='lazy'
+                  decoding='async'
+                  className='w-full h-full object-cover'
+                />
+              ) : (
+                <div className='w-full h-full bg-gradient-to-br from-stone-200 to-stone-100 animate-pulse' />
+              )}
+              {/* PostalPeek seal — always visible once is_owned */}
               <div className='absolute bottom-1 right-1 w-7 h-7 text-red-800/50 rotate-[-12deg] pointer-events-none'>
                 <PostalPeekStampSVG className='w-full h-full' />
               </div>
@@ -163,6 +101,23 @@ function SlotCard({
                 <span className='text-[8px] text-stone-500/80 font-semibold'>Pista</span>
               </div>
             </div>
+          ) : imgUrl ? (
+            /* Mystery slot — show blurred preview to tease the card */
+            <div className='w-full h-full relative overflow-hidden'>
+              <img
+                src={imgUrl}
+                alt='???'
+                loading='lazy'
+                decoding='async'
+                className='w-full h-full object-cover blur-sm scale-105 brightness-75 saturate-75'
+              />
+              <div className='absolute inset-0 flex flex-col items-center justify-center gap-1.5'>
+                <div className='w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm'>
+                  <HelpCircle className='w-4 h-4 text-white/70' />
+                </div>
+                <span className='text-[8px] text-white/50 font-semibold tracking-widest'>???</span>
+              </div>
+            </div>
           ) : (
             /* Nobody has it yet — mystery blur */
             <div className='w-full h-full bg-gradient-to-br from-amber-50 to-stone-100 flex flex-col items-center justify-center gap-1'>
@@ -189,6 +144,7 @@ function SlotCard({
 export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
   const { album, slots, completed_at } = detail;
   const { user } = useFeedContext();
+  const lang = useLang();
   const [showAuthGate, setShowAuthGate] = React.useState(false);
 
   let optimisticSlots = slots;
@@ -235,14 +191,20 @@ export function AlbumDetail({ detail, isLoading, onClose }: AlbumDetailProps) {
         </div>
 
         <h2 className='font-serif text-lg text-stone-800 tracking-tight'>
-          {album.title}
+          {t(album.title, lang)}
         </h2>
         {album.description && (
-          <p className='text-xs text-stone-400 mt-0.5 line-clamp-2'>{album.description}</p>
+          <p className='text-xs text-stone-400 mt-0.5 line-clamp-2'>{t(album.description, lang)}</p>
         )}
 
-        {/* Criteria banner: what to look for */}
-        <CriteriaBanner rules={album.match_rules} difficulty={album.difficulty} />
+        {/* Difficulty badge */}
+        {album.difficulty && DIFFICULTY_CONFIG[album.difficulty] && (
+          <div className='mt-3 flex items-center gap-1.5'>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${DIFFICULTY_CONFIG[album.difficulty].color}`}>
+              {DIFFICULTY_CONFIG[album.difficulty].icon} {DIFFICULTY_CONFIG[album.difficulty].label}
+            </span>
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className='flex items-center gap-3 mt-3'>

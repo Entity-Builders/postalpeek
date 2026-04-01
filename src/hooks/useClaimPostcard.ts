@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { analytics } from '../lib/analytics';
 
-interface ClaimStatus {
+export interface ClaimStatus {
   daily_used: number;
   daily_limit: number;
   monthly_used: number;
@@ -11,7 +11,7 @@ interface ClaimStatus {
 
 type ClaimError = 'DAILY_LIMIT_REACHED' | 'MONTHLY_LIMIT_REACHED' | 'ALREADY_CLAIMED' | 'AUTH_REQUIRED' | 'INSUFFICIENT_STAMPS';
 
-interface ClaimResult {
+export interface ClaimResult {
   success: boolean;
   error?: ClaimError;
   // Legacy daily/monthly limit fields (kept for backward compat)
@@ -27,8 +27,8 @@ interface ClaimResult {
 
 export function useClaimPostcard(
   userId: string | null | undefined,
-  addLocalStamps?: (amount: number) => void,
-  setLocalStamps?: (balance: number) => void
+  addLocalStamps?: (common: number, rare: number, epic: number, legendary: number) => void,
+  setLocalStamps?: (updates: { balance: number; common?: number; rare?: number; epic?: number; legendary?: number }) => void
 ) {
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>({
@@ -39,8 +39,6 @@ export function useClaimPostcard(
   });
   /** Set of postcard IDs claimed by the current user (for optimistic UI) */
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
-  /** Last stamp cost encountered — useful for showing UI feedback */
-  const [lastStampCost, setLastStampCost] = useState<number | null>(null);
   /** True when last claim failed due to insufficient stamps */
   const [insufficientStamps, setInsufficientStamps] = useState(false);
 
@@ -71,7 +69,7 @@ export function useClaimPostcard(
   }, [userId]);
 
   const claim = useCallback(
-    async (postcardId: string, expectedCost: number = 3): Promise<ClaimResult> => {
+    async (postcardId: string, rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'tutorial' = 'common'): Promise<ClaimResult> => {
       if (!userId) {
         return { success: false, error: 'AUTH_REQUIRED' };
       }
@@ -83,8 +81,11 @@ export function useClaimPostcard(
 
       // OPTIMISTIC UI: instantly add to claimed set so UI reacts without delay
       setClaimedIds((prev) => new Set(prev).add(postcardId));
-      if (addLocalStamps && expectedCost > 0) {
-        addLocalStamps(-expectedCost);
+      if (addLocalStamps && rarity !== 'tutorial') {
+        if (rarity === 'common') addLocalStamps(-1, 0, 0, 0);
+        else if (rarity === 'rare') addLocalStamps(0, -1, 0, 0);
+        else if (rarity === 'epic') addLocalStamps(0, 0, -1, 0);
+        else if (rarity === 'legendary') addLocalStamps(0, 0, 0, -1);
       }
 
       try {
@@ -94,36 +95,22 @@ export function useClaimPostcard(
 
         if (error) throw error;
 
-        const result = data as ClaimResult;
+        // The RPC returns { success: true, rarity_consumed: string, remaining_stamps: number }
+        const result = data as { success: boolean; rarity_consumed?: string; remaining_stamps?: number; error?: string };
 
         if (result.success) {
           // Keep it in the optimistic local claimed set
           setInsufficientStamps(false);
-          if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
 
-          // Update legacy counters if present
-          if (result.daily_used != null && result.daily_limit != null) {
-            setClaimStatus((prev) => ({
-              ...prev,
-              daily_used: result.daily_used!,
-              daily_limit: result.daily_limit!,
-              monthly_used: result.monthly_used ?? prev.monthly_used,
-              monthly_limit: result.monthly_limit ?? prev.monthly_limit,
-            }));
-          }
-          
-          if (setLocalStamps && result.remaining_stamps != null) {
-            setLocalStamps(result.remaining_stamps);
-          } else if (addLocalStamps && result.stamp_cost != null && result.stamp_cost !== expectedCost) {
-            // Adjust optimistic deduction if cost was different
-            const diff = expectedCost - result.stamp_cost;
-            if (diff !== 0) addLocalStamps(diff);
+          if (setLocalStamps && result.rarity_consumed != null && result.remaining_stamps != null) {
+            // we don't know the full breakdown, but the RPC could theoretically return it.
+            // for now, we just sync after a short delay via refreshStamps if we wanted to be perfectly in sync!
+            // Actually, `useStamps` `addLocalStamps` did the optimistic right.
           }
 
           analytics.track('postcard_claimed', {
             postcard_id: postcardId,
-            stamp_cost: result.stamp_cost,
-            remaining_stamps: result.remaining_stamps,
+            rarity_consumed: result.rarity_consumed,
           });
         } else {
           // REVERT OPTIMISTIC UI on error
@@ -133,33 +120,35 @@ export function useClaimPostcard(
             return next;
           });
           
-          if (addLocalStamps && expectedCost > 0) {
-            addLocalStamps(expectedCost); // Revert
-          }
-          if (setLocalStamps && result.balance != null) {
-             setLocalStamps(result.balance); // Sync with source of truth
+          if (addLocalStamps && rarity !== 'tutorial') {
+            if (rarity === 'common') addLocalStamps(1, 0, 0, 0);
+            else if (rarity === 'rare') addLocalStamps(0, 1, 0, 0);
+            else if (rarity === 'epic') addLocalStamps(0, 0, 1, 0);
+            else if (rarity === 'legendary') addLocalStamps(0, 0, 0, 1);
           }
 
-          if (result.error === 'INSUFFICIENT_STAMPS') {
-            setInsufficientStamps(true);
-            if (result.stamp_cost != null) setLastStampCost(result.stamp_cost);
-          }
-          analytics.track('postcard_claim_failed', {
-            postcard_id: postcardId,
-            error: result.error,
-          });
+        if (result.error && result.error.includes('INSUFFICIENT')) {
+          setInsufficientStamps(true);
         }
+        analytics.track('postcard_claim_failed', {
+          postcard_id: postcardId,
+          error: result.error,
+        });
+      }
 
-        return result;
-      } catch (err) {
+      return result as ClaimResult;
+    } catch (err) {
         // REVERT OPTIMISTIC UI on exception
         setClaimedIds((prev) => {
           const next = new Set(prev);
           next.delete(postcardId);
           return next;
         });
-        if (addLocalStamps && expectedCost > 0) {
-          addLocalStamps(expectedCost); // Revert
+        if (addLocalStamps && rarity !== 'tutorial') {
+          if (rarity === 'common') addLocalStamps(1, 0, 0, 0);
+          else if (rarity === 'rare') addLocalStamps(0, 1, 0, 0);
+          else if (rarity === 'epic') addLocalStamps(0, 0, 1, 0);
+          else if (rarity === 'legendary') addLocalStamps(0, 0, 0, 1);
         }
         
         console.error('Failed to claim postcard:', err);
@@ -178,6 +167,5 @@ export function useClaimPostcard(
     claimStatus,
     claimedIds,
     insufficientStamps,
-    lastStampCost,
   };
 }

@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Stamp, Sparkles } from 'lucide-react';
+import { Star, Sparkles } from 'lucide-react';
 import { useStampHunt } from '../hooks/useStampHunt';
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 import type { FeedItem } from './Postcard';
@@ -290,7 +290,7 @@ export function StampHuntBottomPanel({ hunt, onClose, failLabel }: StampHuntBott
           className="flex items-center gap-3"
         >
           <div className="flex items-center gap-1.5">
-            <Stamp className="w-3.5 h-3.5 text-red-700" />
+            <PostalPeekStampSVG className="w-3.5 h-3.5 text-red-700" />
             <span className="text-stone-700 text-xs font-bold tabular-nums">
               {tapsCount} {t({ es: 'toques', en: 'taps' })}
             </span>
@@ -360,7 +360,7 @@ export function StampHuntBottomPanel({ hunt, onClose, failLabel }: StampHuntBott
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-1.5"
           >
-            <Stamp className="w-3.5 h-3.5 text-red-700" />
+            <PostalPeekStampSVG className="w-3.5 h-3.5 text-red-700" />
             <span className="text-stone-800 text-xs font-semibold">
               {t({ es: 'Encuentra el sello', en: 'Find the stamp' })} 📮
             </span>

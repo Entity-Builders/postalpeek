@@ -58,7 +58,7 @@ function AlbumCard({
         {coverUrl ? (
           <img
             src={coverUrl}
-            alt={album.title}
+            alt={typeof album.title === 'string' ? album.title : t(album.title, lang)}
             className='w-full h-full object-cover'
             loading='lazy'
           />
@@ -99,7 +99,7 @@ function AlbumCard({
         {/* Title + progress overlaid on image */}
         <div className='absolute bottom-0 left-0 right-0 p-3'>
           <h4 className='font-display text-sm md:text-base text-white font-semibold line-clamp-1 mb-2 drop-shadow-md'>
-            {album.title}
+            {t(album.title, lang)}
           </h4>
           <div className='flex items-center gap-2'>
             <div className='flex-1 bg-white/20 rounded-full h-1.5 overflow-hidden backdrop-blur-sm'>

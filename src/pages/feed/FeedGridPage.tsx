@@ -2,8 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFeedContext } from './FeedLayout';
 import { WalkerGrid } from '../../components/WalkerGrid';
-import { analytics } from '../../lib/analytics';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ProfileWidget } from '../../components/ProfileWidget';
 
 const AUTH_GATE_KEY = 'postalpeek_auth_gate';
 const AUTH_GATE_CARDS_KEY = 'postalpeek_auth_cards';
@@ -15,21 +15,21 @@ export function FeedGridPage() {
       availableCountries, selectedCountry, setSelectedCountry,
       showWelcome, spotlightResults, spotlightQuery, isSpotlightSearching,
       handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
-      user, claimedIds, unlockedCountries, setIsAlbumsModalOpen,
+      user, claimedIds, unlockedCountries,
       claim, refetchCollection, refetchAlbums, handleAuthRequiredAction
   } = useFeedContext();
 
   const [claimToast, setClaimToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
-  const handleClaimPostcard = useCallback(async (id: string, cost?: number) => {
-     const res = await claim(id, cost);
+  const handleClaimPostcard = useCallback(async (id: string, rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common') => {
+     const res = await claim(id, rarity);
      if (res.success) {
-         setClaimToast({ type: 'success', message: `¡Postal Sellada! Costo: ${res.stamp_cost ?? 2} Sellos` });
+         setClaimToast({ type: 'success', message: `¡Postal Sellada!` });
          refetchCollection();
          refetchAlbums();
      } else {
          if (res.error === 'INSUFFICIENT_STAMPS') {
-             setClaimToast({ type: 'error', message: `Necesitas ${res.stamp_cost ?? 2} Sellos (Tienes ${res.balance ?? 0}). ¡A Jugar!` });
+             setClaimToast({ type: 'error', message: `No tienes sellos ${rarity}s. ¡A Jugar!` });
          } else if (res.error === 'ALREADY_CLAIMED') {
              setClaimToast({ type: 'error', message: 'Ya tienes esta postal.' });
          } else {
@@ -84,15 +84,12 @@ export function FeedGridPage() {
         user={user}
         claimedIds={user ? claimedIds : new Set()}
         unlockedCountries={unlockedCountries}
-        onOpenAlbumsModal={() => {
-          setIsAlbumsModalOpen(true);
-          analytics.track('albums_opened');
-        }}
         viewMode="grid"
         onToggleViewMode={() => navigate('/feed/carousel')}
-        onClaimPostcard={(id, cost) => handleAuthRequiredAction(() => {
-          if (user) handleClaimPostcard(id, cost);
+        onClaimPostcard={(id, rarity) => handleAuthRequiredAction(() => {
+          if (user) handleClaimPostcard(id, rarity);
         })}
+        profileWidgetNode={<ProfileWidget handleAuthRequiredAction={handleAuthRequiredAction} />}
       />
 
       {/* Claim Result Toast */}

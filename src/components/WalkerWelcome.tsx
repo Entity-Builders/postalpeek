@@ -26,22 +26,17 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export function WalkerWelcome({ previewCards }: WalkerWelcomeProps) {
   const lang = useLang();
   
-  // We use 3 random cards for the intro sequence, waiting until previewCards is actually loaded
-  const hasShuffled = React.useRef(false);
-  const [cards, setCards] = useState<FeedItem[]>([]);
-  
+  const isLoaded = previewCards && previewCards.length > 0;
+  const cards = React.useMemo(() => {
+    if (!isLoaded) return [];
+    return [...previewCards].sort(() => 0.5 - Math.random()).slice(0, 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
   const [seq, setSeq] = useState<{ index: number; phase: 'photo' | 'watercolor' | 'text' }>({ index: 0, phase: 'photo' });
   const [showText, setShowText] = useState(false);
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
   const handleImageFallback = () => setFallbackEnabled(true);
-
-  useEffect(() => {
-    if (!hasShuffled.current && previewCards && previewCards.length > 0) {
-      hasShuffled.current = true;
-      const shuffled = [...previewCards].sort(() => 0.5 - Math.random());
-      setCards(shuffled.slice(0, 3));
-    }
-  }, [previewCards]);
 
 
   useEffect(() => {

@@ -39,13 +39,13 @@ interface WalkerGridProps {
   viewedItems?: FeedItem[];
   user?: User | null;
   unlockedCountries?: Set<string>;
-  onOpenAlbumsModal?: () => void;
   showWelcome?: boolean;
   previewCards?: FeedItem[];
   claimedIds?: Set<string>;
   viewMode: 'grid' | 'feed';
   onToggleViewMode: () => void;
-  onClaimPostcard?: (id: string, cost?: number) => void;
+  onClaimPostcard?: (id: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
+  profileWidgetNode?: React.ReactNode;
 }
 
 export function WalkerGrid({
@@ -67,13 +67,13 @@ export function WalkerGrid({
   viewedItems = [],
   user = null,
   unlockedCountries = new Set(),
-  onOpenAlbumsModal,
   showWelcome = false,
   previewCards = [],
   claimedIds = new Set<string>(),
   viewMode,
   onToggleViewMode,
   onClaimPostcard,
+  profileWidgetNode,
 }: WalkerGridProps) {
   const displayItems = spotlightQuery && spotlightResults.length > 0 ? spotlightResults : items;
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -210,13 +210,13 @@ export function WalkerGrid({
               selectedCountry={selectedCountry}
               onSelectCountry={onSelectCountry}
               isLoggedIn={!!user}
-              onOpenAlbumsModal={onOpenAlbumsModal || (() => {})}
               spotlightQuery={spotlightQuery}
               isSpotlightSearching={isSpotlightSearching}
               onSpotlightSearch={onSpotlightSearch}
               onSpotlightDismiss={onSpotlightDismiss}
               viewMode={viewMode}
               onToggleViewMode={onToggleViewMode}
+              profileWidgetNode={profileWidgetNode}
             />
           </div>
         </div>
@@ -252,6 +252,7 @@ export function WalkerGrid({
                   isClaimedByMe={claimedIds.has(item.id)}
                   viewMode={viewMode}
                   onClaimPostcard={onClaimPostcard}
+                  user={user}
                 />
               ))}
             </div>

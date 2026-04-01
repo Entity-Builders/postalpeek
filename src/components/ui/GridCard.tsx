@@ -1,11 +1,14 @@
+import { CircleUserRound } from 'lucide-react';
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { FeedItem } from '../Postcard';
+import type { User } from '@supabase/supabase-js';
 import { WIDTHS } from '../../utils/imageUtils';
 import { useSignedImage, useSignedSrcSet } from '../../utils/useSignedImage';
 import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { PostcardChin } from './PostcardChin';
+import { PostcardBack } from '../PostcardBack';
 
 import type { CardLayout } from './cardLayout';
 
@@ -20,7 +23,8 @@ interface GridCardProps {
   onClick: () => void;
   isClaimedByMe?: boolean;
   viewMode?: 'grid' | 'feed';
-  onClaimPostcard?: (id: string, cost?: number) => void;
+  onClaimPostcard?: (id: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
+  user?: User | null;
 }
 
 /** Above-fold cards get framer-motion entry animation; below-fold cards render instantly */
@@ -33,6 +37,7 @@ export const GridCard = React.memo(function GridCard({
   onClick,
   isClaimedByMe,
   onClaimPostcard,
+  user,
 }: GridCardProps) {
   const hasOwner = !!item.owner_id || !!isClaimedByMe;
   const imgUrl = useSignedImage(item.illustration_url, { width: WIDTHS.grid });
@@ -45,8 +50,17 @@ export const GridCard = React.memo(function GridCard({
     quality: 15,
   });
 
+  const avatarUrl = user?.user_metadata?.avatar_url;
+  const name = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0];
+  const initial = typeof name === 'string' && name.length > 0 ? name.charAt(0).toUpperCase() : '?';
+
   const [loaded, setLoaded] = React.useState(false);
   const lang = useLang();
+
+  const [isFlipped, setIsFlipped] = React.useState(false);
+
+  // Polaroid url for the back of the card (disabled in grid mode to save data)
+  const polaroidUrl = '';
 
   const categoryLabel =
     typeof item.category === 'string' ? item.category : t(item.category, lang);
@@ -109,76 +123,129 @@ export const GridCard = React.memo(function GridCard({
   return (
     <Wrapper
       className='relative cursor-pointer group'
-      style={{ display: 'inline-block', width: '100%' }}
+      style={{ display: 'inline-block', width: '100%', perspective: '1000px', WebkitPerspective: '1000px' }}
       onClick={handleClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       {...animProps}
     >
-      {/* ── Postcard frame ── */}
-      <div
-        className={`relative overflow-hidden rounded-lg bg-white
-          transition-shadow duration-200 group-hover:shadow-[0_6px_24px_rgba(0,0,0,0.18)]
-          ${
-            monumental
-              ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
-              : 'shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
-          }`}
-        style={{
-          padding: '5px 5px 0 5px',
-        }}
+      <motion.div
+        className="w-full h-full relative"
+        style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' }}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28, duration: 0.1 }}
       >
-        {/* ── Image area ── */}
+        {/* ── Postcard frame (Front) ── */}
         <div
-          className='relative w-full overflow-hidden rounded-sm bg-stone-200'
-          style={{ aspectRatio }}
+          className={`relative overflow-hidden rounded-lg bg-white
+            transition-shadow duration-200 group-hover:shadow-[0_6px_24px_rgba(0,0,0,0.18)]
+            ${
+              monumental
+                ? 'shadow-[0_2px_16px_rgba(180,130,50,0.25)] ring-1 ring-amber-400/30'
+                : 'shadow-[0_2px_12px_rgba(0,0,0,0.10)]'
+            }`}
+          style={{
+            padding: '5px 5px 0 5px',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'translateZ(1px)',
+            WebkitTransform: 'translateZ(1px)',
+          }}
         >
-          {placeholderUrl && !loaded && (
-            <img
-              src={placeholderUrl}
-              alt=''
-              aria-hidden
-              className='absolute inset-0 w-full h-full object-cover blur-md scale-105'
-            />
-          )}
-
-          {imgUrl && (
-            <img
-              src={imgUrl}
-              srcSet={srcSet || undefined}
-              sizes={sizes}
-              alt={categoryLabel}
-              className={`absolute inset-0 w-full h-full object-cover block transition-all duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-              style={!hasOwner ? { filter: 'grayscale(100%) blur(4px)', transform: 'scale(1.04)' } : undefined}
-              onLoad={() => setLoaded(true)}
-              loading={index < 12 ? 'eager' : 'lazy'}
-            />
-          )}
-
+          {/* ── Image area ── */}
           <div
-            className='absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
-            bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none'
+            className='relative w-full overflow-hidden rounded-sm bg-stone-200'
+            style={{ aspectRatio }}
+          >
+            {placeholderUrl && !loaded && (
+              <img
+                src={placeholderUrl}
+                alt=''
+                aria-hidden
+                className='absolute inset-0 w-full h-full object-cover blur-md scale-105'
+              />
+            )}
+
+            {imgUrl && (
+              <img
+                src={imgUrl}
+                srcSet={srcSet || undefined}
+                sizes={sizes}
+                alt={categoryLabel}
+                className={`absolute inset-0 w-full h-full object-cover block transition-all duration-700 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setLoaded(true)}
+                loading={index < 12 ? 'eager' : 'lazy'}
+              />
+            )}
+
+            <div
+              className='absolute bottom-0 left-0 right-0 px-2.5 pt-6 pb-2
+              bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none'
+            />
+
+            {/* Scarcity lock badge — unclaimed only */}
+            <AnimatePresence>
+              {!hasOwner ? (
+                <motion.div
+                  key="unowned"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[10px] font-semibold px-1.5 py-1 rounded-full pointer-events-none'
+                >
+                  <CircleUserRound className='w-3 h-3 opacity-80' /> {t({ es: 'Sin dueño', en: 'Unowned' }, lang)}
+                </motion.div>
+              ) : isClaimedByMe && user ? (
+                <motion.div
+                  key="owned"
+                  initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.25, type: 'spring', stiffness: 400, damping: 25 }}
+                  className='absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur-md text-white/90 text-[10px] font-semibold pr-2 pl-1 py-1 rounded-full pointer-events-none border border-white/10 shadow-lg'
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-4 h-4 shadow-inner rounded-[8px] bg-amber-500 flex items-center justify-center text-[8px] text-white">
+                      {initial}
+                    </div>
+                  )}
+                  <span className="truncate max-w-[80px]">
+                    {name}
+                  </span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+
+            {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
+          </div>
+          <PostcardChin
+            item={item}
+            hasOwner={hasOwner}
+            isClaimedByMe={isClaimedByMe}
+            isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
+            onClick={onClick}
+            onClaim={onClaimPostcard ? (rarity) => onClaimPostcard(item.id, rarity) : undefined}
+            onFlipCard={() => {
+              setIsFlipped(true);
+            }}
           />
-
-          {/* Scarcity lock badge — unclaimed only */}
-          {!hasOwner && (
-            <div className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[9px] font-semibold px-1.5 py-0.5 rounded-full pointer-events-none'>
-              🔒 {t({ es: 'Sin sellar', en: 'Unsealed' }, lang)}
-            </div>
-          )}
-
-          {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
         </div>
-        <PostcardChin
+
+        {/* ── Postcard Back ── */}
+        <PostcardBack
           item={item}
-          hasOwner={hasOwner}
+          polaroidUrl={polaroidUrl}
+          handleImageError={() => {}}
+          onFlipBack={() => setIsFlipped(false)}
+          isActive={isFlipped}
+          isGridMode={true}
           isClaimedByMe={isClaimedByMe}
-          isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
-          onClick={onClick}
-          onClaim={onClaimPostcard ? (cost) => onClaimPostcard(item.id, cost) : undefined}
+          onClaimPostcard={onClaimPostcard}
         />
-      </div>
+      </motion.div>
     </Wrapper>
   );
 });

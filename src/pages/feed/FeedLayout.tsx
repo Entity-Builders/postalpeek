@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, Outlet, useOutletContext } from 'react-router-dom';
+import { useNavigate, Outlet, useOutletContext, useLocation } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useWalkerFeed } from '../../hooks/useWalkerFeed';
-import { useClaimPostcard, type ClaimResult } from '../../hooks/useClaimPostcard';
+import { useClaimPostcard, type ClaimResult, type ClaimStatus } from '../../hooks/useClaimPostcard';
 import { useCollection } from '../../hooks/useCollection';
 import { useAlbums, type Album } from '../../hooks/useAlbums';
 import { useAlbumDetail } from '../../hooks/useAlbumDetail';
 import { useStampContext } from '../../contexts/StampContext';
 
 import type { FeedItem } from '../../components/Postcard';
-import { AlbumsModal } from '../../components/AlbumsModal';
 import { StatusBar } from '../../components/StatusBar';
 import { PostcardGameSelector } from '../../components/PostcardGameSelector';
 import { hasSeenWelcome } from '../../utils/welcomeStorage';
@@ -21,9 +20,7 @@ import { useLang, t } from '../../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SmartSearchResult } from '../../hooks/useSmartSearch';
-import { LanguageToggle } from '../../components/ui/LanguageToggle';
 import { AuthGateModal } from '../../components/AuthGateModal';
-import { ProfileWidget } from '../../components/ProfileWidget';
 
 // --- Types ---
 export type FeedLayoutContextType = {
@@ -44,9 +41,9 @@ export type FeedLayoutContextType = {
   handleSpotlightDismiss: () => void;
   isSpotlightMode: boolean;
   
-  claim: (id: string, cost: number) => Promise<ClaimResult>;
+  claim: (id: string, rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'tutorial') => Promise<ClaimResult>;
   isClaiming: boolean;
-  claimStatus: any;
+  claimStatus: ClaimStatus;
   claimedIds: Set<string>;
   
   collection: FeedItem[];
@@ -74,11 +71,10 @@ export type FeedLayoutContextType = {
   
   viewMode: 'grid' | 'feed';
   setViewMode: React.Dispatch<React.SetStateAction<'grid' | 'feed'>>;
-  isAlbumsModalOpen: boolean;
-  setIsAlbumsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleAuthRequiredAction: (action: () => void) => void;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useFeedContext() {
   return useOutletContext<FeedLayoutContextType>();
 }
@@ -96,8 +92,8 @@ export function FeedLayout({
 }) {
   const lang = useLang();
   const navigate = useNavigate();
+  const location = useLocation();
   const [viewMode, setViewMode] = useState<'grid' | 'feed'>('grid');
-  const [isAlbumsModalOpen, setIsAlbumsModalOpen] = useState(false);
   const [statusBarGameOpen, setStatusBarGameOpen] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
 
@@ -239,7 +235,7 @@ export function FeedLayout({
     return set;
   }, [albums]);
 
-  const { stampBalance, claimDailyStamps, addLocalStamps, setLocalStamps } = useStampContext();
+  const { stampBalances, claimDailyStamps, addLocalStamps, setLocalStamps } = useStampContext();
   useEffect(() => { if (user?.id) claimDailyStamps(); }, [user?.id, claimDailyStamps]);
 
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
@@ -256,8 +252,8 @@ export function FeedLayout({
       const guestClaimedId = sessionStorage.getItem('postalpeek_guest_claim');
       if (guestClaimedId) {
         sessionStorage.removeItem('postalpeek_guest_claim');
-        // Assume 0 cost since it was the tutorial freebie
-        claim(guestClaimedId, 0).then((res) => {
+        // Pass 'tutorial' as rarity since it's the tutorial freebie
+        claim(guestClaimedId, 'tutorial').then((res) => {
           if (res.success) {
             refetchCollection();
             refetchAlbums();
@@ -277,39 +273,7 @@ export function FeedLayout({
 
   // ── Mock data for guest optimistic UI ──
 
-  const displayAlbums = useMemo(() => {
-    if (user) return albums;
-    if (hasGuestClaim) {
-      return [{
-        id: 'guest-album',
-        title: t({ es: 'Primer Álbum', en: 'First Album' }, lang),
-        description: null,
-        cover_image_url: null,
-        category: 'general',
-        country: 'Global',
-        city: null,
-        difficulty: 'easy' as const,
-        total_slots: 6,
-        collected_slots: 1,
-        reward_claims: 2,
-        completed_at: null,
-      }];
-    }
-    return [{
-      id: 'guest-album',
-      title: t({ es: 'Primer Álbum', en: 'First Album' }, lang),
-      description: null,
-      cover_image_url: null,
-      category: 'general',
-      country: 'Global',
-      city: null,
-      difficulty: 'easy' as const,
-      total_slots: 6,
-      collected_slots: 0,
-      reward_claims: 2,
-      completed_at: null,
-    }];
-  }, [user, hasGuestClaim, albums, lang]);
+
 
   const displayCollectionCount = useMemo(() => {
     if (user) return collection.length;
@@ -317,11 +281,11 @@ export function FeedLayout({
     return 0;
   }, [user, hasGuestClaim, collection.length]);
 
-  const displayStampBalance = useMemo(() => {
-    if (user) return stampBalance;
-    if (hasGuestClaim) return 17;
-    return 20;
-  }, [user, hasGuestClaim, stampBalance]);
+  const displayStampBalances = useMemo(() => {
+    if (user) return stampBalances;
+    if (hasGuestClaim) return { common: 17, rare: 0, epic: 0, legendary: 0 };
+    return { common: 20, rare: 5, epic: 2, legendary: 1 };
+  }, [user, hasGuestClaim, stampBalances]);
 
   const contextValue = useMemo<FeedLayoutContextType>(() => ({
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
@@ -331,7 +295,7 @@ export function FeedLayout({
     albums, isLoadingAlbums, refetchAlbums, albumDetail, isAlbumDetailLoading, fetchAlbumDetail, resetAlbumDetail, unlockedCountries,
     favoriteIds, favoriteItems, toggleFavorite,
     user, isAdmin, isIdle, showWelcome, setShowWelcome,
-    viewMode, setViewMode, isAlbumsModalOpen, setIsAlbumsModalOpen,
+    viewMode, setViewMode,
     handleAuthRequiredAction
   }), [
     items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
@@ -341,18 +305,28 @@ export function FeedLayout({
     albums, isLoadingAlbums, refetchAlbums, albumDetail, isAlbumDetailLoading, fetchAlbumDetail, resetAlbumDetail, unlockedCountries,
     favoriteIds, favoriteItems, toggleFavorite,
     user, isAdmin, isIdle, showWelcome, setShowWelcome,
-    viewMode, isAlbumsModalOpen,
+    viewMode,
     handleAuthRequiredAction
   ]);
 
   const effectiveViewedItems = useMemo(() => {
-    const ad = albumDetail as any;
-    if (ad?.slots?.length > 0) {
+    type AlbumDetailWithSlots = {
+      slots?: Array<{
+        illustration_url?: string;
+        postcard_id?: string;
+        slot_label?: string;
+        city?: string;
+        country?: string;
+        category?: string;
+      }>;
+    };
+    const ad = albumDetail as AlbumDetailWithSlots;
+    if (ad?.slots && ad.slots.length > 0) {
       // We are in an album, extract the items shown here.
       return ad.slots
-        .filter((s: any) => s.illustration_url)
-        .map((s: any) => ({
-          id: s.postcard_id || s.slot_label,
+        .filter((s) => s.illustration_url)
+        .map((s) => ({
+          id: s.postcard_id || s.slot_label || '',
           illustration_url: s.illustration_url,
           city: s.city || '',
           country: s.country || '',
@@ -368,19 +342,6 @@ export function FeedLayout({
       <Outlet context={contextValue} />
 
       {/* ── Global Overlays ── */}
-      <AnimatePresence>
-        {isAlbumsModalOpen && (
-          <AlbumsModal
-            albums={albums}
-            isLoading={isLoadingAlbums}
-            onClose={() => setIsAlbumsModalOpen(false)}
-            onSelectAlbum={(album) => {
-              setIsAlbumsModalOpen(false);
-              navigate(`/feed/album/${album.id}`);
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showWelcomeToast && (
@@ -423,15 +384,19 @@ export function FeedLayout({
       </AnimatePresence>
 
       <AnimatePresence>
-        {!isSpotlightMode && !showWelcome && (
+        {!isSpotlightMode && !showWelcome && !location.pathname.includes('/carousel') && !location.pathname.includes('/postcard/') && (
           <StatusBar
-            albums={displayAlbums}
-            collectionCount={displayCollectionCount}
-            stampBalance={displayStampBalance}
+            albums={albums}
             onAlbumTap={(album) => handleAuthRequiredAction(() => {
               navigate(`/feed/album/${album.id}`);
-              analytics.track('statusbar_album_tapped', { album_id: album.id });
+              analytics.track('statusbar_album_tapped', { albumId: album.id });
             })}
+            onAlbumsTap={() => handleAuthRequiredAction(() => {
+              navigate('/feed/collection');
+              analytics.track('statusbar_albums_tapped');
+            })}
+            collectionCount={displayCollectionCount}
+            stampBalances={displayStampBalances}
             onPlayTap={() => handleAuthRequiredAction(() => {
               setStatusBarGameOpen(true);
               analytics.track('statusbar_play_tapped');
@@ -465,10 +430,6 @@ export function FeedLayout({
         onSelect={() => {}}
         onClose={() => setStatusBarGameOpen(false)}
       />
-
-      <LanguageToggle isIdle={isIdle} isOnWelcome={false} />
-      
-      <ProfileWidget handleAuthRequiredAction={handleAuthRequiredAction} isIdle={isIdle} />
 
       {/* ── Auth Gate ── */}
       <AnimatePresence>

@@ -6,7 +6,8 @@
  */
 
 import React from 'react';
-import { Search, Puzzle, Stamp, Trophy, Check, HelpCircle } from 'lucide-react';
+import { Search, Puzzle, Trophy, Check, HelpCircle } from 'lucide-react';
+import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
 
 import type { DbGameType } from '../hooks/useGameProgress';
 
@@ -21,11 +22,11 @@ interface GameProgressBarProps {
 
 const GAME_META: Record<
   DbGameType,
-  { icon: typeof Search; label: string; color: string }
+  { icon: React.ElementType<{ className?: string }>; label: string; color: string }
 > = {
   find_objects: { icon: Search, label: 'Buscar', color: 'amber' },
   puzzle: { icon: Puzzle, label: 'Puzzle', color: 'blue' },
-  stamp_hunt: { icon: Stamp, label: 'Sello', color: 'red' },
+  stamp_hunt: { icon: PostalPeekStampSVG, label: 'Sello', color: 'red' },
   trivia: { icon: HelpCircle, label: 'Trivia', color: 'purple' },
 };
 

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import type { BilingualText } from '../utils/i18n';
 
 export interface AlbumSlot {
   slot_label: string;
@@ -14,20 +15,13 @@ export interface AlbumSlot {
   is_hint: boolean;
 }
 
-export interface MatchRules {
-  country?: string;
-  city?: string;
-  required_tags?: string[];
-  any_tags?: string[];
-}
-
 export interface AlbumDetailData {
   album: {
     id: string;
-    title: string;
+    title: string | BilingualText;
     title_es?: string;
     title_en?: string;
-    description: string | null;
+    description: string | BilingualText | null;
     description_es?: string | null;
     description_en?: string | null;
     cover_image_url: string | null;
@@ -35,9 +29,7 @@ export interface AlbumDetailData {
     country: string | null;
     city: string | null;
     difficulty: 'easy' | 'medium' | 'hard' | 'epic';
-    match_rules: MatchRules;
     reward_claims: number;
-    target_slots: number;
   };
   slots: AlbumSlot[];
   completed_at: string | null;

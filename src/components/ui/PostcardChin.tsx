@@ -14,9 +14,9 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
-  Stamp,
   Dice5,
   ArrowRightLeft,
+  RotateCw,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
@@ -24,6 +24,7 @@ import { analytics } from '../../lib/analytics';
 import type { FeedItem } from '../Postcard';
 import { ShareButton } from './ShareButton';
 import { AlbumStopIndicator } from './AlbumStopIndicator';
+import { PostalPeekStampSVG } from './PostalPeekStampSVG';
 import { t, useLang } from '../../utils/i18n';
 import { useNavigate } from 'react-router-dom';
 
@@ -70,7 +71,7 @@ export interface PostcardChinProps {
   /** Play button callback (carousel): starts mini-games to grind stamps */
   onPlay?: () => void;
   /** Sellar button callback (carousel): spends stamps to claim */
-  onClaim?: (cost?: number) => void;
+  onClaim?: (rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
   /** Trade button callback (carousel): propose trade */
   onTrade?: () => void;
   /** Navigate to album (carousel) */
@@ -129,7 +130,7 @@ export function PostcardChin({
     new Date(active.last_played_at).toDateString() === new Date().toDateString()
   );
 
-  const stampCost = active.stamp_cost ?? (active.rarity === 'legendary' ? 35 : active.rarity === 'epic' ? 15 : active.rarity === 'rare' ? 6 : 2);
+  const rarity = (active.rarity as 'common' | 'rare' | 'epic' | 'legendary') || 'common';
 
   return (
     <div
@@ -231,7 +232,7 @@ export function PostcardChin({
           {/* Owned (by me) → Certification Seal */}
           {isClaimedByMe && (
             <button
-              className='flex items-center gap-1 px-2 py-1 rounded-sm border-2 border-emerald-600/60 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 transition-colors shadow-sm rotate-[-1deg] hover:rotate-0'
+              className='flex items-center gap-1.5 px-2 py-1 rounded-sm border-2 border-red-600/50 text-red-700 bg-red-50/80 hover:bg-red-100 transition-colors shadow-sm rotate-[-4deg] hover:rotate-0'
               style={{ fontFamily: 'monospace' }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -245,7 +246,7 @@ export function PostcardChin({
               }}
               title={t({ es: 'Ver en álbum', en: 'View in album' }, lang)}
             >
-              <Stamp className='w-3 h-3' />
+              <PostalPeekStampSVG className='w-4 h-4' />
               <span className='text-[9px] font-bold uppercase tracking-wider'>
                 {t({ es: 'Sellada ✓', en: 'Sealed ✓' }, lang)}
               </span>
@@ -299,44 +300,57 @@ export function PostcardChin({
             </button>
           )}
 
-          {/* ✨ Revelar — unclaimed cards only */}
+          {/* ✨ Sellar — unclaimed cards only */}
           {!hasOwner && handleClaimClick && (
             <div className="relative isolate flex-shrink-0">
               <button
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 font-bold shadow-sm transition-all text-xs border border-indigo-200',
-                  showClaimGuide ? 'animate-pulse hover:bg-indigo-100' : 'hover:bg-indigo-100'
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-dashed border-stone-300 text-stone-500 font-bold shadow-sm transition-all text-xs hover:border-red-300 hover:text-red-600 hover:bg-red-50/50 group',
+                  showClaimGuide ? 'animate-pulse hover:border-red-400' : ''
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onClaim) {
-                    onClaim(stampCost);
-                    analytics.track('buy_intention', { postcard_id: item.id });
+                    onClaim(rarity);
+                    analytics.track('claim_intention', { postcard_id: item.id });
                   } else if (onClick) {
                     onClick(); // fallback
                   }
                 }}
-                title={t({ es: `Revelar por ${stampCost} Sellos`, en: `Reveal for ${stampCost} Stamps` }, lang)}
+                title={t({ es: `Usar Sello ${rarity}`, en: `Use ${rarity} Stamp` }, lang)}
               >
-                <span>{t({ es: `Revelar por ${stampCost}`, en: `Reveal for ${stampCost}` }, lang)}</span>
-                <div className="w-4 h-4 rounded-full border border-indigo-300 flex items-center justify-center bg-indigo-100 shrink-0 rotate-12">
-                   <span className="font-mono text-[4px] text-indigo-700 uppercase tracking-tighter text-center leading-[1]">
-                     Postal<br/>Peek
-                   </span>
+                <div className="w-5 h-5 flex items-center justify-center opacity-40 group-hover:opacity-100 transition-opacity">
+                  <PostalPeekStampSVG className="w-full h-full" rarity={rarity} />
                 </div>
+                <span className="capitalize">{t({ es: `Sellar`, en: `Stamp` }, lang)}</span>
               </button>
               {showClaimGuide && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ delay: 0.5, repeat: Infinity, repeatType: 'reverse', duration: 1.5 }}
-                  className="absolute bottom-full mb-3 right-0 bg-indigo-400 text-indigo-950 px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_4px_20px_rgba(129,140,248,0.4)] whitespace-nowrap z-50 pointer-events-none"
+                  className="absolute bottom-full mb-3 right-0 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_4px_20px_rgba(239,68,68,0.3)] whitespace-nowrap z-50 pointer-events-none"
                 >
-                  {t({ es: '✨ Revela para jugar', en: '✨ Reveal to play' }, lang)}
-                  <div className="absolute top-full right-6 -mt-px border-[6px] border-transparent border-t-indigo-400" />
+                  {t({ es: '👇 Sella la postal', en: '👇 Stamp postcard' }, lang)}
+                  <div className="absolute top-full right-6 -mt-px border-[6px] border-transparent border-t-red-500" />
                 </motion.div>
               )}
             </div>
+          )}
+
+          {/* Flip / Info */}
+          {onFlipCard && (
+            <button
+              className='p-1.5 md:p-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 hover:text-stone-700 transition-colors shadow-sm'
+              onClick={(e) => {
+                e.stopPropagation();
+                onFlipCard('info');
+                analytics.track('postcard_flip_clicked', { postcard_id: item.id });
+              }}
+              title={t({ es: 'Ver reverso', en: 'View back' }, lang)}
+            >
+              <RotateCw className='w-4 h-4 md:w-5 md:h-5' />
+            </button>
           )}
 
           {/* Share */}

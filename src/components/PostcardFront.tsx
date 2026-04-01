@@ -58,7 +58,7 @@ interface PostcardFrontProps {
   /** Collectibles: whether this postcard is claimed by anyone */
   hasOwner?: boolean;
   /** Collectibles: callback to claim this postcard */
-  onClaimPostcard?: (postcardId: string, cost?: number) => void;
+  onClaimPostcard?: (postcardId: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
   /** Collectibles: whether a claim is currently in progress */
   isClaimLoading?: boolean;
   /** Dev-only: postcard belongs to an album */
@@ -87,6 +87,8 @@ interface PostcardFrontProps {
   isTutorial?: boolean;
   /** Override the Play behavior */
   onPlayGame?: () => void;
+  /** Current user metadata */
+  user?: import('@supabase/supabase-js').User | null;
 }
 
 export function PostcardFront({
@@ -117,6 +119,7 @@ export function PostcardFront({
   autoStartGame = false,
   isTutorial = false,
   onPlayGame,
+  user,
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
   const { addLocalStamps } = useStampContext();
@@ -460,7 +463,9 @@ export function PostcardFront({
                             isTagDiscovered={isDiscovered}
                             isTagGenerating={isGenerating}
                             hasOwner={!!slideItem.owner_id}
+                            isClaimedByMe={isClaimedByMe}
                             isTutorial={isTutorial}
+                            user={user}
                           />
                         ))}
                       </div>
@@ -501,7 +506,9 @@ export function PostcardFront({
                     isTagDiscovered={isDiscovered}
                     isTagGenerating={isGenerating}
                     hasOwner={hasOwner}
+                    isClaimedByMe={isClaimedByMe}
                     isTutorial={isTutorial}
+                    user={user}
                   />
                 )}
 
@@ -641,7 +648,7 @@ export function PostcardFront({
                       : undefined // Default CTAs to /game/:id navigation
                   : undefined
               }
-              onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? (cost) => onClaimPostcard(item.id, cost) : undefined}
+              onClaim={!hasOwner && !isTriviaLocked && onClaimPostcard ? (rarity) => onClaimPostcard(item.id, rarity) : undefined}
               onTrade={hasOwner && !isClaimedByMe ? () => console.warn('Trade not implemented yet') : undefined}
               isOwned={isClaimedByMe}
               hasOwner={hasOwner}
@@ -659,7 +666,7 @@ export function PostcardFront({
               gameProgress.saveGameCompletion('trivia', 0);
               
               if (onClaimPostcard && !isClaimLoading) {
-                onClaimPostcard(item.id);
+                onClaimPostcard(item.id, item.rarity || 'common');
               } else if (!isTriviaLocked) {
                 // If debugging/replay, just close it
                 setPlayingMode(null);
