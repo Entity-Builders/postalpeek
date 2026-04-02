@@ -120,6 +120,7 @@ interface StepDef {
 
 const STEP_DEFINITIONS: StepDef[] = [
   { key: 'resolveCoordinates', icon: '📍', label: 'Resolve Coordinates', hint: 'Valida y refina las coordenadas GPS usando Google Places para mayor precisión' },
+  { key: 'scoutBestAngle',     icon: '📸', label: 'Multi-Angle Scout',   hint: 'Toma 3 capturas con diferentes ángulos y deja que Gemini elija el mejor encuadre (alto consumo de API)' },
   { key: 'aiInsights',         icon: '🤖', label: 'AI Insights',         hint: 'Analiza la foto con Gemini: categoría, descripción, tags visuales, vibe estético y storytelling' },
   { key: 'generateIllustration', icon: '🎨', label: 'Generate Illustration', hint: 'Genera la ilustración artística de la postal usando el vibe detectado por AI Insights', dependsOn: 'aiInsights' },
   { key: 'illustrationTags',   icon: '🏷️', label: 'Illustration Tags',   hint: 'Analiza la ilustración generada para detectar objetos y elementos (usado en gacha/stickers)', dependsOn: 'generateIllustration' },
@@ -176,6 +177,8 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
   const [batchPrompt, setBatchPrompt] = useState('');
   const [batchCountry, setBatchCountry] = useState('');
   const [batchCount, setBatchCount] = useState(6);
+  const [batchLandmarkPrecision, setBatchLandmarkPrecision] = useState(false);
+  const [assignToAlbum, setAssignToAlbum] = useState(true);
 
   // ─ Source: Hunt
   const [huntTheme, setHuntTheme] = useState('monuments');
@@ -183,7 +186,6 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
 
   // ─ Source: Landmark Precision
   const [landmarkQuery, setLandmarkQuery] = useState('');
-  const [landmarkNameEs, setLandmarkNameEs] = useState('');
 
   // ─ Prompt viewer
   const [promptViewerOpen, setPromptViewerOpen] = useState(false);
@@ -324,7 +326,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
           setStatus({ status: 'error', message: 'Landmark name required (e.g. "Eiffel Tower, Paris")' });
           return;
         }
-        const displayName = landmarkNameEs.trim() || landmarkQuery.trim();
+        const displayName = landmarkQuery.trim();
         data = await callEdge('postalpeek-generate-album', '', {
           ...body,
           prompt: `Landmark: ${landmarkQuery.trim()}`,
@@ -332,7 +334,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
           landmark_precision: {
             landmarkQuery: landmarkQuery.trim(),
             landmarkName: {
-              en: landmarkQuery.trim(),
+              en: displayName,
               es: displayName,
             },
           },
@@ -346,7 +348,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
     } catch (err: unknown) {
       setStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [sourceMode, steps, getRandomStyle, callEdge, huntTheme, huntCountry, singleLat, singleLng, singleName, landmarkQuery, landmarkNameEs, onPostcardGenerated, onRefetchLog]);
+  }, [sourceMode, steps, getRandomStyle, callEdge, huntTheme, huntCountry, singleLat, singleLng, singleName, landmarkQuery, onPostcardGenerated, onRefetchLog]);
 
   // ─ Execute: Batch (prompt → album)
   const executeBatch = useCallback(async () => {
@@ -361,12 +363,14 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
         count: batchCount,
         pipeline_config: steps,
         illustration_style_key: getRandomStyle(),
+        assign_to_album: assignToAlbum,
+        ...(batchLandmarkPrecision ? { use_landmark_precision: true } : {}),
       });
 
       const stats = data?.stats;
       setStatus({
         status: 'success',
-        message: `${stats?.queued ?? 0} slots queued · Album: ${data?.title || data?.album_id}`,
+        message: `${stats?.queued ?? 0} slots queued · Album: ${data?.title || data?.album_id || 'Loose'}`,
       });
 
       onPostcardGenerated?.();
@@ -375,7 +379,8 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
       setBatchProgress(null);
       setStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [batchPrompt, batchCountry, batchCount, steps, getRandomStyle, callEdge, onPostcardGenerated, onRefetchLog]);
+  }, [batchPrompt, batchCountry, batchCount, batchLandmarkPrecision, assignToAlbum, steps, getRandomStyle, callEdge, onPostcardGenerated, onRefetchLog]);
+
 
   // ─ Main execute
   const execute = sourceMode === 'prompt' ? executeBatch : executeSingle;
@@ -762,8 +767,60 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
               </select>
               <span className="text-white/20 text-[10px]">~{perCardTime * batchCount}s total</span>
             </div>
+            {/* Landmark Precision toggle */}
+            <button
+              onClick={() => setBatchLandmarkPrecision(p => !p)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all"
+              style={{
+                background: batchLandmarkPrecision ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${batchLandmarkPrecision ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                color: batchLandmarkPrecision ? 'rgb(252,211,77)' : 'rgba(255,255,255,0.35)',
+              }}
+            >
+              <span>🏛️</span>
+              <span className="flex-1 text-left">Landmark Precision</span>
+              <div
+                className="w-7 h-4 rounded-full relative flex-shrink-0 transition-all"
+                style={{ background: batchLandmarkPrecision ? 'rgba(245,158,11,0.6)' : 'rgba(255,255,255,0.1)' }}
+              >
+                <div
+                  className="absolute top-0.5 w-3 h-3 rounded-full transition-all"
+                  style={{
+                    background: batchLandmarkPrecision ? 'white' : 'rgba(255,255,255,0.3)',
+                    left: batchLandmarkPrecision ? '14px' : '2px',
+                  }}
+                />
+              </div>
+            </button>
+
+            {/* Assign to Album Toggle */}
+            <button
+              onClick={() => setAssignToAlbum(p => !p)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all"
+              style={{
+                background: assignToAlbum ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${assignToAlbum ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                color: assignToAlbum ? 'rgb(165,180,252)' : 'rgba(255,255,255,0.35)',
+              }}
+            >
+              <span>📁</span>
+              <span className="flex-1 text-left">Assign to Album</span>
+              <div
+                className="w-7 h-4 rounded-full relative flex-shrink-0 transition-all"
+                style={{ background: assignToAlbum ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.1)' }}
+              >
+                <div
+                  className="absolute top-0.5 w-3 h-3 rounded-full transition-all"
+                  style={{
+                    background: assignToAlbum ? 'white' : 'rgba(255,255,255,0.3)',
+                    left: assignToAlbum ? '14px' : '2px',
+                  }}
+                />
+              </div>
+            </button>
+
             <p className="text-white/20 text-[10px]">
-              Gemini generates GPS locations → creates album → runs pipeline for each
+              Gemini generates GPS locations → creates {assignToAlbum ? 'album' : 'loose postcards'} → runs pipeline for each
             </p>
           </div>
         )}
@@ -810,17 +867,9 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
               type="text"
               value={landmarkQuery}
               onChange={(e) => setLandmarkQuery(e.target.value)}
-              placeholder="Landmark name in English (e.g. Eiffel Tower, Paris)"
+              placeholder="Landmark name (e.g. Eiffel Tower, Paris)"
               className="w-full px-3 py-2.5 rounded-xl text-sm"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(165,180,252,0.25)', color: 'white', outline: 'none' }}
-            />
-            <input
-              type="text"
-              value={landmarkNameEs}
-              onChange={(e) => setLandmarkNameEs(e.target.value)}
-              placeholder="Nombre en español (opcional, ej: Torre Eiffel, París)"
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
             />
             <div className="rounded-lg p-2.5" style={{ background: 'rgba(165,180,252,0.06)', border: '1px solid rgba(165,180,252,0.12)' }}>
               <p className="text-[10px] text-white/40 leading-relaxed">
