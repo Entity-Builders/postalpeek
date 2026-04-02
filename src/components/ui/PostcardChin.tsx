@@ -27,6 +27,7 @@ import { AlbumStopIndicator } from './AlbumStopIndicator';
 import { PostalPeekStampSVG } from './PostalPeekStampSVG';
 import { t, useLang } from '../../utils/i18n';
 import { useNavigate } from 'react-router-dom';
+import { useStampContext } from '../../contexts/StampContext';
 
 // ── Fact type helpers ────────────────────────────────────────────────
 const FACT_EMOJI: Record<string, string> = {
@@ -131,6 +132,10 @@ export function PostcardChin({
   );
 
   const rarity = (active.rarity as 'common' | 'rare' | 'epic' | 'legendary') || 'common';
+  
+  const stampCtx = useStampContext();
+  const stamps = stampCtx?.stampBalances;
+  const hasEnoughStamps = stamps ? (stamps[rarity] || 0) > 0 : false;
 
   return (
     <div
@@ -305,11 +310,16 @@ export function PostcardChin({
             <div className="relative isolate flex-shrink-0">
               <button
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-dashed border-stone-300 text-stone-500 font-bold shadow-sm transition-all text-xs hover:border-red-300 hover:text-red-600 hover:bg-red-50/50 group',
-                  showClaimGuide ? 'animate-pulse hover:border-red-400' : ''
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-dashed font-bold shadow-sm transition-all text-xs group',
+                  hasEnoughStamps
+                    ? 'border-stone-300 text-stone-500 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50 cursor-pointer'
+                    : 'border-stone-200 text-stone-300 cursor-not-allowed opacity-60 bg-stone-50/50',
+                  showClaimGuide && hasEnoughStamps ? 'animate-pulse hover:border-red-400' : ''
                 )}
+                disabled={!hasEnoughStamps}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!hasEnoughStamps) return;
                   if (onClaim) {
                     onClaim(rarity);
                     analytics.track('claim_intention', { postcard_id: item.id });
@@ -317,9 +327,17 @@ export function PostcardChin({
                     onClick(); // fallback
                   }
                 }}
-                title={t({ es: `Usar Sello ${rarity}`, en: `Use ${rarity} Stamp` }, lang)}
+                title={t(
+                  hasEnoughStamps 
+                    ? { es: `Usar Sello ${rarity}`, en: `Use ${rarity} Stamp` } 
+                    : { es: `No tienes sellos ${rarity}`, en: `No ${rarity} stamps` }, 
+                  lang
+                )}
               >
-                <div className="w-5 h-5 flex items-center justify-center opacity-40 group-hover:opacity-100 transition-opacity">
+                <div className={cn(
+                  "w-5 h-5 flex items-center justify-center transition-opacity",
+                  hasEnoughStamps ? "opacity-40 group-hover:opacity-100" : "opacity-30"
+                )}>
                   <PostalPeekStampSVG className="w-full h-full" rarity={rarity} />
                 </div>
                 <span className="capitalize">{t({ es: `Sellar`, en: `Stamp` }, lang)}</span>

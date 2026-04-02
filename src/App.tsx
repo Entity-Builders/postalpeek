@@ -22,6 +22,17 @@ import { CollectionPage } from './pages/feed/CollectionPage';
 import { ProfilePage } from './pages/feed/ProfilePage';
 import { GamePage } from './pages/GamePage';
 
+// ── Admin sub-pages ────────────────────────────────────────────────────
+import { AdminDashboard }  from './pages/admin/AdminDashboard';
+import { AdminGeneration } from './pages/admin/AdminGeneration';
+import { AdminQueuePage }  from './pages/admin/AdminQueuePage';
+import { AdminBrowser }    from './pages/admin/AdminBrowser';
+import { AdminPostcards }  from './pages/admin/AdminPostcards';
+import { AdminAlbums }     from './pages/admin/AdminAlbums';
+import { AdminSync }       from './pages/admin/AdminSync';
+import { AdminSettings }   from './pages/admin/AdminSettings';
+import { AdminStamps }     from './pages/admin/AdminStamps';
+
 // ── Feed (main app) ────────────────────────────────────────────────────
 
 function FeedApp({
@@ -186,6 +197,9 @@ function App() {
                   
                   {/* Public Postcard View — needs the FeedLayout context */}
                   <Route path='/postcard/:id' element={<FeedCarouselPage />} />
+                  
+                  {/* Public Album View */}
+                  <Route path='/album/:albumId' element={<AlbumPage />} />
                 </Route>
   
                 {/* Root redirects to /feed */}
@@ -194,17 +208,25 @@ function App() {
                 {/* Dedicated Game Route */}
                 <Route path='/game/:shortcode' element={<GamePage />} />
   
-                {/* Full-page admin (protected) */}
-                <Route
-                  path='/admin'
-                  element={
-                    isAdmin ? (
-                      <AdminPage user={user} onPostcardGenerated={() => {}} />
-                    ) : (
-                      <Navigate to='/feed' replace />
-                    )
-                  }
-                />
+                {/* ── Admin console (protected, nested routes) ── */}
+                {isAdmin ? (
+                  <Route
+                    path='/admin'
+                    element={<AdminPage user={user} onPostcardGenerated={() => {}} />}
+                  >
+                    <Route index            element={<AdminDashboard />} />
+                    <Route path='generation' element={<AdminGeneration />} />
+                    <Route path='queue'      element={<AdminQueuePage />} />
+                    <Route path='browser'    element={<AdminBrowser />} />
+                    <Route path='postcards'  element={<AdminPostcards />} />
+                    <Route path='albums'     element={<AdminAlbums />} />
+                    <Route path='sync'       element={<AdminSync />} />
+                    <Route path='settings'   element={<AdminSettings />} />
+                    <Route path='stamps'     element={<AdminStamps />} />
+                  </Route>
+                ) : (
+                  <Route path='/admin/*' element={<Navigate to='/feed' replace />} />
+                )}
   
                 {/* Postcard admin detail — /p/:id only */}
                 <Route path='/p/:id' element={<PostcardDetailPage />} />

@@ -216,10 +216,10 @@ export function AlbumPage() {
 
   const { album, completed_at } = detail;
 
-  const albumTitle = t({ es: album.title_es || album.title, en: album.title_en || album.title }, lang);
+  const albumTitle = t({ es: (album.title_es || album.title) as string, en: (album.title_en || album.title) as string }, lang);
   const albumDescription = album.description_es || album.description_en
-    ? t({ es: album.description_es || album.description || '', en: album.description_en || album.description || '' }, lang)
-    : album.description;
+    ? t({ es: (album.description_es || album.description || '') as string, en: (album.description_en || album.description || '') as string }, lang)
+    : (typeof album.description === 'string' ? album.description : Object(album.description)?.es || Object(album.description)?.en || '');
   const ownedCount = optimisticSlots.filter((s) => s.is_owned).length;
   const totalSlots = optimisticSlots.length;
   const progress =

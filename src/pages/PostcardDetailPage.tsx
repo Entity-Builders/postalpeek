@@ -876,8 +876,18 @@ function StorytellingTriviaSection({
         <div className="mb-4">
           <h4 className="text-indigo-300 text-xs font-semibold mb-2 uppercase tracking-wide">Storytelling Fact</h4>
           <div className="bg-white/5 p-3 rounded-xl border border-white/10 space-y-2">
-            {storytelling.en && <p className="text-sm text-white/80 leading-relaxed"><span className="text-white/40 text-xs mr-2 font-mono">EN</span>{storytelling.en}</p>}
-            {storytelling.es && <p className="text-sm text-white/80 leading-relaxed"><span className="text-white/40 text-xs mr-2 font-mono">ES</span>{storytelling.es}</p>}
+            {(storytelling.did_you_know?.en || storytelling.en) && (
+              <p className="text-sm text-white/80 leading-relaxed">
+                <span className="text-white/40 text-xs mr-2 font-mono">EN</span>
+                {storytelling.did_you_know?.en || storytelling.en}
+              </p>
+            )}
+            {(storytelling.did_you_know?.es || storytelling.es) && (
+              <p className="text-sm text-white/80 leading-relaxed">
+                <span className="text-white/40 text-xs mr-2 font-mono">ES</span>
+                {storytelling.did_you_know?.es || storytelling.es}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -1234,28 +1244,8 @@ export function PostcardDetailPage() {
                   <Row label="Imagine task ID" value={postcard.imagine_task_id} mono />
                 </Section>
 
-                {/* Detailed tags */}
-                <Section icon={<Tag className="w-3.5 h-3.5" />} title="Detailed Tags (AI Analysis)">
-                  <div className="flex justify-end -mt-1 mb-2">
-                    <button
-                      onClick={() => handleRegenerate('detailed')}
-                      disabled={regenLoading.detailed}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
-                      style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
-                    >
-                      <RefreshCw className={`w-3 h-3 ${regenLoading.detailed ? 'animate-spin' : ''}`} />
-                      {regenLoading.detailed ? 'Regenerating…' : 'Regenerate'}
-                    </button>
-                  </div>
-                  {Array.isArray(postcard.detailed_tags) && postcard.detailed_tags.length > 0 ? (
-                    <DetailedTagsTable tags={postcard.detailed_tags} />
-                  ) : (
-                    <p className="text-white/20 text-sm">No detailed tags</p>
-                  )}
-                </Section>
-
-                {/* Illustration tags */}
-                <Section icon={<Hash className="w-3.5 h-3.5" />} title="Illustration Tags">
+                {/* AI Visual Tags */}
+                <Section icon={<Tag className="w-3.5 h-3.5" />} title="AI Visual Tags">
                   <div className="flex justify-end -mt-1 mb-2">
                     <button
                       onClick={() => handleRegenerate('illustration')}
@@ -1267,12 +1257,12 @@ export function PostcardDetailPage() {
                       {regenLoading.illustration ? 'Regenerating…' : 'Regenerate'}
                     </button>
                   </div>
-                  {Array.isArray(postcard.illustration_tags) && postcard.illustration_tags.length > 0 ? (
-                    typeof postcard.illustration_tags[0] === 'object' && postcard.illustration_tags[0] !== null ? (
-                      <DetailedTagsTable tags={postcard.illustration_tags} />
+                  {Array.isArray(postcard.illustration_tags || postcard.detailed_tags) && ((postcard.illustration_tags || postcard.detailed_tags) as any[])?.length > 0 ? (
+                    typeof ((postcard.illustration_tags || postcard.detailed_tags) as any[])?.[0] === 'object' && ((postcard.illustration_tags || postcard.detailed_tags) as any[])?.[0] !== null ? (
+                      <DetailedTagsTable tags={(postcard.illustration_tags || postcard.detailed_tags) as import('../../../../eb-infra/supabase/functions/_shared/postcard-engine/types').DetailedTag[]} />
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
-                        {(postcard.illustration_tags as Array<{ label?: string } | string>).map((tag, i) => (
+                        {((postcard.illustration_tags || postcard.detailed_tags) as Array<{ label?: string } | string>).map((tag, i) => (
                           <TagPill
                             key={i}
                             label={typeof tag === 'string' ? tag : tag?.label ?? JSON.stringify(tag)}
@@ -1281,7 +1271,7 @@ export function PostcardDetailPage() {
                       </div>
                     )
                   ) : (
-                    <p className="text-white/20 text-sm">No illustration tags</p>
+                    <p className="text-white/20 text-sm">No tags found</p>
                   )}
                 </Section>
 

@@ -93,7 +93,10 @@ const INPUT_COST_PER_M = 0.15;
 const OUTPUT_COST_PER_M = 0.6;
 const RATE_LIMIT_DELAY_S = 1;
 
-const CATEGORY_INSTRUCTIONS = `"category": { "es": "A short category with an emoji in Spanish. MUST be ONE OF these core themes based on the dominant setting: 🏙️ Paisaje Urbano, 🏘️ Barrio Residencial, 🌿 Naturaleza y Parques, 🏛️ Histórico y Monumentos, 🏖️ Costa y Agua, 🛣️ Autopista y Ruta, 🏭 Zona Industrial, 🏪 Zona Comercial, 🎨 Escena Cultural, ⛰️ Montañas y Colinas, 🏜️ Paisaje Árido, 🏚️ Abandonado. DO NOT invent highly specific categories.", "en": "Same category in English (e.g. 🏙️ Urban Cityscape, 🌿 Nature & Parks)" }`;
+const CATEGORY_INSTRUCTIONS = `"category": {
+  "es": "A short category with an emoji in Spanish. MUST be ONE OF these core themes based on the dominant setting: 🏙️ Paisaje Urbano, 🏘️ Barrio Residencial, 🌿 Naturaleza y Parques, 🏛️ Histórico y Monumentos, 🏖️ Costa y Agua, 🛣️ Autopista y Ruta, 🏭 Zona Industrial, 🏪 Zona Comercial, 🎨 Escena Cultural, ⛰️ Montañas y Colinas, 🏜️ Paisaje Árido, 🏚️ Abandonado. IF APPLICABLE, use one of these RARE GAMIFIED categories instead: 📬 Reliquia Postal (mailboxes/post offices), 🛸 Rareza Urbana (weird/funny architecture or situations), 🐾 Vida Animal (prominent stray cats/dogs/birds), 🕰️ Cápsula del Tiempo (very vintage cars/storefronts), 🎨 Lienzo Callejero (prominent street art/murals). DO NOT invent highly specific categories.",
+  "en": "Same category in English (e.g. 🏙️ Urban Cityscape, 🛸 Urban Oddity)"
+}`;
 
 // --- Taxonomy prompt: uses shared constants from prompt-constants.ts ---
 const taxonomyPrompt = `Analyze this street view image carefully. Respond with a JSON object:

@@ -294,12 +294,16 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
       let data: any;
       if (sourceMode === 'wander') {
         data = await callEdge('postalpeek-walker-wander', '', body);
-        setStatus({ status: 'success', message: `✅ ${data?.data?.location || 'done'}` });
+        const loc = data?.data?.location || 'done';
+        const pid = data?.data?.postcard_id;
+        setStatus({ status: 'success', message: `${loc}${pid ? ` · ID: ${pid}` : ''}` });
       } else if (sourceMode === 'hunt') {
         const params: string[] = [`theme=${huntTheme}`];
         if (huntCountry.trim()) params.push(`country=${encodeURIComponent(huntCountry.trim())}`);
         data = await callEdge('postalpeek-walker-hunt', params.join('&'), body);
-        setStatus({ status: 'success', message: `✅ ${data?.data?.location} · ${data?.attempts ?? 1} attempt(s)` });
+        const loc = data?.data?.location || 'done';
+        const pid = data?.data?.postcard_id;
+        setStatus({ status: 'success', message: `${loc} · ${data?.attempts ?? 1} attempt(s)${pid ? ` · ID: ${pid}` : ''}` });
       } else if (sourceMode === 'single') {
         if (!singleLat.trim() || !singleLng.trim()) {
           setStatus({ status: 'error', message: 'Lat/Lng required' });
@@ -308,7 +312,9 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
         const params = `lat=${singleLat.trim()}&lng=${singleLng.trim()}&theme=monuments`;
         if (singleName.trim()) body.location_name = singleName.trim();
         data = await callEdge('postalpeek-walker-hunt', params, body);
-        setStatus({ status: 'success', message: `✅ ${data?.data?.location || 'done'}` });
+        const loc = data?.data?.location || 'done';
+        const pid = data?.data?.postcard_id;
+        setStatus({ status: 'success', message: `${loc}${pid ? ` · ID: ${pid}` : ''}` });
       }
 
       onPostcardGenerated?.();
@@ -321,8 +327,8 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
   // ─ Execute: Batch (prompt → album)
   const executeBatch = useCallback(async () => {
     if (!batchPrompt.trim()) return;
-    setStatus({ status: 'loading', message: `🤖 Generating album for "${batchPrompt}"…` });
-    setBatchProgress({ current: 0, total: batchCount, currentLocation: 'Planning…', currentStep: 'Asking Gemini for locations', results: [] });
+    setStatus({ status: 'loading', message: `🤖 Planning album for "${batchPrompt}" (Asking Gemini)…` });
+    setBatchProgress(null); // No longer doing sequential loop in frontend
 
     try {
       const data = await callEdge('postalpeek-generate-album', '', {
@@ -334,10 +340,9 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
       });
 
       const stats = data?.stats;
-      setBatchProgress(null);
       setStatus({
-        status: stats?.failed > 0 ? 'error' : 'success',
-        message: `${stats?.success ?? 0}/${stats?.total ?? 0} postcards created · Album: ${data?.title || data?.album_id} · ${Math.round((stats?.time_ms ?? 0) / 1000)}s`,
+        status: 'success',
+        message: `${stats?.queued ?? 0} slots queued · Album: ${data?.title || data?.album_id}`,
       });
 
       onPostcardGenerated?.();
