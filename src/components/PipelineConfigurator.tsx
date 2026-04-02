@@ -22,7 +22,7 @@ import type { PipelineStepConfig } from '../../../../eb-infra/supabase/functions
 // ── Types ──────────────────────────────────────────────────────────────
 
 type ActionStatus = 'idle' | 'loading' | 'success' | 'error';
-type SourceMode = 'wander' | 'hunt' | 'prompt' | 'single';
+type SourceMode = 'wander' | 'hunt' | 'prompt' | 'single' | 'landmark';
 
 interface PipelinePreset {
   name: string;
@@ -181,6 +181,10 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
   const [huntTheme, setHuntTheme] = useState('monuments');
   const [huntCountry, setHuntCountry] = useState('');
 
+  // ─ Source: Landmark Precision
+  const [landmarkQuery, setLandmarkQuery] = useState('');
+  const [landmarkNameEs, setLandmarkNameEs] = useState('');
+
   // ─ Prompt viewer
   const [promptViewerOpen, setPromptViewerOpen] = useState(false);
   const [activePromptTab, setActivePromptTab] = useState<'insights' | 'illustration' | 'illusTags' | 'taxonomy'>('insights');
@@ -315,6 +319,26 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
         const loc = data?.data?.location || 'done';
         const pid = data?.data?.postcard_id;
         setStatus({ status: 'success', message: `${loc}${pid ? ` · ID: ${pid}` : ''}` });
+      } else if (sourceMode === 'landmark') {
+        if (!landmarkQuery.trim()) {
+          setStatus({ status: 'error', message: 'Landmark name required (e.g. "Eiffel Tower, Paris")' });
+          return;
+        }
+        const displayName = landmarkNameEs.trim() || landmarkQuery.trim();
+        data = await callEdge('postalpeek-generate-album', '', {
+          ...body,
+          prompt: `Landmark: ${landmarkQuery.trim()}`,
+          count: 1,
+          landmark_precision: {
+            landmarkQuery: landmarkQuery.trim(),
+            landmarkName: {
+              en: landmarkQuery.trim(),
+              es: displayName,
+            },
+          },
+        });
+        const landmarkPid = data?.data?.postcard_id;
+        setStatus({ status: 'success', message: `🏛️ ${landmarkQuery} · ${landmarkPid ? `ID: ${landmarkPid}` : 'queued'}` });
       }
 
       onPostcardGenerated?.();
@@ -322,7 +346,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
     } catch (err: unknown) {
       setStatus({ status: 'error', message: err instanceof Error ? err.message : String(err) });
     }
-  }, [sourceMode, steps, getRandomStyle, callEdge, huntTheme, huntCountry, singleLat, singleLng, singleName, onPostcardGenerated, onRefetchLog]);
+  }, [sourceMode, steps, getRandomStyle, callEdge, huntTheme, huntCountry, singleLat, singleLng, singleName, landmarkQuery, landmarkNameEs, onPostcardGenerated, onRefetchLog]);
 
   // ─ Execute: Batch (prompt → album)
   const executeBatch = useCallback(async () => {
@@ -357,6 +381,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
   const execute = sourceMode === 'prompt' ? executeBatch : executeSingle;
   const isRunning = status.status === 'loading';
   const canExecute = sourceMode !== 'single' || (singleLat.trim() && singleLng.trim());
+  const canExecuteLandmark = sourceMode !== 'landmark' || landmarkQuery.trim().length > 2;
 
   // ── Calculate estimated time
   const estimateTime = () => {
@@ -653,12 +678,13 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
         <span className="text-white/60 text-[10px] uppercase tracking-widest font-semibold mb-3 block">Source</span>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 mb-3 p-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="flex gap-1 mb-3 p-0.5 rounded-lg flex-wrap" style={{ background: 'rgba(255,255,255,0.04)' }}>
           {[
             { mode: 'wander' as SourceMode, label: '🌍 Wander' },
             { mode: 'hunt' as SourceMode, label: '🎯 Hunt' },
             { mode: 'prompt' as SourceMode, label: '🤖 Prompt' },
             { mode: 'single' as SourceMode, label: '📍 Single' },
+            { mode: 'landmark' as SourceMode, label: '🏛️ Landmark' },
           ].map(({ mode, label }) => (
             <button
               key={mode}
@@ -773,17 +799,49 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
             </div>
           </div>
         )}
+
+        {/* Source: Landmark Precision */}
+        {sourceMode === 'landmark' && (
+          <div className="space-y-2">
+            <p className="text-white/40 text-[10px]">
+              🏛️ <strong style={{ color: 'rgba(165,180,252,0.8)' }}>Landmark Precision</strong> — Geocodifica el lugar exacto y verifica que sea visible antes de generar la ilustración.
+            </p>
+            <input
+              type="text"
+              value={landmarkQuery}
+              onChange={(e) => setLandmarkQuery(e.target.value)}
+              placeholder="Landmark name in English (e.g. Eiffel Tower, Paris)"
+              className="w-full px-3 py-2.5 rounded-xl text-sm"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(165,180,252,0.25)', color: 'white', outline: 'none' }}
+            />
+            <input
+              type="text"
+              value={landmarkNameEs}
+              onChange={(e) => setLandmarkNameEs(e.target.value)}
+              placeholder="Nombre en español (opcional, ej: Torre Eiffel, París)"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none' }}
+            />
+            <div className="rounded-lg p-2.5" style={{ background: 'rgba(165,180,252,0.06)', border: '1px solid rgba(165,180,252,0.12)' }}>
+              <p className="text-[10px] text-white/40 leading-relaxed">
+                💡 El pipeline geocodificará las coordenadas exactas, apuntará la cámara hacia el landmark y pedirá a Gemini que confirme visualmente que está presente antes de gastar créditos en la ilustración.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Execute Button ── */}
       <button
         onClick={execute}
-        disabled={isRunning || (sourceMode === 'prompt' && !batchPrompt.trim()) || !canExecute}
+        disabled={isRunning || (sourceMode === 'prompt' && !batchPrompt.trim()) || !canExecute || !canExecuteLandmark}
         className="w-full px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:brightness-110 border border-white/5"
         style={{
           background: sourceMode === 'prompt'
             ? 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3))'
-            : 'linear-gradient(135deg, rgba(99,102,241,0.4), rgba(59,130,246,0.3))',
+            : sourceMode === 'landmark'
+              ? 'linear-gradient(135deg, rgba(245,158,11,0.4), rgba(239,68,68,0.25))'
+              : 'linear-gradient(135deg, rgba(99,102,241,0.4), rgba(59,130,246,0.3))',
         }}
       >
         {isRunning ? <Loader className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
@@ -791,6 +849,7 @@ export function PipelineConfigurator({ onPostcardGenerated, onRefetchLog }: Pipe
           ? `Generate Album (${batchCount} postcards)`
           : sourceMode === 'wander' ? 'Run Wander Pipeline'
           : sourceMode === 'hunt' ? `Run Hunt: ${HUNT_THEME_OPTIONS.find(o => o.slug === huntTheme)?.label || huntTheme}`
+          : sourceMode === 'landmark' ? `🏛️ Capture: ${landmarkQuery || 'Enter landmark…'}`
           : 'Run Pipeline'
         }
       </button>
