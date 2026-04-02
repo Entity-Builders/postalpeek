@@ -105,7 +105,7 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
       className="rounded-xl hover:bg-white/5 transition-colors group"
     >
       <a
-        href={`/p/${encodeUuidToHash(entry.id)}`}
+        href={`/preview/${encodeUuidToHash(entry.id)}`}
         target="_blank"
         rel="noopener noreferrer"
         className="flex gap-3 p-3 cursor-pointer no-underline"
@@ -149,7 +149,7 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
             <span className="text-white/30 text-[10px] font-mono">{timeAgo(entry.created_at)}</span>
             <span className="text-white/10 mx-0.5">·</span>
             <a
-              href={`/p/${encodeUuidToHash(entry.id)}`}
+              href={`/preview/${encodeUuidToHash(entry.id)}`}
               onClick={(e) => e.stopPropagation()}
               className="text-white/20 hover:text-indigo-300 text-[10px] font-mono transition-colors"
               style={{ textDecoration: 'none' }}

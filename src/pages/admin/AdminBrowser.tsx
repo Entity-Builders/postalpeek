@@ -10,9 +10,6 @@ import {
   Search,
   ChevronDown,
   Loader,
-  MapPin,
-  Clock,
-  CheckCircle,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -172,7 +169,7 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => window.open(`/p/${encodeUuidToHash(postcardId)}`, '_blank')}
+            onClick={() => window.open(`/preview/${encodeUuidToHash(postcardId)}`, '_blank')}
             className="px-2 py-1 rounded-lg text-[10px] font-medium"
             style={{ background: 'rgba(99,102,241,0.15)', color: 'rgb(165,180,252)', border: '1px solid rgba(99,102,241,0.3)' }}
           >

@@ -30,6 +30,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 
@@ -464,6 +465,17 @@ function SlotRow({
           {slot.city}{slot.country ? `, ${slot.country}` : ''} · {(slot.postcard_id || '').slice(0, 8)}
         </p>
       </div>
+
+      {/* Preview link */}
+      <a
+        href={`/preview/${encodeUuidToHash(slot.postcard_id)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open postcard preview"
+        className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-white/20 hover:text-indigo-400 transition-all opacity-0 group-hover:opacity-100"
+      >
+        <Eye className="w-3.5 h-3.5" />
+      </a>
 
       {/* Remove */}
       <button

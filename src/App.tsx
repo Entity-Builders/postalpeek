@@ -228,8 +228,8 @@ function App() {
                   <Route path='/admin/*' element={<Navigate to='/feed' replace />} />
                 )}
   
-                {/* Postcard admin detail — /p/:id only */}
-                <Route path='/p/:id' element={<PostcardDetailPage />} />
+                {/* Postcard admin detail — /preview/:id */}
+                <Route path='/preview/:id' element={<PostcardDetailPage />} />
   
                 {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
                 <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
