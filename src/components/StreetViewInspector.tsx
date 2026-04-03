@@ -59,6 +59,8 @@ export interface SpatialPanoMetadata {
   date: string;
   heading: number;
   label: string;
+  fov?: number;
+  pitch?: number;
 }
 
 interface PreviewData {
@@ -73,6 +75,19 @@ interface PreviewData {
   pitch: number;
   fov: number;
   scout_frames?: SpatialPanoMetadata[];
+  pilot_frames?: (SpatialPanoMetadata & {
+    imageBase64?: string;
+    pilot_metadata?: {
+      status: string;
+      reason: string;
+      scout_directive?: {
+        move_direction: string;
+        distance_meters: number;
+        pitch_offset: number;
+        zoom_fov: number;
+      };
+    };
+  })[];
 }
 
 export function StreetViewInspector({
@@ -135,13 +150,6 @@ export function StreetViewInspector({
           setHdgOffset(0); // Reset on load
           setActiveScoutIndex(null); // Reset scout selection
         }
-      } catch (err: unknown) {
-        if (isMounted)
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to generate camera preview",
-          );
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -160,6 +168,45 @@ export function StreetViewInspector({
     label,
     isLandmarkPrecision,
   ]);
+
+  const runSimulator = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "postalpeek-camera-preview",
+        {
+          body: {
+            lat: initialLat,
+            lng: initialLng,
+            heading: initialHeading,
+            location_name: label,
+            is_landmark: isLandmarkPrecision,
+            run_pilot: true,
+          },
+        },
+      );
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      if (data) {
+        setPreviewData(data);
+        setActiveFov(data.fov || 90);
+        setActivePitch(data.pitch || 0);
+        setHdgOffset(0);
+        setActiveScoutIndex(null);
+      }
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to run pilot simulation",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const activeScout =
     activeScoutIndex !== null && previewData?.scout_frames
@@ -262,6 +309,14 @@ export function StreetViewInspector({
                       <span className="text-white/70 text-xs font-medium truncate max-w-[220px]">
                         {label}
                       </span>
+                      <button
+                        onClick={runSimulator}
+                        disabled={loading}
+                        className="ml-2 px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 text-[10px] font-mono transition-colors border border-indigo-500/30 flex items-center gap-1"
+                        title="Execute Autonomous Gemini Pilot (Costs API credits)"
+                      >
+                        🚁 Run Pilot Simulator
+                      </button>
                     </div>
 
                     {/* Simulation Result */}
@@ -480,11 +535,17 @@ export function StreetViewInspector({
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                             {previewData.scout_frames.map((scout, idx) => {
                               const isActive = activeScoutIndex === idx;
-                              const scoutUrl = `https://www.google.com/maps/embed/v1/streetview?key=${MAPS_KEY}&pano=${scout.panoId}&heading=${scout.heading}&pitch=0&fov=90`;
+                              const sFov = scout.fov ?? 90;
+                              const sPitch = scout.pitch ?? 0;
+                              const scoutUrl = `https://www.google.com/maps/embed/v1/streetview?key=${MAPS_KEY}&pano=${scout.panoId}&heading=${scout.heading}&pitch=${sPitch}&fov=${sFov}`;
                               return (
                                 <div
                                   key={idx}
-                                  onClick={() => setActiveScoutIndex(idx)}
+                                  onClick={() => {
+                                    setActiveScoutIndex(idx);
+                                    setActiveFov(sFov);
+                                    setActivePitch(sPitch);
+                                  }}
                                   className="relative rounded overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-sky-500/50"
                                   style={{
                                     height: 80,
@@ -506,6 +567,69 @@ export function StreetViewInspector({
                                       style={{ border: 0, display: "block" }}
                                       loading="lazy"
                                     />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Flight Simulator Timeline */}
+                      {previewData?.pilot_frames && previewData.pilot_frames.length > 0 && (
+                        <div className="bg-indigo-950/30 border-t border-indigo-500/20 p-3">
+                          <div className="flex items-center gap-2 mb-3 px-1">
+                            <span className="text-indigo-300/80 text-[10px] uppercase tracking-wider font-semibold">
+                              🛸 Flight Simulator Path ({previewData.pilot_frames.length})
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-3">
+                            {previewData.pilot_frames.map((frame, idx) => {
+                              const isBase64 = !!frame.imageBase64;
+                              const imgSrc = isBase64 
+                                ? `data:image/jpeg;base64,${frame.imageBase64}` 
+                                : `https://maps.googleapis.com/maps/api/streetview?size=600x400&pano=${frame.panoId}&heading=${frame.heading}&pitch=${frame.pitch || 0}&fov=${frame.fov || 90}&key=${MAPS_KEY}`;
+                              
+                              const pm = frame.pilot_metadata;
+                              
+                              return (
+                                <div key={idx} className="flex flex-col sm:flex-row gap-3 bg-black/40 rounded-lg p-2 border border-white/5 shadow-inner">
+                                  {/* Frame image */}
+                                  <div className="shrink-0 rounded overflow-hidden" style={{ width: 140, height: 100 }}>
+                                    <img 
+                                      src={imgSrc} 
+                                      alt={`Flight step ${idx + 1}`} 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  
+                                  {/* Frame details & Gemini reasoning */}
+                                  <div className="flex-1 flex flex-col pt-1">
+                                    <div className="flex justify-between items-start mb-1.5">
+                                      <span className="text-white/50 text-[10px] font-mono">
+                                        Step {idx + 1}/{previewData.pilot_frames!.length} • <span className="text-indigo-300">lat: {frame.lat.toFixed(4)} lng: {frame.lng.toFixed(4)}</span>
+                                      </span>
+                                      {pm?.status && (
+                                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${pm.status === 'perfect' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                          {pm.status}
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-white/70 text-xs mb-2 italic">
+                                      "{pm?.reason || 'No reasoning provided.'}"
+                                    </div>
+                                    
+                                    {pm?.scout_directive && pm.status !== "perfect" && (
+                                      <div className="mt-auto bg-indigo-500/10 rounded px-2 py-1 flex items-center justify-between border border-indigo-500/20">
+                                        <span className="text-indigo-400 text-[10px] font-mono">
+                                          Moving {pm.scout_directive.move_direction} ({pm.scout_directive.distance_meters}m)
+                                        </span>
+                                        <span className="text-indigo-400/50 text-[10px] font-mono">
+                                          adjusting pitch: {Math.round(pm.scout_directive.pitch_offset || 0)}°
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
