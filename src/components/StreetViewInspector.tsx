@@ -77,9 +77,14 @@ interface PreviewData {
   scout_frames?: SpatialPanoMetadata[];
   pilot_frames?: (SpatialPanoMetadata & {
     imageBase64?: string;
+    lensType?: string;
     pilot_metadata?: {
       status: string;
       reason: string;
+      /** Vivid one-sentence description of what is visible in the frame */
+      scene_narration?: string;
+      /** Estimated percentage of the frame occupied by the target (0-100) */
+      target_prominence_pct?: number;
       scout_directive?: {
         move_direction: string;
         distance_meters: number;
@@ -591,42 +596,100 @@ export function StreetViewInspector({
                                 : `https://maps.googleapis.com/maps/api/streetview?size=600x400&pano=${frame.panoId}&heading=${frame.heading}&pitch=${frame.pitch || 0}&fov=${frame.fov || 90}&key=${MAPS_KEY}`;
                               
                               const pm = frame.pilot_metadata;
+                              const isPerfect = pm?.status === 'perfect';
+                              const isWinner = idx === 0; // first frame returned is always the best
+                              const prominencePct = pm?.target_prominence_pct ?? 0;
+                              const isDiscovery = frame.lensType?.includes('Discovery');
+                              const isRefinement = frame.lensType?.includes('Refinement');
                               
                               return (
-                                <div key={idx} className="flex flex-col sm:flex-row gap-3 bg-black/40 rounded-lg p-2 border border-white/5 shadow-inner">
+                                <div
+                                  key={idx}
+                                  className="flex flex-col sm:flex-row gap-3 rounded-lg p-2 border shadow-inner"
+                                  style={{
+                                    background: isWinner ? 'rgba(16,185,129,0.08)' : 'rgba(0,0,0,0.40)',
+                                    border: isWinner
+                                      ? '1px solid rgba(16,185,129,0.4)'
+                                      : '1px solid rgba(255,255,255,0.05)',
+                                  }}
+                                >
                                   {/* Frame image */}
-                                  <div className="shrink-0 rounded overflow-hidden" style={{ width: 140, height: 100 }}>
+                                  <div className="relative shrink-0 rounded overflow-hidden" style={{ width: 140, height: 100 }}>
                                     <img 
                                       src={imgSrc} 
                                       alt={`Flight step ${idx + 1}`} 
                                       className="w-full h-full object-cover"
                                     />
+                                    {/* Winner crown */}
+                                    {isWinner && (
+                                      <div className="absolute top-1 right-1 text-sm" title="Best frame selected">
+                                        👑
+                                      </div>
+                                    )}
+                                    {/* Frame type badge */}
+                                    {(isDiscovery || isRefinement) && (
+                                      <div
+                                        className="absolute bottom-1 left-1 text-[8px] font-mono px-1 py-0.5 rounded"
+                                        style={{
+                                          background: isRefinement ? 'rgba(99,102,241,0.8)' : 'rgba(0,0,0,0.7)',
+                                          color: isRefinement ? '#c7d2fe' : 'rgba(255,255,255,0.6)',
+                                        }}
+                                      >
+                                        {isRefinement ? 'Refinement' : 'Discovery'}
+                                      </div>
+                                    )}
                                   </div>
                                   
-                                  {/* Frame details & Gemini reasoning */}
-                                  <div className="flex-1 flex flex-col pt-1">
-                                    <div className="flex justify-between items-start mb-1.5">
+                                  {/* Frame details & AI analysis */}
+                                  <div className="flex-1 flex flex-col pt-1 gap-1.5">
+                                    {/* Header row */}
+                                    <div className="flex justify-between items-start">
                                       <span className="text-white/50 text-[10px] font-mono">
                                         Step {idx + 1}/{previewData.pilot_frames!.length} • <span className="text-indigo-300">lat: {frame.lat.toFixed(4)} lng: {frame.lng.toFixed(4)}</span>
                                       </span>
                                       {pm?.status && (
-                                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${pm.status === 'perfect' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isPerfect ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
                                           {pm.status}
                                         </span>
                                       )}
                                     </div>
                                     
-                                    <div className="text-white/70 text-xs mb-2 italic">
-                                      "{pm?.reason || 'No reasoning provided.'}"
-                                    </div>
+                                    {/* Scene narration - primary text */}
+                                    {(pm?.scene_narration || pm?.reason) && (
+                                      <div className="text-white/70 text-xs italic leading-relaxed">
+                                        "{pm.scene_narration || pm.reason}"
+                                      </div>
+                                    )}
                                     
+                                    {/* Target prominence bar */}
+                                    {prominencePct > 0 && (
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-white/30 text-[9px] font-mono shrink-0">Target</span>
+                                        <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                          <div
+                                            className="h-full rounded-full transition-all"
+                                            style={{
+                                              width: `${Math.min(prominencePct, 100)}%`,
+                                              background: prominencePct >= 35
+                                                ? 'rgba(16,185,129,0.8)'
+                                                : prominencePct >= 15
+                                                  ? 'rgba(245,158,11,0.8)'
+                                                  : 'rgba(239,68,68,0.7)',
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="text-white/40 text-[9px] font-mono shrink-0">{prominencePct}%</span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Movement directive (refinement shots only) */}
                                     {pm?.scout_directive && pm.status !== "perfect" && (
                                       <div className="mt-auto bg-indigo-500/10 rounded px-2 py-1 flex items-center justify-between border border-indigo-500/20">
                                         <span className="text-indigo-400 text-[10px] font-mono">
                                           Moving {pm.scout_directive.move_direction} ({pm.scout_directive.distance_meters}m)
                                         </span>
                                         <span className="text-indigo-400/50 text-[10px] font-mono">
-                                          adjusting pitch: {Math.round(pm.scout_directive.pitch_offset || 0)}°
+                                          pitch: {Math.round(pm.scout_directive.pitch_offset || 0)}°
                                         </span>
                                       </div>
                                     )}
