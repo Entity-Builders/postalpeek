@@ -688,6 +688,7 @@ export function AdminQueue() {
           {scoutSession && MAPS_KEY && (
             <div className="mt-3">
               <ExplorerRealtimeFeed
+                key={scoutSession.sessionId}
                 sessionId={scoutSession.sessionId}
                 locationName={scoutSession.locationName}
                 mapsApiKey={MAPS_KEY}

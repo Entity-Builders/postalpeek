@@ -13,55 +13,30 @@
  *  done      → Winner banner with full thumbnail + score + narration
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader, CheckCircle, AlertCircle, Compass, Zap, Eye, ScanSearch } from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, ScanSearch, Target, TrendingUp } from 'lucide-react';
 import { useExplorerRealtime, type ExplorerProgressEvent } from '../hooks/useExplorerRealtime';
+import {
+  FrameSection,
+  RefinementSection,
+  PhaseIndicator
+} from './ExplorerShared';
+import {
+  FramePhase,
+  CapturedFrame,
+  svThumb,
+  scoreColor,
+  isApproachLensType,
+} from './explorer-utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface CapturedFrame {
-  pano_id: string;
-  heading: number;
-  fov: number;
-  pitch: number;
-  lat: number;
-  lng: number;
-  index: number;
-  score?: number;
-  prominence_pct?: number;
-  narration?: string;
-  is_winner?: boolean;
-  status?: string;
-}
 
 interface ExplorerRealtimeFeedProps {
   sessionId: string;
   locationName: string;
   mapsApiKey: string;
-  onDone?: () => void;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function svThumb(panoId: string, heading: number, fov: number, pitch: number, key: string) {
-  return `https://maps.googleapis.com/maps/api/streetview?size=400x266&pano=${panoId}&heading=${Math.round(heading)}&pitch=${Math.round(pitch)}&fov=${fov}&key=${key}`;
-}
-
-function scoreColor(score: number) {
-  if (score >= 7) return { bg: '#10b981', text: '#fff' };
-  if (score >= 5) return { bg: '#f59e0b', text: '#fff' };
-  return { bg: '#ef4444', text: '#fff' };
-}
-
-function phaseConfig(phase: number) {
-  switch (phase) {
-    case 1: return { icon: <Compass className="w-4 h-4" />, color: 'text-purple-400', bg: 'rgba(147,51,234,0.1)', border: 'rgba(147,51,234,0.25)' };
-    case 2: return { icon: <Compass className="w-4 h-4" />, color: 'text-blue-400', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' };
-    case 3: return { icon: <Eye className="w-4 h-4" />, color: 'text-amber-400', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' };
-    case 4: return { icon: <Zap className="w-4 h-4" />, color: 'text-emerald-400', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' };
-    default: return { icon: <Loader className="w-4 h-4 animate-spin" />, color: 'text-white/30', bg: 'transparent', border: 'transparent' };
-  }
+  onDone?: (summary: { total_frames: number; best_frame?: CapturedFrame }) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,7 +47,7 @@ export function ExplorerRealtimeFeed({
   mapsApiKey,
   onDone,
 }: ExplorerRealtimeFeedProps) {
-  const { events, isDone: realtimeDone, error: realtimeError, elapsedSeconds } = useExplorerRealtime(sessionId);
+  const { events, error: realtimeError, elapsedSeconds } = useExplorerRealtime(sessionId);
 
   const [phaseNum, setPhaseNum] = useState<number>(0);
   const [phaseMsg, setPhaseMsg] = useState<string>('Initializing…');
@@ -81,6 +56,10 @@ export function ExplorerRealtimeFeed({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [winner, setWinner] = useState<CapturedFrame | null>(null);
+  
+  const candidatePanosRef = useRef<string[]>([]);
+  const activeRefinementParentRef = useRef<string | null>(null);
+  
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   const processedCount = useRef(0);
@@ -99,16 +78,44 @@ export function ExplorerRealtimeFeed({
       case 'phase':
         setPhaseNum(event.phase ?? 0);
         setPhaseMsg(event.message ?? '');
+
+        // When entering phase 4, rank candidates
+        if (event.phase === 4) {
+          setFrames(prev => {
+            const ranked = prev
+              .filter(f => f.phase === 'discovery' && f.score !== undefined)
+              .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+            const topIds = ranked.slice(0, 2).map(f => f.pano_id);
+            candidatePanosRef.current = topIds;
+
+            if (topIds.length === 0) return prev;
+
+            return prev.map(f =>
+              topIds.includes(f.pano_id) && f.phase === 'discovery'
+                ? { ...f, is_candidate: true }
+                : f
+            );
+          });
+        }
         break;
 
       case 'frame_captured': {
         const f = event.frame;
         if (!f?.pano_id) break;
+
         setFrames(prev => {
-          if (prev.find(x => x.pano_id === f.pano_id)) return prev;
+          if (prev.find(x => x.pano_id === f.pano_id && x.phase === 'discovery')) return prev;
           return [...prev, {
-            pano_id: f.pano_id, heading: f.heading, fov: f.fov,
-            pitch: f.pitch, lat: f.lat, lng: f.lng, index: prev.length + 1,
+            pano_id: f.pano_id,
+            heading: f.heading,
+            fov: f.fov,
+            pitch: f.pitch,
+            lat: f.lat,
+            lng: f.lng,
+            index: prev.length + 1,
+            phase: 'discovery' as FramePhase,
+            lens_type: f.lens_type,
           }];
         });
         break;
@@ -125,9 +132,10 @@ export function ExplorerRealtimeFeed({
       case 'ranked': {
         const f = event.frame;
         if (!f?.pano_id) break;
+        
         setIsAnalyzing(false);
         setFrames(prev => prev.map(x =>
-          x.pano_id === f.pano_id
+          x.pano_id === f.pano_id && x.phase === 'discovery'
             ? { ...x, score: f.score, prominence_pct: f.prominence_pct, narration: f.narration, is_winner: f.is_winner, status: f.status }
             : x
         ));
@@ -137,40 +145,79 @@ export function ExplorerRealtimeFeed({
       case 'refinement': {
         const f = event.frame;
         if (!f?.pano_id) break;
+
+        const phase: FramePhase = isApproachLensType(f.lens_type) ? 'approach' : 'refinement';
+
+        let parentPanoId: string | undefined;
+        if (phase === 'refinement') {
+          if (candidatePanosRef.current.includes(f.pano_id)) {
+            activeRefinementParentRef.current = f.pano_id;
+          }
+          parentPanoId = f.pano_id;
+        } else {
+          parentPanoId = activeRefinementParentRef.current ?? candidatePanosRef.current[0];
+        }
+
         setFrames(prev => {
-          if (prev.find(x => x.pano_id === f.pano_id && x.fov === f.fov)) return prev;
+          const exists = prev.find(x => x.pano_id === f.pano_id && x.fov === f.fov && x.phase === phase);
+          if (exists) return prev;
+
           return [...prev, {
-            pano_id: f.pano_id, heading: f.heading, fov: f.fov,
-            pitch: f.pitch, lat: f.lat, lng: f.lng, index: prev.length + 1,
-            score: f.score, prominence_pct: f.prominence_pct, narration: f.narration,
+            pano_id: f.pano_id,
+            heading: f.heading,
+            fov: f.fov,
+            pitch: f.pitch,
+            lat: f.lat,
+            lng: f.lng,
+            index: prev.length + 1,
+            phase,
+            score: f.score,
+            prominence_pct: f.prominence_pct,
+            narration: f.narration,
+            is_winner: f.is_winner,
+            status: f.status,
+            lens_type: f.lens_type,
+            parent_pano_id: parentPanoId,
           }];
         });
         break;
       }
 
       case 'done': {
-        const f = event.frame;
         setIsAnalyzing(false);
         setIsDone(true);
+        const f = event.frame;
+        const totalFrames = frames.length;
         if (f?.pano_id) {
           const w: CapturedFrame = {
             pano_id: f.pano_id, heading: f.heading, fov: f.fov,
             pitch: f.pitch, lat: f.lat, lng: f.lng, index: 0,
+            phase: 'discovery',
             score: f.score, prominence_pct: f.prominence_pct,
             narration: f.narration, is_winner: true,
           };
           setWinner(w);
           setFrames(prev => prev.map(x => x.pano_id === f.pano_id ? { ...x, is_winner: true } : x));
+          setTimeout(() => onDoneRef.current?.({ total_frames: totalFrames + 1, best_frame: w }), 1000);
+        } else {
+          setTimeout(() => onDoneRef.current?.({ total_frames: totalFrames }), 1000);
         }
-        setTimeout(() => onDoneRef.current?.(), 30_000);
         break;
       }
     }
   }
 
+  // ── Derived state ──────────────────────────────────────────────────────────
+
+  const discoveryFrames = frames.filter(f => f.phase === 'discovery');
+  const refinementFrames = frames.filter(f => f.phase === 'refinement');
+  const approachFrames = frames.filter(f => f.phase === 'approach');
   const rankedFrames = frames.filter(f => f.score !== undefined);
+  const candidateFrames = discoveryFrames.filter(f => f.is_candidate);
+
   const error = realtimeError;
-  const pConfig = phaseConfig(phaseNum);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -217,27 +264,13 @@ export function ExplorerRealtimeFeed({
 
       {/* ── Phase indicator ── */}
       <AnimatePresence mode="wait">
-        <motion.div
-          key={`${phaseNum}-${phaseMsg.slice(0, 20)}`}
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="mx-3 mt-3 mb-1 px-3 py-2 rounded-xl flex items-center gap-2.5"
-          style={{ background: pConfig.bg, border: `1px solid ${pConfig.border}` }}
-        >
-          <span className={pConfig.color}>{pConfig.icon}</span>
-          <p className={`text-[11px] font-mono font-medium truncate ${pConfig.color}`}>
-            {phaseNum > 0 && <span className="opacity-60 mr-1.5">PHASE {phaseNum} ·</span>}
-            {phaseMsg}
-          </p>
-        </motion.div>
+        <PhaseIndicator phase={phaseNum} message={phaseMsg} />
       </AnimatePresence>
 
-      {/* ── Main content ── */}
+      {/* ── Main content area ── */}
       <div className="px-3 pb-3 flex flex-col gap-3 mt-2">
 
-        {/* Early phases radar */}
+        {/* ── Empty state: radar animation ── */}
         {phaseNum <= 2 && frames.length === 0 && (
           <div className="py-6 flex flex-col items-center gap-3">
             <div className="relative">
@@ -251,74 +284,20 @@ export function ExplorerRealtimeFeed({
           </div>
         )}
 
-        {/* Frame grid */}
-        {frames.length > 0 && !contactSheet && (
-          <>
-            <p className="text-[9px] font-mono text-white/25 uppercase tracking-widest px-0.5">
-              {frames.length} frame{frames.length > 1 ? 's' : ''} captured
-            </p>
-            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              <AnimatePresence initial={false}>
-                {frames.map((frame, idx) => (
-                  <motion.div
-                    key={`${frame.pano_id}-${frame.fov}`}
-                    initial={{ opacity: 0, scale: 0.92 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.25, delay: idx * 0.04 }}
-                    className="relative rounded-xl overflow-hidden"
-                    style={{
-                      aspectRatio: '3/2',
-                      border: frame.is_winner ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: frame.is_winner ? '0 0 16px rgba(16,185,129,0.3)' : 'none',
-                    }}
-                  >
-                    <img
-                      src={svThumb(frame.pano_id, frame.heading, frame.fov, frame.pitch, mapsApiKey)}
-                      alt={`Frame ${frame.index}`}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                    <div className="absolute top-1.5 left-1.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded"
-                      style={{ background: 'rgba(0,0,0,0.7)', color: 'rgba(255,255,255,0.6)' }}>
-                      {idx + 1}
-                    </div>
-                    <div className="absolute top-1.5 right-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded"
-                      style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.4)' }}>
-                      {frame.fov}°
-                    </div>
-                    {frame.score !== undefined && (
-                      <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-                        className="absolute bottom-1.5 right-1.5 text-[11px] font-bold px-2 py-0.5 rounded-lg"
-                        style={{ background: scoreColor(frame.score).bg, color: '#fff' }}>
-                        {frame.score}/10
-                      </motion.div>
-                    )}
-                    {frame.prominence_pct !== undefined && frame.prominence_pct > 0 && (
-                      <div className="absolute bottom-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded"
-                        style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.55)' }}>
-                        {frame.prominence_pct}%
-                      </div>
-                    )}
-                    {frame.is_winner && (
-                      <div className="absolute top-0 right-0 left-0 h-1 rounded-t-xl" style={{ background: '#10b981' }} />
-                    )}
-                  </motion.div>
-                ))}
-                {!isDone && (
-                  <motion.div key="loader"
-                    animate={{ opacity: [0.3, 0.6, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="rounded-xl flex items-center justify-center"
-                    style={{ aspectRatio: '3/2', border: '1px dashed rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.04)' }}>
-                    <Loader className="w-5 h-5 text-indigo-400/30 animate-spin" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </>
+        {/* ── Phase 3: Discovery frames grid (2-col, larger) ── */}
+        {discoveryFrames.length > 0 && (
+          <FrameSection
+            label="Discovery"
+            count={discoveryFrames.length}
+            frames={discoveryFrames}
+            mapsApiKey={mapsApiKey}
+            accentColor="rgba(255,255,255,0.04)"
+            showPlaceholder={phaseNum === 3 && !isDone}
+            columns={2}
+          />
         )}
 
-        {/* Contact sheet */}
+        {/* ── Contact sheet ── */}
         <AnimatePresence>
           {contactSheet && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -346,41 +325,73 @@ export function ExplorerRealtimeFeed({
           )}
         </AnimatePresence>
 
-        {/* Winner banner */}
+        {/* ── Phase 4A: Refinement brackets ── */}
+        {candidateFrames.length > 0 && (
+          <RefinementSection
+            label="Refinement"
+            icon={<Target className="w-3.5 h-3.5" />}
+            description="Brackets (N/S/E/W) of top candidates"
+            frames={refinementFrames}
+            discoveryFrames={discoveryFrames}
+            mapsApiKey={mapsApiKey}
+            accentColor="rgba(99,102,241,0.04)"
+            accentBorder="rgba(99,102,241,0.15)"
+            labelColor="rgba(129,140,248,0.9)"
+            showPlaceholder={phaseNum === 4 && approachFrames.length === 0 && !isDone}
+          />
+        )}
+
+        {/* ── Phase 4B: Approach vectors ── */}
+        {approachFrames.length > 0 && (
+          <RefinementSection
+            label="Approach Vectors"
+            icon={<TrendingUp className="w-3.5 h-3.5" />}
+            description="Moving closer to landmark"
+            frames={approachFrames}
+            discoveryFrames={discoveryFrames}
+            mapsApiKey={mapsApiKey}
+            accentColor="rgba(251,191,36,0.04)"
+            accentBorder="rgba(251,191,36,0.15)"
+            labelColor="rgba(251,191,36,0.9)"
+            showPlaceholder={phaseNum === 4 && !isDone}
+          />
+        )}
+
+        {/* ── Winner banner ── */}
         <AnimatePresence>
           {isDone && winner && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl overflow-hidden"
-              style={{ border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.06)' }}>
+              className="rounded-xl overflow-hidden mt-2"
+              style={{ border: '2px solid rgba(16,185,129,0.5)', background: 'rgba(16,185,129,0.06)', boxShadow: '0 8px 32px rgba(16,185,129,0.15)' }}>
               <div className="relative">
                 <img
                   src={svThumb(winner.pano_id, winner.heading, winner.fov, winner.pitch, mapsApiKey)}
                   alt="Winner"
                   className="w-full object-cover rounded-t-xl"
-                  style={{ height: 140 }}
+                  style={{ height: 180 }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-xl" />
-                <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
-                  <span className="text-base">👑</span>
-                  <div className="flex items-center gap-1.5">
-                    {winner.score !== undefined && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg"
-                        style={{ background: scoreColor(winner.score).bg, color: '#fff' }}>
-                        {winner.score}/10
-                      </span>
-                    )}
-                    {winner.prominence_pct !== undefined && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg"
-                        style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.7)' }}>
-                        {winner.prominence_pct}% prominence
-                      </span>
-                    )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent rounded-t-xl" />
+                <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl drop-shadow-md">👑</span>
+                    <div>
+                      <p className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-widest mb-0.5" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Selected Frame</p>
+                      <p className="text-white text-sm font-semibold truncate" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                        {winner.prominence_pct}% Prominence
+                      </p>
+                    </div>
                   </div>
+                  {winner.score !== undefined && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-lg"
+                      style={{ background: scoreColor(winner.score).bg, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                      {winner.score}/10
+                    </span>
+                  )}
                 </div>
               </div>
               {winner.narration && (
-                <div className="px-3 py-2.5">
-                  <p className="text-[11px] text-white/50 italic leading-relaxed">"{winner.narration}"</p>
+                <div className="px-4 py-3 border-t border-emerald-500/20">
+                  <p className="text-xs text-emerald-100/70 italic leading-relaxed font-serif">"{winner.narration}"</p>
                 </div>
               )}
             </motion.div>
@@ -388,7 +399,7 @@ export function ExplorerRealtimeFeed({
         </AnimatePresence>
 
         {error && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl mt-2"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
             <p className="text-[11px] text-red-400/80 font-mono">{error}</p>
@@ -398,13 +409,13 @@ export function ExplorerRealtimeFeed({
 
       {/* Footer */}
       {frames.length > 0 && (
-        <div className="px-4 py-2.5 flex items-center gap-4"
+        <div className="px-4 py-2.5 flex items-center gap-4 mt-auto"
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
           <span className="text-[10px] font-mono text-white/30">
             <span className="text-white/55">{frames.length}</span> captured
           </span>
           <span className="text-[10px] font-mono text-white/30">
-            <span className="text-white/55">{rankedFrames.length}</span> ranked
+            <span className="text-white/55">{rankedFrames.length}</span> analyzed
           </span>
           {isDone && (
             <span className="ml-auto text-[10px] font-mono text-emerald-400/70">✓ Scout complete</span>
