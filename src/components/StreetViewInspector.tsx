@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { ExplorerLiveFeed } from "./ExplorerLiveFeed";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Eye,
@@ -114,6 +115,7 @@ export function StreetViewInspector({
   const [activePitch, setActivePitch] = useState<number>(0);
   const [hdgOffset, setHdgOffset] = useState<number>(0);
   const [activeScoutIndex, setActiveScoutIndex] = useState<number | null>(null);
+  const [showLiveFeed, setShowLiveFeed] = useState(false);
 
   const fovOptions = isTripStop ? TRIP_FOVS : WANDER_FOVS;
 
@@ -175,8 +177,15 @@ export function StreetViewInspector({
   ]);
 
   const runSimulator = async () => {
-    setLoading(true);
+    // Show live SSE feed immediately — results land when stream is done
+    setShowLiveFeed(true);
+    setLoading(false); // don't show full-screen spinner — live feed IS the progress
     setError(null);
+  };
+
+  const onLiveFeedDone = async () => {
+    // Stream finished — fetch the full pilot_frames JSON for the inspector
+    setLoading(true);
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
         "postalpeek-camera-preview",
@@ -188,6 +197,7 @@ export function StreetViewInspector({
             location_name: label,
             is_landmark: isLandmarkPrecision,
             run_pilot: true,
+            // no stream flag — get full JSON with base64 images
           },
         },
       );
@@ -203,11 +213,7 @@ export function StreetViewInspector({
         setActiveScoutIndex(null);
       }
     } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to run pilot simulation",
-      );
+      setError(err instanceof Error ? err.message : 'Failed to run pilot simulation');
     } finally {
       setLoading(false);
     }
@@ -323,6 +329,21 @@ export function StreetViewInspector({
                         🚁 Run Pilot Simulator
                       </button>
                     </div>
+
+                    {/* ── Explorer v2 Live Feed ──────────────────────────────────── */}
+                    {showLiveFeed && !previewData?.pilot_frames && MAPS_KEY && (
+                      <div className="px-4 py-3">
+                        <ExplorerLiveFeed
+                          locationName={label ?? 'Target'}
+                          lat={initialLat}
+                          lng={initialLng}
+                          mapsApiKey={MAPS_KEY}
+                          supabaseUrl={import.meta.env.VITE_SUPABASE_URL ?? ''}
+                          supabaseAnonKey={import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''}
+                          onDone={onLiveFeedDone}
+                        />
+                      </div>
+                    )}
 
                     {/* Simulation Result */}
                     <div className="flex items-center gap-3 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
