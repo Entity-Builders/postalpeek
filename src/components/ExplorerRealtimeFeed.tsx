@@ -100,6 +100,7 @@ export function ExplorerRealtimeFeed({
   const [phase, setPhase] = useState<ExplorerPhase | null>(null);
   const [frames, setFrames] = useState<ExplorerFrame[]>([]);
   const [bestFrame, setBestFrame] = useState<ExplorerFrame | null>(null);
+  const [contactSheet, setContactSheet] = useState<string | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const onDoneCalledRef = useRef(false);
 
@@ -122,6 +123,10 @@ export function ExplorerRealtimeFeed({
     switch (event.type) {
       case 'phase':
         setPhase({ phase: event.phase ?? 1, message: event.message ?? '', ring_radius_m: event.ring_radius_m });
+        break;
+
+      case 'contact_sheet':
+        if (event.contact_sheet_base64) setContactSheet(event.contact_sheet_base64);
         break;
 
       case 'ring_point': {
@@ -337,6 +342,19 @@ export function ExplorerRealtimeFeed({
           </motion.div>
         )}
       </div>
+
+      {/* ── Contact Sheet Preview ── */}
+      {contactSheet && (
+        <div className="px-3 py-2" style={{ background: 'rgba(99,102,241,0.04)', borderTop: '1px solid rgba(99,102,241,0.12)' }}>
+          <p className="text-[9px] font-mono text-indigo-300/50 mb-1.5 uppercase tracking-widest">🔍 What Gemini sees</p>
+          <img
+            src={`data:image/jpeg;base64,${contactSheet}`}
+            alt="Contact sheet"
+            className="w-full rounded-lg object-contain"
+            style={{ maxHeight: 220, border: '1px solid rgba(255,255,255,0.07)' }}
+          />
+        </div>
+      )}
 
       {/* ── Stats ── */}
       <div className="px-4 py-2 border-t flex items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>

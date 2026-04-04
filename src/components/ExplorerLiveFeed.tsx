@@ -24,12 +24,13 @@ import { Loader, CheckCircle, AlertCircle, Eye, Compass, Zap } from 'lucide-reac
 
 // Mirrors ExplorerProgressEvent from streetview.ts (can't import Deno types here)
 interface ExplorerProgressEvent {
-  type: 'phase' | 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'done';
+  type: 'phase' | 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'contact_sheet' | 'done';
   phase?: 1 | 2 | 3 | 4;
   message?: string;
   ring_radius_m?: number;
   radius_class?: string;
   total_frames?: number;
+  contact_sheet_base64?: string;
   frame?: {
     pano_id: string;
     heading: number;
@@ -119,6 +120,7 @@ export function ExplorerLiveFeed({
   const [error, setError] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [bestFrame, setBestFrame] = useState<ExplorerFrame | null>(null);
+  const [contactSheet, setContactSheet] = useState<string | null>(null); // base64 JPEG
   const startTimeRef = useRef(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const filmstripRef = useRef<HTMLDivElement>(null);
@@ -255,6 +257,12 @@ export function ExplorerLiveFeed({
         setTimeout(scrollToEnd, 50);
         break;
       }
+
+      case 'contact_sheet':
+        if (event.contact_sheet_base64) {
+          setContactSheet(event.contact_sheet_base64);
+        }
+        break;
 
       case 'ranked': {
         const incoming = event.frame;
@@ -448,6 +456,30 @@ export function ExplorerLiveFeed({
           </motion.div>
         )}
       </div>
+
+      {/* ── Contact Sheet Preview ("What Gemini sees") ── */}
+      <AnimatePresence>
+        {contactSheet && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 py-2" style={{ background: 'rgba(99,102,241,0.04)', borderTop: '1px solid rgba(99,102,241,0.12)' }}>
+              <p className="text-[9px] font-mono text-indigo-300/50 mb-1.5 uppercase tracking-widest">
+                🔍 What Gemini sees
+              </p>
+              <img
+                src={`data:image/jpeg;base64,${contactSheet}`}
+                alt="Contact sheet"
+                className="w-full rounded-lg object-contain"
+                style={{ maxHeight: 220, border: '1px solid rgba(255,255,255,0.07)' }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Stats bar ── */}
       <div className="px-4 py-2 border-t flex items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>

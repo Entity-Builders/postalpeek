@@ -16,12 +16,13 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ExplorerProgressEvent {
-  type: 'phase' | 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'done';
+  type: 'phase' | 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'contact_sheet' | 'done';
   phase?: 1 | 2 | 3 | 4;
   message?: string;
   ring_radius_m?: number;
   radius_class?: string;
   total_frames?: number;
+  contact_sheet_base64?: string;
   frame?: {
     pano_id: string;
     heading: number;
