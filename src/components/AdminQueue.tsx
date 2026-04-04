@@ -27,6 +27,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@eb-packages/logic/src/supabase";
 import { StreetViewInspector } from "./StreetViewInspector";
+import { ExplorerRealtimeFeed } from "./ExplorerRealtimeFeed";
+
+const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -208,6 +211,13 @@ export function AdminQueue() {
     import.meta.env.VITE_SUPABASE_ANON_KEY ||
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO7o6oSc4wYjSnO28-VRLNxMEnOj9aQREp8o";
 
+  // ── Active Explorer Scout (for real-time cron monitoring) ──
+  const [scoutSession, setScoutSession] = useState<{
+    sessionId: string;
+    locationName: string;
+    slotId?: string;
+  } | null>(null);
+
   // ── Cron status ──
   const [cronStatus, setCronStatus] = useState<{
     status: ActionStatus;
@@ -368,6 +378,19 @@ export function AdminQueue() {
   // ── Run cron once (next slot or specific slot) ──
   const runCron = useCallback(
     async (slotId?: string) => {
+      // For landmark slots, generate a scout session ID for real-time progress
+      const targetSlot = slotId ? pendingSlots.find(s => s.id === slotId) : pendingSlots[0];
+      const isLandmark = targetSlot?.generation_metadata_override?.landmark_precision === true;
+      const sessionId = isLandmark ? crypto.randomUUID() : null;
+      const locationName = targetSlot?.slot_label ?? 'Scout…';
+
+      // Show live feed immediately for landmark slots
+      if (sessionId) {
+        setScoutSession({ sessionId, locationName, slotId });
+      } else {
+        setScoutSession(null);
+      }
+
       setCronStatus({
         status: "loading",
         message: slotId
@@ -375,7 +398,11 @@ export function AdminQueue() {
           : "Running cron walker…",
       });
       try {
-        const data = await callEdgeFunction(slotId ? { slot_id: slotId } : {});
+        const data = await callEdgeFunction(
+          slotId
+            ? { slot_id: slotId, ...(sessionId ? { scout_session_id: sessionId } : {}) }
+            : (sessionId ? { scout_session_id: sessionId } : {})
+        );
         const loc = data?.data?.location;
         setCronStatus({
           status: "success",
@@ -394,7 +421,7 @@ export function AdminQueue() {
         throw err;
       }
     },
-    [callEdgeFunction, fetchPendingSlots, fetchCronLog],
+    [callEdgeFunction, fetchPendingSlots, fetchCronLog, pendingSlots],
   );
 
   // ── Auto-Run loop ──
@@ -656,6 +683,21 @@ export function AdminQueue() {
             </div>
           </div>
           <StatusMsg status={cronStatus.status} message={cronStatus.message} />
+
+          {/* ── Explorer Scout Live Feed (appears when running landmark slots) ── */}
+          {scoutSession && MAPS_KEY && (
+            <div className="mt-3">
+              <ExplorerRealtimeFeed
+                sessionId={scoutSession.sessionId}
+                locationName={scoutSession.locationName}
+                mapsApiKey={MAPS_KEY}
+                onDone={() => {
+                  // Keep feed visible for 30s after completion so user can review
+                  setTimeout(() => setScoutSession(null), 30_000);
+                }}
+              />
+            </div>
+          )}
         </div>
       </section>
 
