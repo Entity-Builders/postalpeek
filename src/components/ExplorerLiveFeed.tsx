@@ -2,27 +2,22 @@
  * ExplorerLiveFeed.tsx
  *
  * Streams Explorer v2 progress in real-time via SSE from postalpeek-camera-preview.
- * Shows frames appearing one-by-one as the scout captures and ranks them.
  *
- * Usage:
- *   <ExplorerLiveFeed
- *     locationName="Catedral de Córdoba"
- *     lat={-31.4166}
- *     lng={-64.1848}
- *     mapsApiKey={VITE_GOOGLE_MAPS_API_KEY}
- *     supabaseUrl={VITE_SUPABASE_URL}
- *     supabaseAnonKey={VITE_SUPABASE_ANON_KEY}
- *     onDone={(summary) => ...}
- *   />
+ * Visual flow (single screen, no duplicate representations):
+ *
+ *  Phase 1-2  →  Ring discovery + size classification status
+ *  Phase 3    →  Grid of captured thumbnails growing as frames arrive
+ *  contact_sheet event → Show composite image "what Gemini sees"
+ *  ranked     →  Overlay score badges on each thumbnail in the grid
+ *  done       →  Winner banner + narration
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader, CheckCircle, AlertCircle, Eye, Compass, Zap } from 'lucide-react';
+import { Loader, CheckCircle, AlertCircle, Compass, Zap, Eye, ScanSearch } from 'lucide-react';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-// Mirrors ExplorerProgressEvent from streetview.ts (can't import Deno types here)
 interface ExplorerProgressEvent {
   type: 'phase' | 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'contact_sheet' | 'done';
   phase?: 1 | 2 | 3 | 4;
@@ -47,28 +42,19 @@ interface ExplorerProgressEvent {
   };
 }
 
-interface ExplorerFrame {
+interface CapturedFrame {
   pano_id: string;
   heading: number;
   fov: number;
   pitch: number;
   lat: number;
   lng: number;
-  lens_type?: string;
-  status?: string;
+  index: number; // 1-based
+  score?: number;
   prominence_pct?: number;
   narration?: string;
-  score?: number;
   is_winner?: boolean;
-  // What kind of event produced this frame
-  event_type: 'ring_point' | 'frame_captured' | 'ranked' | 'refinement' | 'done';
-}
-
-interface ExplorerPhase {
-  phase: 1 | 2 | 3 | 4;
-  message: string;
-  ring_radius_m?: number;
-  radius_class?: string;
+  status?: string;
 }
 
 interface ExplorerLiveFeedProps {
@@ -78,28 +64,28 @@ interface ExplorerLiveFeedProps {
   mapsApiKey: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
-  onDone?: (summary: { total_frames: number; best_frame?: ExplorerFrame }) => void;
+  onDone?: (summary: { total_frames: number; best_frame?: CapturedFrame }) => void;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function svThumb(panoId: string, heading: number, fov: number, pitch: number, mapsKey: string, size = '160x110') {
-  return `https://maps.googleapis.com/maps/api/streetview?size=${size}&pano=${panoId}&heading=${Math.round(heading)}&pitch=${Math.round(pitch)}&fov=${fov}&key=${mapsKey}`;
+function svThumb(panoId: string, heading: number, fov: number, pitch: number, mapsKey: string) {
+  return `https://maps.googleapis.com/maps/api/streetview?size=400x266&pano=${panoId}&heading=${Math.round(heading)}&pitch=${Math.round(pitch)}&fov=${fov}&key=${mapsKey}`;
 }
 
-function prominenceColor(pct: number) {
-  if (pct >= 35) return { bg: 'rgba(16,185,129,0.85)', text: '#ecfdf5' };
-  if (pct >= 15) return { bg: 'rgba(245,158,11,0.85)', text: '#fffbeb' };
-  return { bg: 'rgba(239,68,68,0.7)', text: '#fef2f2' };
+function scoreColor(score: number) {
+  if (score >= 7) return { bg: '#10b981', text: '#fff' };
+  if (score >= 5) return { bg: '#f59e0b', text: '#fff' };
+  return { bg: '#ef4444', text: '#fff' };
 }
 
-function phaseLabel(phase: number) {
+function phaseConfig(phase: number, msg: string) {
   switch (phase) {
-    case 1: return { icon: <Compass className="w-3 h-3" />, label: 'Classifying size', color: 'text-purple-300' };
-    case 2: return { icon: <Compass className="w-3 h-3" />, label: 'Discovering ring', color: 'text-blue-300' };
-    case 3: return { icon: <Eye className="w-3 h-3" />, label: 'Capturing & ranking', color: 'text-amber-300' };
-    case 4: return { icon: <Zap className="w-3 h-3" />, label: 'Refining FOV', color: 'text-emerald-300' };
-    default: return { icon: <Loader className="w-3 h-3" />, label: 'Processing', color: 'text-white/40' };
+    case 1: return { icon: <Compass className="w-4 h-4" />, color: 'text-purple-400', bg: 'rgba(147,51,234,0.1)', border: 'rgba(147,51,234,0.25)' };
+    case 2: return { icon: <Compass className="w-4 h-4" />, color: 'text-blue-400', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' };
+    case 3: return { icon: <Eye className="w-4 h-4" />, color: 'text-amber-400', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' };
+    case 4: return { icon: <Zap className="w-4 h-4" />, color: 'text-emerald-400', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' };
+    default: return { icon: <Loader className="w-4 h-4 animate-spin" />, color: 'text-white/30', bg: 'transparent', border: 'transparent' };
   }
 }
 
@@ -114,36 +100,130 @@ export function ExplorerLiveFeed({
   supabaseAnonKey,
   onDone,
 }: ExplorerLiveFeedProps) {
-  const [phase, setPhase] = useState<ExplorerPhase | null>(null);
-  const [frames, setFrames] = useState<ExplorerFrame[]>([]);
+  const [phaseNum, setPhaseNum] = useState<number>(0);
+  const [phaseMsg, setPhaseMsg] = useState<string>('Initializing...');
+  const [frames, setFrames] = useState<CapturedFrame[]>([]);
+  const [contactSheet, setContactSheet] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [winner, setWinner] = useState<CapturedFrame | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [bestFrame, setBestFrame] = useState<ExplorerFrame | null>(null);
-  const [contactSheet, setContactSheet] = useState<string | null>(null); // base64 JPEG
-  const startTimeRef = useRef(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(Date.now());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const filmstripRef = useRef<HTMLDivElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
-  // Auto-scroll filmstrip to the right as frames appear
-  const scrollToEnd = useCallback(() => {
-    if (filmstripRef.current) {
-      filmstripRef.current.scrollTo({ left: filmstripRef.current.scrollWidth, behavior: 'smooth' });
+  // ── Event handler ──────────────────────────────────────────────────────────
+
+  const handleEvent = useCallback((event: ExplorerProgressEvent) => {
+    switch (event.type) {
+      case 'phase':
+        setPhaseNum(event.phase ?? 0);
+        setPhaseMsg(event.message ?? '');
+        break;
+
+      case 'ring_point':
+        // Just phase info, no visual action needed
+        break;
+
+      case 'frame_captured': {
+        const f = event.frame;
+        if (!f?.pano_id) break;
+        setFrames(prev => {
+          if (prev.find(x => x.pano_id === f.pano_id)) return prev;
+          return [...prev, {
+            pano_id: f.pano_id,
+            heading: f.heading,
+            fov: f.fov,
+            pitch: f.pitch,
+            lat: f.lat,
+            lng: f.lng,
+            index: prev.length + 1,
+          }];
+        });
+        break;
+      }
+
+      case 'contact_sheet':
+        if (event.contact_sheet_base64) {
+          setContactSheet(event.contact_sheet_base64);
+          setIsAnalyzing(true);
+          setPhaseMsg('Gemini is analyzing the contact sheet...');
+        }
+        break;
+
+      case 'ranked': {
+        const f = event.frame;
+        if (!f?.pano_id) break;
+        setIsAnalyzing(false);
+        setFrames(prev => prev.map(x =>
+          x.pano_id === f.pano_id
+            ? { ...x, score: f.score, prominence_pct: f.prominence_pct, narration: f.narration, is_winner: f.is_winner, status: f.status }
+            : x
+        ));
+        break;
+      }
+
+      case 'refinement': {
+        const f = event.frame;
+        if (!f?.pano_id) break;
+        setFrames(prev => {
+          const exists = prev.find(x => x.pano_id === f.pano_id && x.fov === f.fov);
+          if (exists) return prev;
+          return [...prev, {
+            pano_id: f.pano_id,
+            heading: f.heading,
+            fov: f.fov,
+            pitch: f.pitch,
+            lat: f.lat,
+            lng: f.lng,
+            index: prev.length + 1,
+            score: f.score,
+            prominence_pct: f.prominence_pct,
+            narration: f.narration,
+            is_winner: f.is_winner,
+            status: f.status,
+          }];
+        });
+        break;
+      }
+
+      case 'done': {
+        setIsAnalyzing(false);
+        setIsDone(true);
+        if (timerRef.current) clearInterval(timerRef.current);
+        const f = event.frame;
+        if (f?.pano_id) {
+          const w: CapturedFrame = {
+            pano_id: f.pano_id, heading: f.heading, fov: f.fov,
+            pitch: f.pitch, lat: f.lat, lng: f.lng, index: 0,
+            score: f.score, prominence_pct: f.prominence_pct,
+            narration: f.narration, is_winner: true,
+          };
+          setWinner(w);
+          setFrames(prev => prev.map(x => x.pano_id === f.pano_id ? { ...x, is_winner: true } : x));
+          onDoneRef.current?.({ total_frames: frames.length + 1, best_frame: w });
+        }
+        break;
+      }
     }
-  }, []);
+  }, [frames.length]);
+
+  // ── SSE connection ─────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Timer
+    startRef.current = Date.now();
     timerRef.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     }, 1000);
 
-    // SSE connection to camera-preview
     const fnUrl = `${supabaseUrl}/functions/v1/postalpeek-camera-preview`;
+    const body = JSON.stringify({ lat, lng, stream: true });
 
-    let aborted = false;
+    let es: EventSource | null = null;
 
-    (async () => {
+    const connect = async () => {
       try {
         const res = await fetch(fnUrl, {
           method: 'POST',
@@ -151,371 +231,322 @@ export function ExplorerLiveFeed({
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseAnonKey}`,
           },
-          body: JSON.stringify({
-            lat,
-            lng,
-            heading: 0,
-            location_name: locationName,
-            is_landmark: true,
-            run_pilot: true,
-            stream: true,
-          }),
+          body,
         });
 
         if (!res.ok || !res.body) {
-          const text = await res.text();
-          throw new Error(`HTTP ${res.status}: ${text}`);
+          setError(`Server error ${res.status}`);
+          return;
         }
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (!aborted) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? ''; // keep incomplete line
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            try {
-              const event = JSON.parse(line.slice(6));
-              handleEvent(event);
-            } catch { /* malformed event */ }
+        const read = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const evt = JSON.parse(line.slice(6)) as ExplorerProgressEvent;
+                  handleEvent(evt);
+                } catch { /* ignore parse errors */ }
+              }
+            }
           }
-        }
-      } catch (err: unknown) {
-        if (!aborted) setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        if (timerRef.current) clearInterval(timerRef.current);
+        };
+        read().catch(e => setError(e?.message ?? 'Stream error'));
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Connection failed');
       }
-    })();
+    };
+
+    connect();
 
     return () => {
-      aborted = true;
+      es?.close();
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lat, lng, supabaseUrl, supabaseAnonKey, handleEvent]);
 
-  // Safely coerce an optional SSE event.frame into a complete ExplorerFrame
-  function toFrame(
-    src: ExplorerProgressEvent['frame'] | undefined,
-    eventType: ExplorerFrame['event_type'],
-  ): ExplorerFrame | null {
-    if (!src?.pano_id) return null;
-    return {
-      pano_id: src.pano_id,
-      heading: src.heading ?? 0,
-      fov: src.fov ?? 90,
-      pitch: src.pitch ?? 0,
-      lat: src.lat ?? 0,
-      lng: src.lng ?? 0,
-      lens_type: src.lens_type,
-      status: src.status,
-      prominence_pct: src.prominence_pct,
-      narration: src.narration,
-      score: src.score,
-      is_winner: src.is_winner,
-      event_type: eventType,
-    };
-  }
+  // ── Derived state ──────────────────────────────────────────────────────────
 
-  function handleEvent(event: ExplorerProgressEvent) {
-    switch (event.type) {
-      case 'phase':
-        setPhase({
-          phase: event.phase ?? 1,
-          message: event.message ?? '',
-          ring_radius_m: event.ring_radius_m,
-          radius_class: event.radius_class,
-        });
-        break;
+  const rankedFrames = frames.filter(f => f.score !== undefined);
+  const pConfig = phaseConfig(phaseNum, phaseMsg);
+  const sortedForDisplay = [...frames].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 
-      case 'ring_point': {
-        const frame = toFrame(event.frame, 'ring_point');
-        if (!frame) break;
-        setFrames(prev => {
-          if (prev.find(f => f.pano_id === frame.pano_id && f.event_type === 'ring_point')) return prev;
-          return [...prev, frame];
-        });
-        setTimeout(scrollToEnd, 50);
-        break;
-      }
-
-      case 'frame_captured': {
-        const frame = toFrame(event.frame, 'frame_captured');
-        if (!frame) break;
-        setFrames(prev => {
-          const withoutRing = prev.filter(f => !(f.pano_id === frame.pano_id && f.event_type === 'ring_point'));
-          if (withoutRing.find(f => f.pano_id === frame.pano_id && f.event_type === 'frame_captured')) return prev;
-          return [...withoutRing, frame];
-        });
-        setTimeout(scrollToEnd, 50);
-        break;
-      }
-
-      case 'contact_sheet':
-        if (event.contact_sheet_base64) {
-          setContactSheet(event.contact_sheet_base64);
-        }
-        break;
-
-      case 'ranked': {
-        const incoming = event.frame;
-        if (!incoming?.pano_id) break;
-        setFrames(prev => prev.map(f =>
-          f.pano_id === incoming.pano_id
-            ? { ...f, ...toFrame(incoming, 'ranked')! }
-            : f
-        ));
-        break;
-      }
-
-      case 'refinement': {
-        const frame = toFrame(event.frame, 'refinement');
-        if (!frame) break;
-        setFrames(prev => {
-          if (prev.find(f => f.pano_id === frame.pano_id && f.fov === frame.fov && f.event_type === 'refinement')) return prev;
-          return [...prev, frame];
-        });
-        setTimeout(scrollToEnd, 50);
-        break;
-      }
-
-      case 'done': {
-        setIsDone(true);
-        if (timerRef.current) clearInterval(timerRef.current);
-        const winner = toFrame(event.frame, 'done');
-        if (winner) {
-          winner.is_winner = true;
-          setBestFrame(winner);
-          setFrames(prev => prev.map(f =>
-            f.pano_id === winner.pano_id && (f.fov === winner.fov || f.event_type === 'done')
-              ? { ...f, is_winner: true }
-              : f
-          ));
-        }
-        onDone?.({ total_frames: event.total_frames ?? 0, best_frame: winner ?? undefined });
-        break;
-      }
-    }
-  }
-
-  const currentPhaseInfo = phase ? phaseLabel(phase.phase) : null;
-  const capturedCount = frames.filter(f => f.event_type === 'frame_captured' || f.event_type === 'ranked' || f.event_type === 'refinement').length;
-  const rankedCount = frames.filter(f => f.event_type === 'ranked').length;
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
-      style={{ background: 'rgba(15,15,28,0.95)', border: '1px solid rgba(99,102,241,0.2)' }}
+      className="rounded-2xl overflow-hidden flex flex-col"
+      style={{
+        background: 'rgba(10,10,22,0.97)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+      }}
     >
       {/* ── Header ── */}
-      <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(99,102,241,0.15)' }}>
-        <div className="flex items-center gap-2.5">
-          <div className="relative">
+      <div className="px-4 py-3 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative shrink-0">
             {!isDone && !error && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             )}
-            <span className="text-base">🛸</span>
+            <span className="text-lg leading-none">🛸</span>
           </div>
-          <div>
-            <p className="text-white/90 text-sm font-semibold leading-tight">Explorer v2 Live</p>
-            <p className="text-white/40 text-[10px] font-mono truncate max-w-[200px]">{locationName}</p>
+          <div className="min-w-0">
+            <p className="text-white/90 font-semibold text-sm leading-tight truncate">Explorer Scout — Live</p>
+            <p className="text-white/35 text-[10px] font-mono truncate">{locationName}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isDone ? (
-            <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
-              <CheckCircle className="w-3 h-3" /> done · {elapsedSeconds}s
+            <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+              <CheckCircle className="w-3.5 h-3.5" /> {elapsed}s
             </span>
           ) : error ? (
-            <span className="flex items-center gap-1 text-[10px] font-mono text-red-400">
-              <AlertCircle className="w-3 h-3" /> error
+            <span className="flex items-center gap-1 text-[11px] font-mono text-red-400">
+              <AlertCircle className="w-3.5 h-3.5" /> Error
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] font-mono text-white/30">
-              <Loader className="w-3 h-3 animate-spin" /> {elapsedSeconds}s
+            <span className="text-[11px] font-mono text-white/25 flex items-center gap-1">
+              <Loader className="w-3 h-3 animate-spin" /> {elapsed}s
             </span>
           )}
         </div>
       </div>
 
       {/* ── Phase indicator ── */}
-      {phase && (
-        <div className="px-4 py-2 flex items-center gap-2" style={{ background: 'rgba(99,102,241,0.06)' }}>
-          <span className={`flex items-center gap-1 ${currentPhaseInfo?.color ?? 'text-white/40'}`}>
-            {currentPhaseInfo?.icon}
-            <span className="text-[10px] font-mono font-semibold uppercase tracking-wide">
-              Phase {phase.phase} · {currentPhaseInfo?.label}
-            </span>
-          </span>
-          <span className="text-[10px] text-white/30 font-mono truncate ml-1">{phase.message}</span>
-          {phase.ring_radius_m && (
-            <span className="ml-auto text-[10px] font-mono text-indigo-400/60 shrink-0">
-              ⊙ {phase.ring_radius_m}m
-            </span>
-          )}
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`${phaseNum}-${phaseMsg.slice(0, 20)}`}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mx-3 mt-3 mb-1 px-3 py-2 rounded-xl flex items-center gap-2.5"
+          style={{ background: pConfig.bg, border: `1px solid ${pConfig.border}` }}
+        >
+          <span className={pConfig.color}>{pConfig.icon}</span>
+          <p className={`text-[11px] font-mono font-medium truncate ${pConfig.color}`}>
+            {phaseNum > 0 && <span className="opacity-60 mr-1.5">PHASE {phaseNum} ·</span>}
+            {phaseMsg}
+          </p>
+        </motion.div>
+      </AnimatePresence>
 
-      {/* ── Filmstrip ── */}
-      <div
-        ref={filmstripRef}
-        className="flex gap-2 px-3 py-3 overflow-x-auto"
-        style={{ scrollbarWidth: 'thin', minHeight: 110 }}
-      >
-        <AnimatePresence initial={false}>
-          {frames.map((frame, idx) => {
-            const isCapturing = frame.event_type === 'ring_point';
-            const isRefined = frame.event_type === 'refinement';
-            const hasScore = frame.status && frame.event_type !== 'ring_point' && frame.event_type !== 'frame_captured';
-            const pct = frame.prominence_pct ?? 0;
-            const pColor = prominenceColor(pct);
+      {/* ── Main content area ── */}
+      <div className="px-3 pb-3 flex flex-col gap-3 mt-2">
 
-            return (
-              <motion.div
-                key={`${frame.pano_id}-${frame.fov}-${idx}`}
-                initial={{ opacity: 0, scale: 0.85, x: 20 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className="relative shrink-0 rounded-lg overflow-hidden"
-                style={{
-                  width: isCapturing ? 72 : 96,
-                  height: isCapturing ? 50 : 68,
-                  border: frame.is_winner
-                    ? '2px solid rgba(16,185,129,0.7)'
-                    : isRefined
-                      ? '1.5px solid rgba(99,102,241,0.4)'
-                      : '1px solid rgba(255,255,255,0.08)',
-                  boxShadow: frame.is_winner ? '0 0 12px rgba(16,185,129,0.35)' : 'none',
-                  background: 'rgba(255,255,255,0.04)',
-                }}
-                title={frame.narration ?? `${frame.lens_type ?? 'Frame'}`}
-              >
-                {isCapturing ? (
-                  // Ring point placeholder — skeleton with spinner
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Loader className="w-3.5 h-3.5 text-white/20 animate-spin" />
-                  </div>
-                ) : (
-                  <img
-                    src={svThumb(frame.pano_id, frame.heading, frame.fov, frame.pitch, mapsApiKey)}
-                    alt={frame.lens_type ?? `Frame ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    loading="eager"
-                  />
-                )}
-
-                {/* Winner crown */}
-                {frame.is_winner && (
-                  <div className="absolute top-0.5 right-0.5 text-[11px] leading-none drop-shadow">👑</div>
-                )}
-
-                {/* Prominence badge */}
-                {hasScore && pct > 0 && (
-                  <div
-                    className="absolute bottom-0.5 left-0.5 text-[7px] font-mono px-1 rounded leading-tight"
-                    style={{ background: pColor.bg, color: pColor.text }}
-                  >
-                    {pct}%
-                  </div>
-                )}
-
-                {/* Type badge */}
-                <div
-                  className="absolute top-0.5 left-0.5 text-[7px] font-mono px-0.5 rounded leading-tight"
-                  style={{ background: 'rgba(0,0,0,0.65)', color: isRefined ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.4)' }}
-                >
-                  {isRefined ? `r${frame.fov}` : frame.fov}°
+        {/* ── State: Early phases (ring discovery) — just show phase info ── */}
+        {phaseNum <= 2 && frames.length === 0 && (
+          <div className="py-6 flex flex-col items-center gap-3">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-2 border-indigo-500/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full border-2 border-indigo-500/40 flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-indigo-500/60 animate-ping" />
                 </div>
-
-                {/* Status dot */}
-                {frame.status === 'perfect' && (
-                  <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-
-        {/* Live "incoming" pulse at the end while running */}
-        {!isDone && !error && (
-          <motion.div
-            key="pulse"
-            animate={{ opacity: [0.3, 0.7, 0.3] }}
-            transition={{ duration: 1.2, repeat: Infinity }}
-            className="shrink-0 w-16 h-[68px] rounded-lg flex items-center justify-center"
-            style={{ border: '1px dashed rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.04)' }}
-          >
-            <Loader className="w-4 h-4 text-indigo-400/50 animate-spin" />
-          </motion.div>
+              </div>
+            </div>
+            <p className="text-white/30 text-xs font-mono text-center">Mapping vantage points around the landmark…</p>
+          </div>
         )}
-      </div>
 
-      {/* ── Contact Sheet Preview ("What Gemini sees") ── */}
-      <AnimatePresence>
-        {contactSheet && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 py-2" style={{ background: 'rgba(99,102,241,0.04)', borderTop: '1px solid rgba(99,102,241,0.12)' }}>
-              <p className="text-[9px] font-mono text-indigo-300/50 mb-1.5 uppercase tracking-widest">
-                🔍 What Gemini sees
-              </p>
+        {/* ── State: Frames captured — show thumbnail grid ── */}
+        {frames.length > 0 && !contactSheet && (
+          <>
+            <p className="text-[9px] font-mono text-white/25 uppercase tracking-widest px-0.5">
+              {frames.length} frame{frames.length > 1 ? 's' : ''} captured
+            </p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              <AnimatePresence initial={false}>
+                {frames.map((frame, idx) => (
+                  <motion.div
+                    key={`${frame.pano_id}-${frame.fov}`}
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.25, delay: idx * 0.04 }}
+                    className="relative rounded-xl overflow-hidden"
+                    style={{
+                      aspectRatio: '3/2',
+                      border: frame.is_winner
+                        ? '2px solid #10b981'
+                        : '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: frame.is_winner ? '0 0 16px rgba(16,185,129,0.3)' : 'none',
+                    }}
+                  >
+                    <img
+                      src={svThumb(frame.pano_id, frame.heading, frame.fov, frame.pitch, mapsApiKey)}
+                      alt={`Frame ${frame.index}`}
+                      className="w-full h-full object-cover"
+                      loading="eager"
+                    />
+                    {/* Frame index badge */}
+                    <div className="absolute top-1.5 left-1.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(0,0,0,0.7)', color: 'rgba(255,255,255,0.6)' }}>
+                      {idx + 1}
+                    </div>
+                    {/* FOV badge */}
+                    <div className="absolute top-1.5 right-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.4)' }}>
+                      {frame.fov}°
+                    </div>
+                    {/* Score badge (when ranked) */}
+                    {frame.score !== undefined && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.7 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="absolute bottom-1.5 right-1.5 text-[11px] font-bold px-2 py-0.5 rounded-lg"
+                        style={{ background: scoreColor(frame.score).bg, color: scoreColor(frame.score).text }}
+                      >
+                        {frame.score}/10
+                      </motion.div>
+                    )}
+                    {/* Prominence badge */}
+                    {frame.prominence_pct !== undefined && frame.prominence_pct > 0 && (
+                      <div className="absolute bottom-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded"
+                        style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.55)' }}>
+                        {frame.prominence_pct}%
+                      </div>
+                    )}
+                    {/* Winner crown */}
+                    {frame.is_winner && (
+                      <div className="absolute top-0 right-0 left-0 h-1 rounded-t-xl" style={{ background: '#10b981' }} />
+                    )}
+                  </motion.div>
+                ))}
+                {/* Placeholder for in-progress */}
+                {!isDone && (
+                  <motion.div
+                    key="placeholder"
+                    animate={{ opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="rounded-xl flex items-center justify-center"
+                    style={{
+                      aspectRatio: '3/2',
+                      border: '1px dashed rgba(99,102,241,0.3)',
+                      background: 'rgba(99,102,241,0.04)',
+                    }}
+                  >
+                    <Loader className="w-5 h-5 text-indigo-400/30 animate-spin" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </>
+        )}
+
+        {/* ── State: Contact sheet ready → show what Gemini sees ── */}
+        <AnimatePresence>
+          {contactSheet && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl overflow-hidden"
+              style={{ border: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.05)' }}
+            >
+              <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+                <ScanSearch className="w-3.5 h-3.5 text-indigo-400/60" />
+                <p className="text-[10px] font-mono text-indigo-300/60 uppercase tracking-widest">
+                  {isAnalyzing ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader className="w-2.5 h-2.5 animate-spin" />
+                      Gemini is analyzing all frames…
+                    </span>
+                  ) : rankedFrames.length > 0 ? (
+                    `${rankedFrames.length} frames ranked`
+                  ) : 'Contact sheet'}
+                </p>
+              </div>
               <img
                 src={`data:image/jpeg;base64,${contactSheet}`}
-                alt="Contact sheet"
-                className="w-full rounded-lg object-contain"
-                style={{ maxHeight: 220, border: '1px solid rgba(255,255,255,0.07)' }}
+                alt="Contact sheet — all frames side by side"
+                className="w-full object-contain"
+                style={{ maxHeight: 260, display: 'block' }}
               />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* ── Stats bar ── */}
-      <div className="px-4 py-2 border-t flex items-center gap-4" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-        <span className="text-[10px] font-mono text-white/30">
-          <span className="text-white/60">{capturedCount}</span> captured
-        </span>
-        <span className="text-[10px] font-mono text-white/30">
-          <span className="text-white/60">{rankedCount}</span> ranked
-        </span>
-        {bestFrame && (
-          <span className="text-[10px] font-mono text-emerald-400/70 ml-auto">
-            👑 best: {bestFrame.prominence_pct ?? 0}% prominence
-          </span>
+        {/* ── State: Done → Winner banner ── */}
+        <AnimatePresence>
+          {isDone && winner && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl overflow-hidden"
+              style={{ border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.06)' }}
+            >
+              {/* Winner thumbnail */}
+              <div className="relative">
+                <img
+                  src={svThumb(winner.pano_id, winner.heading, winner.fov, winner.pitch, mapsApiKey)}
+                  alt="Best frame"
+                  className="w-full object-cover rounded-t-xl"
+                  style={{ height: 140 }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-xl" />
+                <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between">
+                  <span className="text-base">👑</span>
+                  <div className="flex items-center gap-1.5">
+                    {winner.score !== undefined && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg"
+                        style={{ background: scoreColor(winner.score).bg, color: '#fff' }}>
+                        {winner.score}/10
+                      </span>
+                    )}
+                    {winner.prominence_pct !== undefined && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.7)' }}>
+                        {winner.prominence_pct}% prominence
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Narration */}
+              {winner.narration && (
+                <div className="px-3 py-2.5">
+                  <p className="text-[11px] text-white/50 italic leading-relaxed">
+                    "{winner.narration}"
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Error ── */}
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <p className="text-[11px] text-red-400/80 font-mono">{error}</p>
+          </div>
         )}
       </div>
 
-      {/* ── Best frame narration ── */}
-      <AnimatePresence>
-        {isDone && bestFrame?.narration && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            className="px-4 pb-3 overflow-hidden"
-          >
-            <p className="text-[11px] text-indigo-200/50 italic leading-relaxed border-l-2 pl-2" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
-              "{bestFrame.narration}"
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Error state ── */}
-      {error && (
-        <div className="px-4 pb-3 flex items-center gap-2">
-          <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-          <p className="text-[11px] text-red-400/70 font-mono">{error}</p>
+      {/* ── Footer stats ── */}
+      {frames.length > 0 && (
+        <div className="px-4 py-2.5 flex items-center gap-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+          <span className="text-[10px] font-mono text-white/30">
+            <span className="text-white/55">{frames.length}</span> captured
+          </span>
+          <span className="text-[10px] font-mono text-white/30">
+            <span className="text-white/55">{rankedFrames.length}</span> ranked
+          </span>
+          {isDone && winner?.score !== undefined && (
+            <span className="ml-auto text-[10px] font-mono text-emerald-400/70">
+              ✓ Scout complete
+            </span>
+          )}
         </div>
       )}
     </div>
