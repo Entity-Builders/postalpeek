@@ -90,13 +90,25 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
   const storytelling  = meta?.storytelling as { title?: { es?: string; en?: string } | string; did_you_know?: { es?: string; en?: string } | string } | null;
   const styleKey      = meta?.illustration_style_key as string | null;
   const vibeInjected  = meta?.vibe_injected as string | null;
+  const explorerScout = meta?.explorer_scout as {
+    total_frames: number;
+    best_frame: { pano_id: string; heading: number; fov: number; pitch: number; status: string; prominence_pct: number; narration?: string };
+    all_frames: { rank: number; pano_id: string; heading: number; fov: number; pitch: number; lens_type?: string; status?: string; prominence_pct: number; narration?: string }[];
+  } | null;
+
   const storyTitle    = storytelling?.title
     ? (typeof storytelling.title === 'string' ? storytelling.title : storytelling.title.es || storytelling.title.en || '')
     : null;
   const didYouKnow    = storytelling?.did_you_know
     ? (typeof storytelling.did_you_know === 'string' ? storytelling.did_you_know : storytelling.did_you_know.es || storytelling.did_you_know.en || '')
     : null;
-  const hasMetadata   = !!(storyTitle || didYouKnow || styleKey || vibeInjected);
+  const hasMetadata   = !!(storyTitle || didYouKnow || styleKey || vibeInjected || explorerScout);
+
+  // Build a Street View Static thumbnail URL from panoId (no API key needed for metadata-only,
+  // but we need key for image fetch — use the env var if available)
+  const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+  const svThumb = (panoId: string, heading: number, fov: number, pitch: number) =>
+    `https://maps.googleapis.com/maps/api/streetview?size=160x110&pano=${panoId}&heading=${heading}&pitch=${pitch}&fov=${fov}&key=${MAPS_KEY}`;
 
   return (
     <motion.div
@@ -122,6 +134,11 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-medium ${strategyColor(entry.strategy)}`}>
               {strategyShort(entry.strategy)}
             </span>
+            {explorerScout && (
+              <span className="text-[9px] px-1 py-0.5 rounded font-mono bg-indigo-500/20 text-indigo-300">
+                🛸 v2
+              </span>
+            )}
             {entry.has_detailed_tags && <CheckCircle className="w-3 h-3 text-emerald-400/60" />}
           </div>
           <p className="text-white/90 text-sm font-medium truncate leading-tight">
@@ -168,6 +185,11 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
           >
             <span>{expanded ? '▾' : '▸'}</span>
             <span>metadata</span>
+            {explorerScout && (
+              <span className="ml-1 text-[9px] font-mono text-indigo-400/50 normal-case tracking-normal">
+                {explorerScout.total_frames} frames scouted
+              </span>
+            )}
             {styleKey && <span className="ml-auto text-[9px] font-mono text-purple-400/50 normal-case tracking-normal">{styleKey}</span>}
           </button>
           <AnimatePresence>
@@ -178,6 +200,68 @@ function LogCard({ entry }: { entry: GenerationLogEntry }) {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
+                {/* ── Explorer Scout Filmstrip ─────────────────────────── */}
+                {explorerScout && MAPS_KEY && (
+                  <div className="mt-2 mb-2">
+                    <p className="text-[9px] text-indigo-300/50 uppercase tracking-widest mb-1.5 font-semibold">
+                      🛸 Explorer v2 — {explorerScout.total_frames} frames considered
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+                      {explorerScout.all_frames.map((frame) => {
+                        const isWinner = frame.rank === 1;
+                        const prominenceColor = frame.prominence_pct >= 35
+                          ? 'rgba(16,185,129,0.9)'
+                          : frame.prominence_pct >= 15
+                            ? 'rgba(245,158,11,0.9)'
+                            : 'rgba(239,68,68,0.7)';
+                        return (
+                          <div
+                            key={frame.rank}
+                            className="relative shrink-0 rounded-md overflow-hidden"
+                            style={{
+                              width: 80, height: 56,
+                              border: isWinner ? '1.5px solid rgba(16,185,129,0.6)' : '1px solid rgba(255,255,255,0.07)',
+                              boxShadow: isWinner ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
+                            }}
+                            title={frame.narration || `Frame ${frame.rank}`}
+                          >
+                            <img
+                              src={svThumb(frame.pano_id, frame.heading, frame.fov, frame.pitch)}
+                              alt={`Frame ${frame.rank}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            {/* Winner crown */}
+                            {isWinner && (
+                              <div className="absolute top-0.5 right-0.5 text-[10px] leading-none">👑</div>
+                            )}
+                            {/* Prominence dot */}
+                            {frame.prominence_pct > 0 && (
+                              <div
+                                className="absolute bottom-0.5 left-0.5 text-[7px] font-mono px-1 rounded"
+                                style={{ background: 'rgba(0,0,0,0.7)', color: prominenceColor }}
+                              >
+                                {frame.prominence_pct}%
+                              </div>
+                            )}
+                            {/* Frame number */}
+                            <div className="absolute top-0.5 left-0.5 text-[7px] font-mono px-0.5 rounded"
+                              style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.5)' }}>
+                              #{frame.rank}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Best frame narration */}
+                    {explorerScout.best_frame.narration && (
+                      <p className="text-[10px] text-white/40 italic mt-1.5 leading-relaxed line-clamp-2">
+                        "{explorerScout.best_frame.narration}"
+                      </p>
+                    )}
+                  </div>
+                )}
+                {/* ── Classic metadata ──────────────────────────────────── */}
                 <div className="mt-1.5 pl-2 border-l space-y-1" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
                   {storyTitle   && <MetadataRow label="📖" value={storyTitle} />}
                   {didYouKnow   && <MetadataRow label="💡" value={didYouKnow} />}
