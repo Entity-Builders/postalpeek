@@ -56,6 +56,14 @@ export interface FeedItem {
   weather?: string | null;
   human_activity?: string | null;
   stamp_cost?: number;
+  game_stats?: {
+    hp: number;
+    attack: number;
+    defense: number;
+    magic: number;
+    element: string;
+    rarity: string;
+  };
 }
 
 interface PostcardProps {

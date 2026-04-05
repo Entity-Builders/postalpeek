@@ -193,19 +193,32 @@ export function PostcardBack({
                    </div>
                 )}
 
-                {/* Vibe Stats */}
-                {item.generation_metadata?.stats && (
+                {/* Visual Stats */}
+                {((item.game_stats && item.game_stats.hp !== undefined) || item.generation_metadata?.stats) && (
                   <div className="shrink-0">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400 mb-2 text-center border-b border-black/5 pb-1">
-                      Radar de Vibes
-                    </p>
+                    <div className="flex items-center justify-between mb-2 border-b border-black/5 pb-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
+                        {item.game_stats && item.game_stats.hp !== undefined ? "Postcard Stats" : "Radar de Vibes"}
+                      </p>
+                      {item.game_stats && item.game_stats.hp !== undefined && (
+                        <div className="flex gap-1.5">
+                          <span className="text-[8px] font-mono text-amber-700 bg-amber-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">{item.game_stats.rarity || 'common'}</span>
+                          <span className="text-[8px] font-mono text-indigo-700 bg-indigo-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">{item.game_stats.element || 'neutral'}</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-2 px-1">
-                      {[
-                        { label: 'Nature', value: item.generation_metadata.stats.nature, color: 'bg-emerald-500', icon: '🌿' },
-                        { label: 'History', value: item.generation_metadata.stats.history, color: 'bg-amber-500', icon: '🏛️' },
-                        { label: 'Urban', value: item.generation_metadata.stats.urban, color: 'bg-stone-500', icon: '🏗️' },
-                        { label: 'Vibe', value: item.generation_metadata.stats.vibe, color: 'bg-purple-500', icon: '✨' },
-                      ].map((stat) => (
+                      {(item.game_stats && item.game_stats.hp !== undefined ? [
+                        { label: 'HP', value: item.game_stats.hp, color: 'bg-rose-500', icon: '❤️' },
+                        { label: 'Attack', value: item.game_stats.attack, color: 'bg-orange-500', icon: '⚔️' },
+                        { label: 'Defense', value: item.game_stats.defense, color: 'bg-blue-500', icon: '🛡️' },
+                        { label: 'Magic', value: item.game_stats.magic, color: 'bg-purple-500', icon: '✨' },
+                      ] : [
+                        { label: 'Nature', value: item.generation_metadata.stats?.nature || 0, color: 'bg-emerald-500', icon: '🌿' },
+                        { label: 'History', value: item.generation_metadata.stats?.history || 0, color: 'bg-amber-500', icon: '🏛️' },
+                        { label: 'Urban', value: item.generation_metadata.stats?.urban || 0, color: 'bg-stone-500', icon: '🏗️' },
+                        { label: 'Vibe', value: item.generation_metadata.stats?.vibe || 0, color: 'bg-purple-500', icon: '✨' },
+                      ]).map((stat) => (
                         <div key={stat.label} className="flex items-center gap-2">
                           <span className="text-[10px] w-4 text-center">{stat.icon}</span>
                           <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none w-12">{stat.label}</span>
@@ -282,56 +295,40 @@ export function PostcardBack({
                 </div>
               )}
 
-              {/* Vibe Stats (TCG style) */}
-              {item.generation_metadata?.stats && (
-                <div className='grid grid-cols-2 gap-x-4 gap-y-2 mt-auto mb-3 max-w-[200px]'>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="text-[10px]">🌿</span>
-                      <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none">Nature</span>
+              {/* Visual Stats (TCG style) */}
+              {((item.game_stats && item.game_stats.hp !== undefined) || item.generation_metadata?.stats) && (
+                <div className='mt-auto mb-3 w-full'>
+                  {item.game_stats && item.game_stats.hp !== undefined && (
+                    <div className="flex gap-2 mb-2">
+                      <span className="text-[8px] font-mono text-amber-700 bg-amber-100/50 border border-amber-200/50 px-1.5 py-0.5 rounded tracking-wider uppercase shadow-sm">Rarity: {item.game_stats.rarity || 'common'}</span>
+                      <span className="text-[8px] font-mono text-indigo-700 bg-indigo-100/50 border border-indigo-200/50 px-1.5 py-0.5 rounded tracking-wider uppercase shadow-sm">Element: {item.game_stats.element || 'neutral'}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden w-16">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, item.generation_metadata.stats.nature))}%` }} />
+                  )}
+                  <div className='grid grid-cols-2 gap-x-4 gap-y-2 max-w-[200px]'>
+                    {(item.game_stats && item.game_stats.hp !== undefined ? [
+                      { label: 'HP', value: item.game_stats.hp, color: 'bg-rose-500', icon: '❤️' },
+                      { label: 'Attack', value: item.game_stats.attack, color: 'bg-orange-500', icon: '⚔️' },
+                      { label: 'Defense', value: item.game_stats.defense, color: 'bg-blue-500', icon: '🛡️' },
+                      { label: 'Magic', value: item.game_stats.magic, color: 'bg-purple-500', icon: '✨' },
+                    ] : [
+                      { label: 'Nature', value: item.generation_metadata.stats?.nature || 0, color: 'bg-emerald-500', icon: '🌿' },
+                      { label: 'History', value: item.generation_metadata.stats?.history || 0, color: 'bg-amber-500', icon: '🏛️' },
+                      { label: 'Urban', value: item.generation_metadata.stats?.urban || 0, color: 'bg-stone-500', icon: '🏗️' },
+                      { label: 'Vibe', value: item.generation_metadata.stats?.vibe || 0, color: 'bg-purple-500', icon: '✨' },
+                    ]).map((stat) => (
+                      <div key={stat.label} className="flex flex-col">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="text-[10px]">{stat.icon}</span>
+                          <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none">{stat.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden w-16">
+                            <div className={`h-full ${stat.color} rounded-full`} style={{ width: `${Math.min(100, Math.max(0, stat.value))}%` }} />
+                          </div>
+                          <span className="text-[9px] font-mono font-semibold text-stone-700 w-4 text-right">{stat.value}</span>
+                        </div>
                       </div>
-                      <span className="text-[9px] font-mono font-semibold text-stone-700 w-4 text-right">{item.generation_metadata.stats.nature}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="text-[10px]">🏛️</span>
-                      <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none">History</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden w-16">
-                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, item.generation_metadata.stats.history))}%` }} />
-                      </div>
-                      <span className="text-[9px] font-mono font-semibold text-stone-700 w-4 text-right">{item.generation_metadata.stats.history}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="text-[10px]">🏗️</span>
-                      <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none">Urban</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden w-16">
-                        <div className="h-full bg-stone-500 rounded-full" style={{ width: `${Math.min(100, Math.max(0, item.generation_metadata.stats.urban))}%` }} />
-                      </div>
-                      <span className="text-[9px] font-mono font-semibold text-stone-700 w-4 text-right">{item.generation_metadata.stats.urban}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="text-[10px]">✨</span>
-                      <span className="text-[8px] font-mono text-stone-500 uppercase tracking-widest leading-none">Vibe</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden w-16">
-                        <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(0, item.generation_metadata.stats.vibe))}%` }} />
-                      </div>
-                      <span className="text-[9px] font-mono font-semibold text-stone-700 w-4 text-right">{item.generation_metadata.stats.vibe}</span>
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}

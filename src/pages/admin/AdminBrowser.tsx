@@ -83,6 +83,7 @@ interface PostcardDetail {
   original_image_url: string | null;
   illustration_url: string | null;
   generation_metadata: Record<string, unknown> | null;
+  game_stats: { hp: number; attack: number; defense: number; magic: number; element: string; rarity: string; } | null;
   created_at: string;
 }
 
@@ -123,13 +124,14 @@ function DetailSection({ title, icon, children }: { title: string; icon: string;
 function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onClose: () => void }) {
   const [detail, setDetail] = useState<PostcardDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [width, setWidth] = useState(420);
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('postalpeek_postcards')
-        .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, created_at')
+        .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, game_stats, created_at')
         .eq('id', postcardId)
         .single();
       if (error) console.error('[DetailPanel]', error);
@@ -159,11 +161,30 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="fixed top-0 right-0 h-full w-[420px] z-50 overflow-y-auto"
-      style={{ background: 'rgba(15,15,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}
+      className="fixed top-0 right-0 h-full z-50 flex shadow-2xl"
+      style={{ width, background: 'rgba(15,15,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between p-4" style={{ background: 'rgba(15,15,25,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div>
+      <div 
+        className="absolute top-0 bottom-0 left-0 w-2 hover:w-3 cursor-col-resize hover:bg-indigo-500/30 transition-all z-[60] -ml-1"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const startWidth = width;
+          const onMouseMove = (moveEvent: MouseEvent) => {
+            const newWidth = startWidth + (startX - moveEvent.clientX);
+            setWidth(Math.min(Math.max(380, newWidth), 1800));
+          };
+          const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+          };
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        }}
+      />
+      <div className="flex-1 overflow-y-auto relative h-full">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4" style={{ background: 'rgba(15,15,25,0.95)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
           <p className="text-white/80 text-sm font-semibold">{detail?.city}, {detail?.country}</p>
           <p className="text-white/25 text-[10px] font-mono">{postcardId.slice(0, 12)}… · {detail?.created_at ? timeAgo(detail.created_at) : ''}</p>
         </div>
@@ -234,17 +255,41 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
           )}
           {detail.visual_tags && detail.visual_tags.length > 0 && (
             <DetailSection title="Visual Tags" icon="👁️">
-              <div className="flex flex-wrap">{detail.visual_tags.map((t, i) => <TagPill key={i} color="indigo">{t}</TagPill>)}</div>
+              <div className="flex flex-wrap">{detail.visual_tags.map((t: any, i) => <TagPill key={i} color="indigo">{typeof t === 'string' ? t : bilingualText(t.label)}</TagPill>)}</div>
             </DetailSection>
           )}
           {detail.detailed_tags && detail.detailed_tags.length > 0 && (
             <DetailSection title={`Detailed Tags (${detail.detailed_tags.length})`} icon="🔍">
-              <div className="flex flex-wrap">{detail.detailed_tags.map((t, i) => <TagPill key={i} color="emerald">{t.label}{t.confidence ? ` (${Math.round(t.confidence * 100)}%)` : ''}</TagPill>)}</div>
+              <div className="flex flex-wrap">{detail.detailed_tags.map((t: any, i) => <TagPill key={i} color="emerald">{typeof t === 'string' ? t : bilingualText(t.label)}{typeof t === 'object' && t.confidence ? ` (${Math.round(t.confidence * 100)}%)` : ''}</TagPill>)}</div>
             </DetailSection>
           )}
           {detail.illustration_tags && detail.illustration_tags.length > 0 && (
             <DetailSection title={`Illustration Tags (${detail.illustration_tags.length})`} icon="🏷️">
-              <div className="flex flex-wrap">{detail.illustration_tags.map((t, i) => <TagPill key={i} color="rose">{t}</TagPill>)}</div>
+              <div className="flex flex-wrap">{detail.illustration_tags.map((t: any, i) => <TagPill key={i} color="rose">{typeof t === 'string' ? t : bilingualText(t.label)}</TagPill>)}</div>
+            </DetailSection>
+          )}
+
+          {((detail.game_stats && detail.game_stats.hp !== undefined) || (detail.generation_metadata?.stats as any)?.nature !== undefined) && (
+            <DetailSection title={(detail.game_stats && detail.game_stats.hp !== undefined) ? `RPG Stats — ${(detail.game_stats.rarity || 'common').toUpperCase()} ${(detail.game_stats.element || 'neutral').toUpperCase()}` : `Radar de Vibes`} icon={(detail.game_stats && detail.game_stats.hp !== undefined) ? "🎴" : "✨"}>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(detail.game_stats && detail.game_stats.hp !== undefined ? [
+                  { label: 'HP', value: detail.game_stats.hp, icon: '❤️' },
+                  { label: 'Attack', value: detail.game_stats.attack, icon: '⚔️' },
+                  { label: 'Defense', value: detail.game_stats.defense, icon: '🛡️' },
+                  { label: 'Magic', value: detail.game_stats.magic, icon: '✨' },
+                ] : [
+                  { label: 'Nature', value: (detail.generation_metadata!.stats as any).nature, icon: '🌿' },
+                  { label: 'History', value: (detail.generation_metadata!.stats as any).history, icon: '🏛️' },
+                  { label: 'Urban', value: (detail.generation_metadata!.stats as any).urban, icon: '🏗️' },
+                  { label: 'Vibe', value: (detail.generation_metadata!.stats as any).vibe, icon: '✨' },
+                ]).map(stat => (
+                  <div key={stat.label} className="rounded-lg p-2 flex flex-col items-center justify-center text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span className="text-sm mb-1">{stat.icon}</span>
+                    <span className="text-white/80 font-mono font-bold text-xs">{stat.value}</span>
+                    <span className="text-white/30 text-[8px] uppercase tracking-wider">{stat.label}</span>
+                  </div>
+                ))}
+              </div>
             </DetailSection>
           )}
 
@@ -282,6 +327,7 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
           <div className="h-8" />
         </div>
       )}
+      </div>
     </motion.div>
   );
 }
