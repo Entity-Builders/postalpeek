@@ -34,6 +34,7 @@ import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash, decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
+import { deriveGameStats, hasValidGameStats, type GameStats } from '../utils/deriveGameStats';
 
 // ── Full postcard type ──────────────────────────────────────────────────
 interface PostcardDetail {
@@ -76,6 +77,8 @@ interface PostcardDetail {
   // SAM2
   sam2_masks: string[] | null;
   semantic_layers: Record<string, any>[] | null;
+  // Game Stats
+  game_stats: GameStats | Record<string, never> | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -948,6 +951,149 @@ function StorytellingTriviaSection({
   );
 }
 
+// ── Game Stats Section ─────────────────────────────────────────────────
+
+const ELEMENT_COLORS: Record<string, { bg: string; text: string; icon: string }> = {
+  fire:     { bg: 'rgba(239,68,68,0.15)',  text: 'rgb(252,165,165)', icon: '🔥' },
+  water:    { bg: 'rgba(59,130,246,0.15)', text: 'rgb(147,197,253)', icon: '💧' },
+  earth:    { bg: 'rgba(180,83,9,0.15)',   text: 'rgb(217,119,6)',   icon: '🌍' },
+  air:      { bg: 'rgba(156,163,175,0.15)',text: 'rgb(209,213,219)', icon: '💨' },
+  electric: { bg: 'rgba(250,204,21,0.15)', text: 'rgb(253,224,71)',  icon: '⚡' },
+  light:    { bg: 'rgba(251,191,36,0.15)', text: 'rgb(252,211,77)',  icon: '✨' },
+  dark:     { bg: 'rgba(88,28,135,0.15)',  text: 'rgb(192,132,252)', icon: '🌑' },
+  steel:    { bg: 'rgba(107,114,128,0.15)',text: 'rgb(156,163,175)', icon: '⚙️' },
+  nature:   { bg: 'rgba(34,197,94,0.15)',  text: 'rgb(134,239,172)', icon: '🌿' },
+  neutral:  { bg: 'rgba(255,255,255,0.08)',text: 'rgb(209,213,219)', icon: '⚪' },
+};
+
+const RARITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  common:    { bg: 'rgba(156,163,175,0.12)', text: 'rgb(156,163,175)', border: 'rgba(156,163,175,0.3)' },
+  uncommon:  { bg: 'rgba(34,197,94,0.12)',   text: 'rgb(74,222,128)',  border: 'rgba(34,197,94,0.3)' },
+  rare:      { bg: 'rgba(59,130,246,0.12)',  text: 'rgb(96,165,250)',  border: 'rgba(59,130,246,0.3)' },
+  epic:      { bg: 'rgba(168,85,247,0.12)',  text: 'rgb(192,132,252)', border: 'rgba(168,85,247,0.3)' },
+  legendary: { bg: 'rgba(245,158,11,0.12)',  text: 'rgb(251,191,36)',  border: 'rgba(245,158,11,0.3)' },
+};
+
+const STAT_BAR_COLORS = {
+  hp:      { bar: 'bg-rose-500',    glow: 'rgba(244,63,94,0.3)' },
+  attack:  { bar: 'bg-orange-500',  glow: 'rgba(249,115,22,0.3)' },
+  defense: { bar: 'bg-blue-500',    glow: 'rgba(59,130,246,0.3)' },
+  magic:   { bar: 'bg-purple-500',  glow: 'rgba(168,85,247,0.3)' },
+};
+
+function GameStatsSection({ postcard, onUpdate }: { postcard: PostcardDetail; onUpdate: (p: PostcardDetail) => void }) {
+  const [generating, setGenerating] = useState(false);
+  const stats = hasValidGameStats(postcard.game_stats) ? postcard.game_stats : null;
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const derived = deriveGameStats({
+        category: postcard.category as { es?: string; en?: string } | string | null,
+        scene_type: postcard.scene_type,
+        weather: postcard.weather,
+        architecture_style: postcard.architecture_style,
+        aesthetic_vibes: postcard.aesthetic_vibes,
+      });
+
+      const { error } = await supabase
+        .from('postalpeek_postcards')
+        .update({ game_stats: derived })
+        .eq('id', postcard.id);
+
+      if (error) throw error;
+      onUpdate({ ...postcard, game_stats: derived });
+    } catch (err) {
+      console.error('[GameStats] Generate failed:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const elColor = stats ? (ELEMENT_COLORS[stats.element] || ELEMENT_COLORS.neutral) : ELEMENT_COLORS.neutral;
+  const rarColor = stats ? (RARITY_COLORS[stats.rarity] || RARITY_COLORS.common) : RARITY_COLORS.common;
+
+  return (
+    <Section icon={<Sparkles className="w-3.5 h-3.5" />} title="Game Stats">
+      {stats ? (
+        <div className="space-y-4">
+          {/* Element & Rarity badges */}
+          <div className="flex items-center gap-3">
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider"
+              style={{ background: elColor.bg, color: elColor.text, border: `1px solid ${elColor.bg.replace('0.15', '0.35')}` }}
+            >
+              {elColor.icon} {stats.element}
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider"
+              style={{ background: rarColor.bg, color: rarColor.text, border: `1px solid ${rarColor.border}` }}
+            >
+              {stats.rarity}
+            </span>
+            <span className="text-white/20 text-xs font-mono ml-auto">
+              Total: {stats.hp + stats.attack + stats.defense + stats.magic}
+            </span>
+          </div>
+
+          {/* Stat bars */}
+          <div className="space-y-2.5">
+            {([
+              { key: 'hp' as const,      label: 'HP',      value: stats.hp,      icon: '❤️' },
+              { key: 'attack' as const,  label: 'Attack',  value: stats.attack,  icon: '⚔️' },
+              { key: 'defense' as const, label: 'Defense', value: stats.defense, icon: '🛡️' },
+              { key: 'magic' as const,   label: 'Magic',   value: stats.magic,   icon: '✨' },
+            ]).map((stat) => {
+              const colors = STAT_BAR_COLORS[stat.key];
+              return (
+                <div key={stat.key} className="flex items-center gap-3">
+                  <span className="text-sm w-5 text-center">{stat.icon}</span>
+                  <span className="text-white/40 text-xs font-mono uppercase tracking-widest w-16">{stat.label}</span>
+                  <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div
+                      className={`h-full ${colors.bar} rounded-full transition-all duration-500`}
+                      style={{ width: `${stat.value}%`, boxShadow: `0 0 8px ${colors.glow}` }}
+                    />
+                  </div>
+                  <span className="text-white/80 font-mono font-bold text-sm w-8 text-right">{stat.value}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Regenerate button */}
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-white/10 disabled:opacity-40"
+            style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(165,180,252,0.9)' }}
+          >
+            <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
+            {generating ? 'Regenerating…' : 'Regenerate from scene'}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <p className="text-white/40 text-sm mb-3">No game stats generated yet.</p>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-all duration-200 disabled:opacity-50 hover:brightness-110 border border-white/5"
+            style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.5), rgba(139,92,246,0.5))' }}
+          >
+            {generating ? (
+              <><Loader className="w-4 h-4 animate-spin" /> Generating…</>
+            ) : (
+              <><Sparkles className="w-4 h-4" /> Generate Stats from Scene</>
+            )}
+          </button>
+          <p className="text-white/20 text-xs mt-2">Derives HP, Attack, Defense, Magic from scene metadata.</p>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 export function PostcardDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -987,7 +1133,8 @@ export function PostcardDetailPage() {
           scene_type, time_of_day, weather, human_activity,
           detailed_tags, illustration_tags,
           aesthetic_vibes, architecture_style, color_palette,
-          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers
+          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers,
+          game_stats
         `)
         .eq('id', postcard.id)
         .single();
@@ -1021,7 +1168,8 @@ export function PostcardDetailPage() {
           scene_type, time_of_day, weather, human_activity,
           detailed_tags, illustration_tags,
           aesthetic_vibes, architecture_style, color_palette,
-          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers
+          video_generation_status, imagine_task_id, should_animate, sam2_masks, semantic_layers,
+          game_stats
         `;
 
       let data: any = null;
@@ -1186,6 +1334,9 @@ export function PostcardDetailPage() {
                   onRegenerate={() => handleRegenerate('enrich')}
                   isGenerating={regenLoading.enrich}
                 />
+
+                {/* Game Stats */}
+                <GameStatsSection postcard={postcard} onUpdate={(updated) => setPostcard(updated)} />
 
                 {/* Scene Metadata */}
                 <Section icon={<Eye className="w-3.5 h-3.5" />} title="Scene Analysis">
