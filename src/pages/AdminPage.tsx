@@ -24,6 +24,7 @@ import {
   Stamp,
   Play,
   Upload,
+  Instagram,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -289,6 +290,7 @@ const NAV = [
   { path: 'sync',       icon: <Upload     className="w-4 h-4" />, label: 'Sync to Prod' },
   { path: 'settings',   icon: <Settings   className="w-4 h-4" />, label: 'User Actions' },
   { path: 'stamps',     icon: <Stamp      className="w-4 h-4" />, label: 'Grant Stamps' },
+  { path: 'instagram',  icon: <Instagram  className="w-4 h-4" />, label: 'Instagram Bot' },
 ];
 
 // ── Types ──────────────────────────────────────────────────────────────

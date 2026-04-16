@@ -32,6 +32,7 @@ import { AdminAlbums }     from './pages/admin/AdminAlbums';
 import { AdminSync }       from './pages/admin/AdminSync';
 import { AdminSettings }   from './pages/admin/AdminSettings';
 import { AdminStamps }     from './pages/admin/AdminStamps';
+import { AdminInstagram }  from './pages/admin/AdminInstagram';
 
 // ── Feed (main app) ────────────────────────────────────────────────────
 
@@ -223,6 +224,7 @@ function App() {
                     <Route path='sync'       element={<AdminSync />} />
                     <Route path='settings'   element={<AdminSettings />} />
                     <Route path='stamps'     element={<AdminStamps />} />
+                    <Route path='instagram'  element={<AdminInstagram />} />
                   </Route>
                 ) : (
                   <Route path='/admin/*' element={<Navigate to='/feed' replace />} />
