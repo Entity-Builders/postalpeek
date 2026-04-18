@@ -10,6 +10,10 @@ import {
   Search,
   ChevronDown,
   Loader,
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark
 } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -163,6 +167,8 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
 
   const [pushing, setPushing] = useState(false);
   const [isCarouselMode, setIsCarouselMode] = useState(false);
+  const [igPreviewData, setIgPreviewData] = useState<{caption: string; image_url: string; original_image_url?: string; carousel_mode?: boolean} | null>(null);
+
   const handlePushToIg = async (preview = false) => {
     setPushing(true);
     try {
@@ -175,7 +181,14 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to run edge function');
-      if (preview) alert(`Preview:\\n\\n${data.caption}`);
+      if (preview) {
+        setIgPreviewData({
+           caption: data.caption,
+           image_url: data.image_url,
+           carousel_mode: data.carousel_mode,
+           original_image_url: detail?.original_image_url || undefined
+        });
+      }
       else {
         alert('Publicado con éxito!');
         setDetail(prev => prev ? { ...prev, ig_media_id: data.ig_media_id || 'published' } : null);
@@ -195,6 +208,59 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
       className="fixed top-0 right-0 h-full z-50 flex shadow-2xl"
       style={{ width, background: 'rgba(15,15,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}
     >
+      {igPreviewData && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm transition-all" onClick={() => setIgPreviewData(null)}>
+          <div className="bg-white text-black w-full max-w-[360px] rounded-xl overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 p-[2px]">
+                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
+                    <img src="https://ui-avatars.com/api/?name=Walker&background=000&color=fff" alt="Walker" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold leading-none">walker</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-none">{detail?.city}, {detail?.country}</p>
+                </div>
+              </div>
+              <span className="text-gray-900 font-bold tracking-widest leading-none mb-2">...</span>
+            </div>
+
+            <div className="aspect-[4/5] bg-gray-100 relative group overflow-hidden">
+              <img src={igPreviewData.carousel_mode && igPreviewData.original_image_url ? igPreviewData.original_image_url : igPreviewData.image_url} className="w-full h-full object-cover" />
+              {igPreviewData.carousel_mode && (
+                <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md">
+                   1/2
+                </div>
+              )}
+            </div>
+
+            <div className="p-3">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex gap-4">
+                  <Heart className="w-6 h-6 stroke-[1.5]" />
+                  <MessageCircle className="w-6 h-6 stroke-[1.5]" />
+                  <Send className="w-6 h-6 stroke-[1.5]" />
+                </div>
+                <Bookmark className="w-6 h-6 stroke-[1.5]" />
+              </div>
+              <p className="text-[13px] font-semibold mb-1">9,234 likes</p>
+              
+              <div className="text-[13px] leading-tight">
+                <span className="font-semibold mr-1">walker</span>
+                {igPreviewData.caption.split('\n\n').map((block, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <br />}
+                    {i > 0 && <br />}
+                     <span className={block.includes('#') ? 'text-blue-800' : ''}>{block}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2 uppercase font-medium tracking-wide">Just now</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div 
         className="absolute top-0 bottom-0 left-0 w-2 hover:w-3 cursor-col-resize hover:bg-indigo-500/30 transition-all z-[60] -ml-1"
         onMouseDown={(e) => {
@@ -241,7 +307,14 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
                 </label>
               )}
               <button
-                onClick={() => handlePushToIg()}
+                onClick={() => handlePushToIg(true)}
+                disabled={pushing}
+                className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all text-white/50 bg-white/5 hover:text-white/80 border border-white/10"
+              >
+                👀 Preview
+              </button>
+              <button
+                onClick={() => handlePushToIg(false)}
                 disabled={pushing || !!detail.ig_media_id}
                 className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
                 style={{ background: detail.ig_media_id ? 'rgba(16,185,129,0.15)' : 'rgba(219,39,119,0.15)', color: detail.ig_media_id ? 'rgb(110,231,183)' : 'rgb(244,114,182)', border: `1px solid ${detail.ig_media_id ? 'rgba(16,185,129,0.3)' : 'rgba(219,39,119,0.3)'}` }}
