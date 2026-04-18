@@ -21,6 +21,7 @@ export function AdminInstagram() {
   const [published, setPublished] = useState<IgPostcard[]>([]);
   const [loading, setLoading] = useState(true);
   const [runStatus, setRunStatus] = useState<{ status: ActionStatus; message: string }>({ status: 'idle', message: '' });
+  const [previewData, setPreviewData] = useState<{ caption: string, imageUrl: string } | null>(null);
 
   const fetchPostcards = useCallback(async () => {
     setLoading(true);
@@ -56,8 +57,8 @@ export function AdminInstagram() {
     fetchPostcards();
   }, [fetchPostcards]);
 
-  const forcePublish = async (postcardId?: string) => {
-    setRunStatus({ status: 'loading', message: 'Ejecutando cron-publisher...' });
+  const forcePublish = async (postcardId?: string, preview = false) => {
+    setRunStatus({ status: 'loading', message: preview ? 'Generando preview...' : 'Ejecutando cron-publisher...' });
     const edgeBase = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
     const edgeKey  = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
     
@@ -68,12 +69,18 @@ export function AdminInstagram() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${edgeKey}`,
         },
-        body: JSON.stringify(postcardId ? { postcard_id: postcardId } : {}),
+        body: JSON.stringify(postcardId ? { postcard_id: postcardId, preview } : { preview }),
       });
       const data = await res.json();
       
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to run edge function');
+      }
+
+      if (preview) {
+        setPreviewData({ caption: data.caption, imageUrl: data.image_url });
+        setRunStatus({ status: 'success', message: 'Preview generado con éxito.' });
+        return;
       }
       
       setRunStatus({ status: 'success', message: data.message || 'Publicado con éxito!' });
@@ -101,6 +108,18 @@ export function AdminInstagram() {
       
       <StatusMsg status={runStatus.status} message={runStatus.message} />
 
+      {previewData && (
+        <div className="bg-emerald-900/20 border border-emerald-500/20 p-4 rounded-xl flex gap-4">
+           <div className="w-32 h-32 bg-black rounded-lg overflow-hidden shrink-0">
+             <img src={previewData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+           </div>
+           <div className="flex-1 whitespace-pre-wrap text-sm text-emerald-100/90 font-mono">
+             {previewData.caption}
+           </div>
+           <button onClick={() => setPreviewData(null)} className="h-6 px-2 bg-white/10 rounded text-xs self-start shrink-0">Close</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="py-12 flex justify-center"><Loader className="animate-spin text-white/30" /></div>
       ) : (
@@ -111,7 +130,7 @@ export function AdminInstagram() {
             {pending.length === 0 && <p className="text-xs text-white/30">No hay postales pendientes.</p>}
             <div className="space-y-2">
               {pending.map(pc => (
-                <IgCard key={pc.id} postcard={pc} onPublish={() => forcePublish(pc.id)} publishing={runStatus.status === 'loading'} />
+                <IgCard key={pc.id} postcard={pc} onPublish={() => forcePublish(pc.id)} onPreview={() => forcePublish(pc.id, true)} publishing={runStatus.status === 'loading'} />
               ))}
             </div>
           </div>
@@ -132,7 +151,7 @@ export function AdminInstagram() {
   );
 }
 
-function IgCard({ postcard, onPublish, publishing }: { postcard: IgPostcard, onPublish?: () => void, publishing?: boolean }) {
+function IgCard({ postcard, onPublish, onPreview, publishing }: { postcard: IgPostcard, onPublish?: () => void, onPreview?: () => void, publishing?: boolean }) {
   const thumb = useSignedImage(postcard.illustration_url, { width: WIDTHS.thumb });
   
   return (
@@ -147,15 +166,26 @@ function IgCard({ postcard, onPublish, publishing }: { postcard: IgPostcard, onP
           <p className="text-[9px] text-emerald-400 mt-1 uppercase">Pub: {new Date(postcard.ig_published_at).toLocaleDateString()}</p>
         )}
       </div>
-      {onPublish && (
-         <button 
-           onClick={onPublish}
-           disabled={publishing}
-           className="px-3 py-1.5 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 rounded text-xs transition-colors shrink-0 disabled:opacity-50"
-         >
-           Push to IG
-         </button>
-      )}
+      <div className="flex gap-2">
+        {onPreview && (
+           <button 
+             onClick={onPreview}
+             disabled={publishing}
+             className="px-3 py-1.5 bg-stone-500/20 text-stone-300 hover:bg-stone-500/30 rounded text-xs transition-colors shrink-0 disabled:opacity-50"
+           >
+             Preview
+           </button>
+        )}
+        {onPublish && (
+           <button 
+             onClick={onPublish}
+             disabled={publishing}
+             className="px-3 py-1.5 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 rounded text-xs transition-colors shrink-0 disabled:opacity-50"
+           >
+             Push to IG
+           </button>
+        )}
+      </div>
       {postcard.ig_media_id && (
         <a 
           href={`https://instagram.com/`} // No public link format guaranteed by Media ID alone without username, but we can drop a generic link
