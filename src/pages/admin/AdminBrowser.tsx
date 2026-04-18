@@ -59,8 +59,10 @@ interface BrowserPostcard {
   category: { es: string; en: string } | string | null;
   has_detailed: boolean;
   has_illus_tags: boolean;
+  has_illus_tags: boolean;
   has_storytelling: boolean;
   strategy: string | null;
+  ig_media_id: string | null;
 }
 
 interface PostcardDetail {
@@ -83,8 +85,11 @@ interface PostcardDetail {
   original_image_url: string | null;
   illustration_url: string | null;
   generation_metadata: Record<string, unknown> | null;
+  generation_metadata: Record<string, unknown> | null;
   game_stats: { hp: number; attack: number; defense: number; magic: number; element: string; rarity: string; } | null;
   created_at: string;
+  ig_media_id: string | null;
+  ig_published_at: string | null;
 }
 
 // ── Detail Panel helpers ────────────────────────────────────────────────
@@ -131,7 +136,7 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
       setLoading(true);
       const { data, error } = await supabase
         .from('postalpeek_postcards')
-        .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, game_stats, created_at')
+        .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, game_stats, created_at, ig_media_id, ig_published_at')
         .eq('id', postcardId)
         .single();
       if (error) console.error('[DetailPanel]', error);
@@ -154,6 +159,32 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
     if (!val) return '—';
     if (typeof val === 'string') return val;
     return val.en || val.es || '—';
+  };
+
+  const [pushing, setPushing] = useState(false);
+  const [isCarouselMode, setIsCarouselMode] = useState(false);
+  const handlePushToIg = async (preview = false) => {
+    setPushing(true);
+    try {
+      const edgeBase = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const edgeKey  = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const res = await fetch(`${edgeBase}/functions/v1/postalpeek-ig-publisher`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${edgeKey}` },
+        body: JSON.stringify({ postcard_id: postcardId, preview, carousel: isCarouselMode }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to run edge function');
+      if (preview) alert(`Preview:\\n\\n${data.caption}`);
+      else {
+        alert('Publicado con éxito!');
+        setDetail(prev => prev ? { ...prev, ig_media_id: data.ig_media_id || 'published' } : null);
+      }
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setPushing(false);
+    }
   };
 
   return (
@@ -196,6 +227,29 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
           >
             Open ↗
           </button>
+          {detail?.illustration_url && (
+            <div className="flex items-center gap-2">
+              {detail.original_image_url && !detail.ig_media_id && (
+                <label className="flex items-center gap-1.5 text-[9px] text-white/50 cursor-pointer hover:text-white/80 transition-colors bg-white/5 px-2 py-1 rounded-lg border border-white/10">
+                  <input 
+                    type="checkbox" 
+                    checked={isCarouselMode} 
+                    onChange={(e) => setIsCarouselMode(e.target.checked)} 
+                    className="rounded border-white/20 bg-white/5 w-3 h-3 text-pink-500 focus:ring-0 focus:ring-offset-0" 
+                  />
+                  Carrusel
+                </label>
+              )}
+              <button
+                onClick={() => handlePushToIg()}
+                disabled={pushing || !!detail.ig_media_id}
+                className="px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
+                style={{ background: detail.ig_media_id ? 'rgba(16,185,129,0.15)' : 'rgba(219,39,119,0.15)', color: detail.ig_media_id ? 'rgb(110,231,183)' : 'rgb(244,114,182)', border: `1px solid ${detail.ig_media_id ? 'rgba(16,185,129,0.3)' : 'rgba(219,39,119,0.3)'}` }}
+              >
+                {pushing ? '⏳ Pushing...' : detail.ig_media_id ? '📱 ✓ Publicado' : '📱 Push IG'}
+              </button>
+            </div>
+          )}
           <button onClick={onClose} className="text-white/30 hover:text-white/60 text-lg transition-colors">✕</button>
         </div>
       </div>
@@ -334,12 +388,37 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
 
 // ── Browser Card ───────────────────────────────────────────────────────
 
-function BrowserCard({ pc, onClick }: { pc: BrowserPostcard; onClick: (id: string) => void }) {
+function BrowserCard({ pc, onClick, onForceUpdate }: { pc: BrowserPostcard; onClick: (id: string) => void, onForceUpdate: (id: string, ig_media_id: string|null) => void }) {
   const imgUrl = useSignedImage(pc.illustration_url, { width: WIDTHS.thumb });
+  const [pushing, setPushing] = useState(false);
+
+  const handlePush = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pc.ig_media_id) return alert('Ya está publicado!');
+    setPushing(true);
+    try {
+      const edgeBase = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+      const edgeKey  = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const res = await fetch(`${edgeBase}/functions/v1/postalpeek-ig-publisher`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${edgeKey}` },
+        body: JSON.stringify({ postcard_id: pc.id, preview: false }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to publish');
+      alert('Publicado con éxito!');
+      onForceUpdate(pc.id, data.ig_media_id || 'published');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setPushing(false);
+    }
+  };
+
   return (
     <div
       onClick={() => onClick(pc.id)}
-      className="rounded-xl overflow-hidden cursor-pointer group transition-all hover:ring-1 hover:ring-indigo-400/40 hover:scale-[1.02]"
+      className="rounded-xl overflow-hidden cursor-pointer group transition-all hover:ring-1 hover:ring-indigo-400/40 hover:scale-[1.02] flex flex-col relative"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
     >
       <div className="aspect-[3/4] w-full bg-white/5 overflow-hidden relative">
@@ -354,6 +433,7 @@ function BrowserCard({ pc, onClick }: { pc: BrowserPostcard; onClick: (id: strin
           {pc.has_detailed    && <span className="w-4 h-4 rounded-full bg-emerald-500/80 flex items-center justify-center text-[8px]" title="Enriched">✓</span>}
           {pc.has_illus_tags  && <span className="w-4 h-4 rounded-full bg-indigo-500/80  flex items-center justify-center text-[8px]" title="Illus Tags">🏷</span>}
           {pc.has_storytelling && <span className="w-4 h-4 rounded-full bg-amber-500/80   flex items-center justify-center text-[8px]" title="Storytelling">📖</span>}
+          {pc.ig_media_id     && <span className="w-4 h-4 rounded-full bg-pink-500/80   flex items-center justify-center text-[8px]" title="Instagram">📱</span>}
         </div>
         {pc.strategy && (
           <span className={`absolute bottom-1 left-1 text-[8px] px-1.5 py-0.5 rounded-full font-mono font-medium ${strategyColor(pc.strategy)}`}>
@@ -361,13 +441,29 @@ function BrowserCard({ pc, onClick }: { pc: BrowserPostcard; onClick: (id: strin
           </span>
         )}
       </div>
-      <div className="p-2">
-        <p className="text-white/80 text-[11px] font-medium truncate leading-tight">
-          {pc.city}{pc.country ? `, ${pc.country}` : ''}
-        </p>
-        <p className="text-white/25 text-[9px] font-mono truncate mt-0.5">
-          {pc.id.slice(0, 8)} · {timeAgo(pc.created_at)}
-        </p>
+      <div className="p-2 flex flex-col justify-between flex-1">
+        <div>
+          <p className="text-white/80 text-[11px] font-medium truncate leading-tight">
+            {pc.city}{pc.country ? `, ${pc.country}` : ''}
+          </p>
+          <p className="text-white/25 text-[9px] font-mono truncate mt-0.5">
+            {pc.id.slice(0, 8)} · {timeAgo(pc.created_at)}
+          </p>
+        </div>
+        <div className="mt-2 text-right">
+          <button
+            onClick={handlePush}
+            disabled={pushing || !!pc.ig_media_id}
+            className="px-2 py-0.5 rounded text-[9px] font-medium transition-all inline-block hover:opacity-80"
+            style={{ 
+              background: pc.ig_media_id ? 'rgba(16,185,129,0.15)' : 'rgba(219,39,119,0.15)', 
+              color: pc.ig_media_id ? 'rgb(110,231,183)' : 'rgb(244,114,182)', 
+              border: `1px solid ${pc.ig_media_id ? 'rgba(16,185,129,0.3)' : 'rgba(219,39,119,0.3)'}` 
+            }}
+          >
+            {pushing ? '⏳ Pushing...' : pc.ig_media_id ? '📱 ✓ Publicado' : '📱 Push IG'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -396,7 +492,7 @@ function PostcardsBrowser({ onSelectPostcard }: { onSelectPostcard: (id: string)
       }
       let query = supabase
         .from('postalpeek_postcards')
-        .select('id, created_at, city, country, illustration_url, category, detailed_tags, illustration_tags, generation_metadata')
+        .select('id, created_at, city, country, illustration_url, category, detailed_tags, illustration_tags, generation_metadata, ig_media_id')
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
@@ -421,6 +517,7 @@ function PostcardsBrowser({ onSelectPostcard }: { onSelectPostcard: (id: string)
           has_illus_tags: Array.isArray(row.illustration_tags) && (row.illustration_tags as unknown[]).length > 0,
           has_storytelling: !!(meta?.storytelling),
           strategy: (meta?.strategy as string) || null,
+          ig_media_id: (row.ig_media_id as string | null) || null,
         };
       });
 
@@ -473,7 +570,16 @@ function PostcardsBrowser({ onSelectPostcard }: { onSelectPostcard: (id: string)
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-        {postcards.map((pc) => <BrowserCard key={pc.id} pc={pc} onClick={onSelectPostcard} />)}
+        {postcards.map((pc) => (
+          <BrowserCard 
+            key={pc.id} 
+            pc={pc} 
+            onClick={onSelectPostcard} 
+            onForceUpdate={(id, ig_media_id) => {
+              setPostcards(prev => prev.map(p => p.id === id ? { ...p, ig_media_id } : p));
+            }}
+          />
+        ))}
       </div>
 
       {loading && <div className="flex items-center justify-center py-6 text-white/30 text-sm"><Loader className="w-4 h-4 animate-spin mr-2" /> Loading…</div>}
