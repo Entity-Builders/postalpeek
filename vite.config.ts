@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
+    server: {
+      allowedHosts: true,
+    },
     build: {
       rollupOptions: {
         output: {
