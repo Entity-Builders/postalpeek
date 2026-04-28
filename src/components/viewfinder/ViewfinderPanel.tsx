@@ -5,17 +5,26 @@
  * Wraps the existing StreetViewPanorama with viewfinder aesthetics
  * (brackets, toolbar, compass) and capture orchestration.
  *
+ * The capture is triggered via an imperative ref to StreetViewPanorama,
+ * keeping the toolbar fully decoupled from the panorama internals.
+ *
  * ref #94
  */
 
 import React, { useCallback, useRef } from 'react';
-import { StreetViewPanorama, type StreetViewPOV } from '../StreetViewPanorama';
+import {
+  StreetViewPanorama,
+  type StreetViewPOV,
+  type StreetViewPanoramaHandle,
+} from '../StreetViewPanorama';
 import { ViewfinderBrackets } from './ViewfinderBrackets';
 import { ViewfinderToolbar } from './ViewfinderToolbar';
 import { useViewfinder } from '../../hooks/useViewfinder';
 import type { FeedItem } from '../Postcard';
-import { MapPin } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MapPin, RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cdnImage } from '../../utils/imageUtils';
+import { useLang, t } from '../../utils/i18n';
 
 interface ViewfinderPanelProps {
   sourceItem: FeedItem;
@@ -28,6 +37,9 @@ export function ViewfinderPanel({
   userId,
   onPostcardCreated,
 }: ViewfinderPanelProps) {
+  const lang = useLang();
+  const panoramaRef = useRef<StreetViewPanoramaHandle>(null);
+
   const {
     step,
     capturedPostcard,
@@ -50,18 +62,26 @@ export function ViewfinderPanel({
     [handleCapture],
   );
 
-  // The existing StreetViewPanorama component handles loading the
-  // interactive panorama at the given address/coordinates.
-  // We pass the location_name as the address for geocoding.
+  // Trigger capture via the imperative ref — clean, no DOM hacking
+  const triggerCapture = useCallback(() => {
+    panoramaRef.current?.capture();
+  }, []);
+
+  // Get the system postcard image for side-by-side comparison
+  const systemPostcardUrl = sourceItem.illustration_url
+    ? cdnImage(sourceItem.illustration_url, { width: 480 })
+    : null;
 
   return (
     <div className="relative w-full h-full bg-[#0a0a0e] overflow-hidden">
-      {/* Street View Panorama — full bleed */}
+      {/* Street View Panorama — full bleed, no built-in controls */}
       <div className="absolute inset-0">
         <StreetViewPanorama
+          ref={panoramaRef}
           address={locationLabel}
           onCapture={onPanoramaCapture}
           isCapturing={step === 'capturing' || step === 'illustrating'}
+          hideControls
         />
       </div>
 
@@ -78,77 +98,117 @@ export function ViewfinderPanel({
         </div>
       </div>
 
-      {/* Capture toolbar — bottom center */}
+      {/* Capture toolbar — bottom center (uses imperative ref for clean capture) */}
       <ViewfinderToolbar
         step={step}
         illustrationStyle={illustrationStyle}
         onStyleChange={setIllustrationStyle}
-        onCapture={() => {
-          // We need to trigger capture from the StreetViewPanorama.
-          // The panorama's onCapture callback will fire with the current POV.
-          // To trigger it, we simulate a click on the hidden capture button.
-          // Actually, the StreetViewPanorama already has a capture button.
-          // We'll hide its default button and use our toolbar instead.
-          // For now, we call the panorama's capture programmatically.
-          const panoContainer = document.querySelector(
-            '.viewfinder-panorama-container',
-          );
-          if (panoContainer) {
-            const captureBtn =
-              panoContainer.querySelector<HTMLButtonElement>(
-                '[data-capture-btn]',
-              );
-            captureBtn?.click();
-          }
-        }}
+        onCapture={triggerCapture}
         errorMessage={errorMessage}
       />
 
-      {/* Success overlay — shows the created postcard */}
-      {step === 'success' && capturedPostcard && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-6 p-8"
-        >
+      {/* Success overlay — side-by-side: system vs user postcard */}
+      <AnimatePresence>
+        {step === 'success' && capturedPostcard && (
           <motion.div
-            initial={{ scale: 0.8, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="max-w-sm w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-6 p-6 md:p-10"
           >
-            {/* Postcard preview */}
-            <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-white">
-              <div className="p-2 pb-8">
-                {capturedPostcard.illustration_url && (
-                  <img
-                    src={capturedPostcard.illustration_url}
-                    alt="Your postcard"
-                    className="w-full aspect-[4/3] object-cover rounded-xl"
-                  />
-                )}
-              </div>
-            </div>
+            {/* Title */}
+            <motion.p
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-white/60 text-xs font-semibold uppercase tracking-[0.2em]"
+            >
+              {t({ es: '¡Postal creada!', en: 'Postcard Created!' }, lang)}
+            </motion.p>
 
-            {/* Actions — self-contained, no navigation to other app sections */}
-            <div className="flex gap-3 mt-4">
+            {/* Side-by-side comparison */}
+            <motion.div
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="flex flex-col md:flex-row gap-4 max-w-2xl w-full items-center"
+            >
+              {/* System postcard — "The Original" */}
+              {systemPostcardUrl && (
+                <div className="flex-1 max-w-[280px]">
+                  <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest mb-2 text-center">
+                    {t({ es: 'La Original', en: 'The Original' }, lang)}
+                  </p>
+                  <div className="rounded-xl overflow-hidden border border-white/10 shadow-xl bg-white/5">
+                    <div className="p-1.5 pb-5">
+                      <img
+                        src={systemPostcardUrl}
+                        alt="System postcard"
+                        className="w-full aspect-[4/3] object-cover rounded-lg opacity-70"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* VS divider */}
+              {systemPostcardUrl && (
+                <div className="text-white/20 text-xs font-bold md:py-8">
+                  VS
+                </div>
+              )}
+
+              {/* User postcard — "Your Version" */}
+              <div className="flex-1 max-w-[280px]">
+                <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-2 text-center">
+                  {t({ es: 'Tu Versión', en: 'Your Version' }, lang)} ✨
+                </p>
+                <div className="rounded-xl overflow-hidden border border-indigo-400/20 shadow-[0_4px_30px_rgba(99,102,241,0.15)] bg-white">
+                  <div className="p-1.5 pb-5">
+                    {capturedPostcard.illustration_url && (
+                      <img
+                        src={capturedPostcard.illustration_url}
+                        alt="Your postcard"
+                        className="w-full aspect-[4/3] object-cover rounded-lg"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Location context */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-white/40 text-sm font-medium flex items-center gap-1.5"
+            >
+              <MapPin className="w-3 h-3" />
+              {sourceItem.city}, {sourceItem.country}
+            </motion.p>
+
+            {/* Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="flex gap-3"
+            >
               <button
                 onClick={() => {
                   reset();
                   onPostcardCreated?.();
                 }}
-                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-pink-500 text-white text-sm font-semibold hover:from-indigo-400 hover:to-pink-400 transition-all duration-200 shadow-lg"
+                className="py-3 px-6 rounded-xl bg-gradient-to-r from-indigo-500 to-pink-500 text-white text-sm font-semibold hover:from-indigo-400 hover:to-pink-400 transition-all duration-200 shadow-lg flex items-center gap-2"
               >
-                🎨 Create Another
+                <RotateCcw className="w-4 h-4" />
+                {t({ es: 'Crear otra', en: 'Create Another' }, lang)}
               </button>
-            </div>
+            </motion.div>
           </motion.div>
-
-          <p className="text-white/40 text-xs font-medium tracking-wide">
-            Your postcard has been saved!
-          </p>
-        </motion.div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

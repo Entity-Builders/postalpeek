@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Loader2, Sparkles, Map } from 'lucide-react';
 
 declare global {
@@ -16,21 +16,57 @@ export interface StreetViewPOV {
   lng: number;
 }
 
+/** Imperative handle to allow parent components to trigger capture */
+export interface StreetViewPanoramaHandle {
+  capture: () => void;
+}
+
 interface StreetViewPanoramaProps {
   address: string | null;
   onCapture: (pov: StreetViewPOV) => void;
   isCapturing: boolean;
+  /** When true, hides the built-in bottom bar (toolbar manages capture externally) */
+  hideControls?: boolean;
 }
 
-export function StreetViewPanorama({
-  address,
-  onCapture,
-  isCapturing,
-}: StreetViewPanoramaProps) {
+export const StreetViewPanorama = forwardRef<
+  StreetViewPanoramaHandle,
+  StreetViewPanoramaProps
+>(function StreetViewPanorama(
+  { address, onCapture, isCapturing, hideControls = false },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Expose capture method to parent via ref
+  const handleCapture = useCallback(() => {
+    if (!panoramaRef.current) return;
+
+    const pov = panoramaRef.current.getPov();
+    const pos = panoramaRef.current.getPosition();
+    const zoom = panoramaRef.current.getZoom();
+
+    if (!pos) return;
+
+    onCapture({
+      heading: Math.round(pov.heading * 100) / 100,
+      pitch: Math.round(pov.pitch * 100) / 100,
+      zoom: zoom,
+      lat: pos.lat(),
+      lng: pos.lng(),
+    });
+  }, [onCapture]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      capture: handleCapture,
+    }),
+    [handleCapture],
+  );
 
   // Initialize panorama when address changes
   useEffect(() => {
@@ -95,29 +131,11 @@ export function StreetViewPanorama({
     });
   }, [address]);
 
-  const handleCapture = useCallback(() => {
-    if (!panoramaRef.current) return;
-
-    const pov = panoramaRef.current.getPov();
-    const pos = panoramaRef.current.getPosition();
-    const zoom = panoramaRef.current.getZoom();
-
-    if (!pos) return;
-
-    onCapture({
-      heading: Math.round(pov.heading * 100) / 100,
-      pitch: Math.round(pov.pitch * 100) / 100,
-      zoom: zoom,
-      lat: pos.lat(),
-      lng: pos.lng(),
-    });
-  }, [onCapture]);
-
   return (
-    <div className='w-full max-w-3xl mx-auto relative rounded-2xl overflow-hidden glass-panel shadow-2xl bg-black/20'>
+    <div className='w-full h-full relative overflow-hidden bg-black/20'>
       {/* Empty state */}
       {!address && (
-        <div className='aspect-square flex flex-col items-center justify-center text-slate-500 gap-4 opacity-70'>
+        <div className='w-full h-full flex flex-col items-center justify-center text-slate-500 gap-4 opacity-70'>
           <Map className='w-12 h-12 mb-2 text-indigo-400/50' />
           <p className='font-light tracking-wide'>
             Search for an address to explore
@@ -127,7 +145,7 @@ export function StreetViewPanorama({
 
       {/* Error state */}
       {error && (
-        <div className='aspect-square flex flex-col items-center justify-center text-red-400 gap-4'>
+        <div className='w-full h-full flex flex-col items-center justify-center text-red-400 gap-4'>
           <Map className='w-12 h-12 mb-2 text-red-400/50' />
           <p className='font-light tracking-wide text-sm px-8 text-center'>
             {error}
@@ -135,10 +153,10 @@ export function StreetViewPanorama({
         </div>
       )}
 
-      {/* Panorama container */}
+      {/* Panorama container — full bleed when in viewfinder mode */}
       <div
         ref={containerRef}
-        className={`w-full aspect-square ${!address || error ? 'hidden' : ''}`}
+        className={`w-full h-full ${!address || error ? 'hidden' : ''}`}
       />
 
       {/* Loading overlay */}
@@ -151,8 +169,8 @@ export function StreetViewPanorama({
         </div>
       )}
 
-      {/* Bottom bar with Capture button */}
-      {isReady && !error && (
+      {/* Bottom bar with Capture button — only shown when NOT in external toolbar mode */}
+      {isReady && !error && !hideControls && (
         <div className='absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4 z-20'>
           {/* Address label */}
           <div className='inline-block px-5 py-3 bg-black/50 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-fade-in'>
@@ -188,4 +206,4 @@ export function StreetViewPanorama({
       )}
     </div>
   );
-}
+});
