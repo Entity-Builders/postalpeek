@@ -130,7 +130,7 @@ export function ViewfinderPanel({
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions — self-contained, no navigation to other app sections */}
             <div className="flex gap-3 mt-4">
               <button
                 onClick={() => {
@@ -139,13 +139,7 @@ export function ViewfinderPanel({
                 }}
                 className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-pink-500 text-white text-sm font-semibold hover:from-indigo-400 hover:to-pink-400 transition-all duration-200 shadow-lg"
               >
-                ✨ View in Collection
-              </button>
-              <button
-                onClick={reset}
-                className="py-3 px-4 rounded-xl bg-white/10 text-white/70 text-sm font-medium hover:bg-white/15 transition-all duration-200 border border-white/10"
-              >
-                Create Another
+                🎨 Create Another
               </button>
             </div>
           </motion.div>

@@ -2,7 +2,6 @@ import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import Globe from 'react-globe.gl';
 import Supercluster from 'supercluster';
 import { useFeedContext } from './FeedLayout';
-import { useNavigate } from 'react-router-dom';
 import { FeedItem } from '../../components/Postcard';
 import { GlobeHeader } from './components/globe/GlobeHeader';
 import { GlobeReticle } from './components/globe/GlobeReticle';
@@ -16,7 +15,6 @@ import { cdnImage } from '../../utils/imageUtils';
 import { analytics } from '../../lib/analytics';
 
 export function GlobeExplorerPage() {
-  const navigate = useNavigate();
   const lang = useLang();
   const { items, handleAuthRequiredAction, user, toggleFavorite, favoriteIds } = useFeedContext();
   const globeEl = useRef<any>(null);
@@ -255,19 +253,6 @@ export function GlobeExplorerPage() {
       }
     }
   }, [globeData, flyTo]);
-
-  // Navigate to carousel to "play" or "explore" the postcard
-  const handleExplore = useCallback(() => {
-    if (selectedItem) {
-      const itemToExplore = Array.isArray(selectedItem) ? selectedItem[0] : selectedItem;
-      const index = items.findIndex((i) => i.id === itemToExplore.id);
-      if (index !== -1) {
-        handleAuthRequiredAction(() => {
-          navigate(`/feed/carousel?index=${index}`);
-        });
-      }
-    }
-  }, [selectedItem, items, navigate, handleAuthRequiredAction]);
 
   const handleToggleFavorite = useCallback(() => {
     if (selectedItem && !Array.isArray(selectedItem)) {
@@ -551,7 +536,6 @@ export function GlobeExplorerPage() {
       <GlobeSelectionPanel
         selectedItem={selectedItem}
         isFavorited={isFavorited}
-        onExplore={handleExplore}
         onToggleFavorite={handleToggleFavorite}
         onSkipNext={handleSkipNext}
         onCreateOwn={handleCreateOwn}
