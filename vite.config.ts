@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+
 import { cloudflare } from '@cloudflare/vite-plugin';
 
 // Resolve the absolute path to react-native-web to avoid duplicate module warnings
@@ -76,6 +77,11 @@ export default defineConfig(({ mode }) => {
           find: 'react-native',
           replacement: rnwPath,
         },
+        // Ignore RN-only analytics in web
+        {
+          find: 'posthog-react-native',
+          replacement: codegenStub,
+        },
       ],
       extensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js'],
     },
@@ -105,6 +111,10 @@ export default defineConfig(({ mode }) => {
               // Redirect react-native → react-native-web
               build.onResolve({ filter: /^react-native$/ }, () => ({
                 path: path.resolve(rnwPath, 'dist/index.js'),
+              }));
+              // Ignore posthog-react-native
+              build.onResolve({ filter: /^posthog-react-native$/ }, () => ({
+                path: codegenStub,
               }));
             },
           },

@@ -280,6 +280,8 @@ export function GlobeExplorerPage() {
   }, [selectedItem, handleAuthRequiredAction]);
 
   const handleBackToGlobe = useCallback(() => {
+    setGlobeReady(false);
+    hasInitialFocus.current = false;
     setMode('globe');
     analytics.track('viewfinder_exited_to_globe');
   }, []);
@@ -481,16 +483,28 @@ export function GlobeExplorerPage() {
   if (mode === 'viewfinder' && viewfinderTarget) {
     return (
       <div className="w-full h-full relative bg-[#0a0a0e] overflow-hidden flex">
-        {/* Left Sidebar */}
-        <ViewfinderSidebar
-          sourceItem={viewfinderTarget}
-          nearbyItems={nearbyItems}
-          onBack={handleBackToGlobe}
-          onSelectNearby={handleSelectNearby}
-        />
+        {/* Left Sidebar - hidden on mobile to maximize camera space */}
+        <div className="hidden md:block">
+          <ViewfinderSidebar
+            sourceItem={viewfinderTarget}
+            nearbyItems={nearbyItems}
+            onBack={handleBackToGlobe}
+            onSelectNearby={handleSelectNearby}
+          />
+        </div>
 
         {/* Right Panel — Street View Viewfinder */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative z-0">
+          {/* Mobile Back Button Overlay */}
+          <div className="md:hidden absolute top-safe-4 left-4 z-50">
+            <button
+              onClick={handleBackToGlobe}
+              className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all shadow-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+          </div>
+
           <ViewfinderPanel
             sourceItem={viewfinderTarget}
             userId={user?.id}

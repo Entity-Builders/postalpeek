@@ -384,7 +384,7 @@ export function FeedLayout({
       </AnimatePresence>
 
       <AnimatePresence>
-        {!isSpotlightMode && !showWelcome && !location.pathname.includes('/carousel') && !location.pathname.includes('/postcard/') && (
+        {!isSpotlightMode && !showWelcome && !location.pathname.includes('/carousel') && !location.pathname.includes('/postcard/') && location.pathname !== '/' && (
           <StatusBar
             albums={albums}
             onAlbumTap={(album) => handleAuthRequiredAction(() => {

@@ -75,7 +75,7 @@ export function ViewfinderPanel({
   return (
     <div className="relative w-full h-full bg-[#0a0a0e] overflow-hidden">
       {/* Street View Panorama — full bleed, no built-in controls */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-0">
         <StreetViewPanorama
           ref={panoramaRef}
           address={locationLabel}
@@ -142,6 +142,17 @@ export function ViewfinderPanel({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* External capture toolbar when generating/ready */}
+      {step !== 'success' && (
+        <ViewfinderToolbar
+          step={step}
+          illustrationStyle={illustrationStyle}
+          onStyleChange={setIllustrationStyle}
+          onCapture={triggerCapture}
+          errorMessage={errorMessage}
+        />
+      )}
 
       {/* Success overlay — full bleed postcard replacing StreetView */}
       <AnimatePresence>
