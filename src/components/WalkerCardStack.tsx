@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
+
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion';
 import { analytics } from '../lib/analytics';
 import { useLang, t } from '../utils/i18n';
@@ -226,26 +226,15 @@ function SwipeableCard({
     if (info.offset.x > threshold || velocity > 500) {
       // Swipe Right (Like/Claim)
       if (user && !item.owner_id && item.type !== 'welcome') {
-        Alert.alert(
-          t({ es: 'Reclamar Postal', en: 'Claim Postcard' }, lang),
-          t({ es: 'Cuesta 1 Estampilla reclamar esta postal del feed global. ¿Aceptar?', en: 'It costs 1 Stamp to claim this postcard from the global feed. Accept?' }, lang),
-          [
-            {
-              text: t({ es: 'Cancelar', en: 'Cancel' }, lang),
-              style: 'cancel',
-              onPress: () => {
-                controls.start({ x: 0, transition: { type: 'spring', stiffness: 300, damping: 20 } });
-              }
-            },
-            {
-              text: t({ es: 'Aceptar', en: 'Accept' }, lang),
-              onPress: () => {
-                controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
-                analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
-              }
-            }
-          ]
+        const confirmed = window.confirm(
+          t({ es: 'Cuesta 1 Estampilla reclamar esta postal del feed global. ¿Aceptar?', en: 'It costs 1 Stamp to claim this postcard from the global feed. Accept?' }, lang)
         );
+        if (confirmed) {
+          controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
+          analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });
+        } else {
+          controls.start({ x: 0, transition: { type: 'spring', stiffness: 300, damping: 20 } });
+        }
       } else {
         controls.start({ x: 500, opacity: 0, transition: { duration: 0.3 } }).then(() => onSwipe('right'));
         analytics.track('card_swiped', { direction: 'right', postcard_id: item.id });

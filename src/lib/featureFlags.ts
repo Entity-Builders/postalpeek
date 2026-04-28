@@ -12,6 +12,8 @@ export const FeatureFlags = {
   DAILY_PACK_REVEAL_MODE: 'daily-pack-reveal-mode',
   /** Enable/disable the daily envelope (sobre diario) feature entirely */
   DAILY_PACK: 'postalpeek_daily_pack',
+  /** Enable the Viewfinder "Create Your Own" mode on the Globe */
+  VIEWFINDER: 'postalpeek_viewfinder',
 } as const;
 
 export type FeatureFlagKey = (typeof FeatureFlags)[keyof typeof FeatureFlags];

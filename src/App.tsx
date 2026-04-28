@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import './index.css';
 // WalkerFeed was replaced with FeedLayout + Pages
 import { useMouseIdle } from './hooks/useMouseIdle';
@@ -12,8 +12,7 @@ import { initAnalytics, analytics } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
 import { GameModeProvider } from './contexts/GameModeContext';
 import { StampProvider } from './contexts/StampContext';
-import { OnboardingProvider, useOnboarding } from './contexts/OnboardingContext';
-import { OnboardingFlow } from './components/OnboardingFlow';
+import { OnboardingProvider } from './contexts/OnboardingContext';
 
 import { FeedLayout } from './pages/feed/FeedLayout';
 import { FeedGridPage } from './pages/feed/FeedGridPage';
@@ -21,6 +20,8 @@ import { FeedCarouselPage } from './pages/feed/FeedCarouselPage';
 import { CollectionPage } from './pages/feed/CollectionPage';
 import { ProfilePage } from './pages/feed/ProfilePage';
 import { GamePage } from './pages/GamePage';
+
+import { GlobeExplorerPage } from './pages/feed/GlobeExplorerPage';
 
 // ── Admin sub-pages ────────────────────────────────────────────────────
 import { AdminDashboard }  from './pages/admin/AdminDashboard';
@@ -121,22 +122,9 @@ function FeedApp({
   );
 }
 
-// ── Onboarding Gate ──────────────────────────────────────────────────────
-function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { hasCompleted } = useOnboarding();
-  
-  if (hasCompleted === false) {
-    return <OnboardingFlow />;
-  }
-  if (hasCompleted === null) {
-    return (
-      <div className='h-screen w-screen flex items-center justify-center' style={{ background: '#0a0a12' }}>
-        <div className='w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin' />
-      </div>
-    );
-  }
-  
-  return <>{children}</>;
+function ShareRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/postcard/${id}`} replace />;
 }
 
 // ── App root ───────────────────────────────────────────────────────────
@@ -183,60 +171,58 @@ function App() {
       <GameModeProvider>
         <StampProvider userId={user?.id}>
           <OnboardingProvider>
-            <OnboardingGate>
-              <Routes>
-                {/* SEO-friendly feed route AND Postcard view use the same layout */}
-                <Route element={feedElement}>
-                  <Route path='/feed'>
-                    <Route index element={<FeedGridPage />} />
-                    <Route path='country/:country' element={<FeedGridPage />} />
-                    <Route path='carousel' element={<FeedCarouselPage />} />
-                    <Route path='collection' element={<CollectionPage />} />
-                    <Route path='album/:albumId' element={<AlbumPage />} />
-                    <Route path='profile' element={<ProfilePage />} />
-                  </Route>
-                  
-                  {/* Public Postcard View — needs the FeedLayout context */}
-                  <Route path='/postcard/:id' element={<FeedCarouselPage />} />
-                  
-                  {/* Public Album View */}
-                  <Route path='/album/:albumId' element={<AlbumPage />} />
+            <Routes>
+              {/* SEO-friendly feed route AND Postcard view use the same layout */}
+              <Route element={feedElement}>
+                {/* The new 3D Globe Explorer Mode is the default root */}
+                <Route path='/' element={<GlobeExplorerPage />} />
+
+                <Route path='/feed'>
+                  <Route index element={<FeedGridPage />} />
+                  <Route path='country/:country' element={<FeedGridPage />} />
+                  <Route path='carousel' element={<FeedCarouselPage />} />
+                  <Route path='collection' element={<CollectionPage />} />
+                  <Route path='album/:albumId' element={<AlbumPage />} />
+                  <Route path='profile' element={<ProfilePage />} />
                 </Route>
-  
-                {/* Root redirects to /feed */}
-                <Route path='/' element={<Navigate to='/feed' replace />} />
-  
-                {/* Dedicated Game Route */}
-                <Route path='/game/:shortcode' element={<GamePage />} />
-  
-                {/* ── Admin console (protected, nested routes) ── */}
-                {isAdmin ? (
-                  <Route
-                    path='/admin'
-                    element={<AdminPage user={user} onPostcardGenerated={() => {}} />}
-                  >
-                    <Route index            element={<AdminDashboard />} />
-                    <Route path='generation' element={<AdminGeneration />} />
-                    <Route path='queue'      element={<AdminQueuePage />} />
-                    <Route path='browser'    element={<AdminBrowser />} />
-                    <Route path='postcards'  element={<AdminPostcards />} />
-                    <Route path='albums'     element={<AdminAlbums />} />
-                    <Route path='sync'       element={<AdminSync />} />
-                    <Route path='settings'   element={<AdminSettings />} />
-                    <Route path='stamps'     element={<AdminStamps />} />
-                    <Route path='instagram'  element={<AdminInstagram />} />
-                  </Route>
-                ) : (
-                  <Route path='/admin/*' element={<Navigate to='/feed' replace />} />
-                )}
-  
-                {/* Postcard admin detail — /preview/:id */}
-                <Route path='/preview/:id' element={<PostcardDetailPage />} />
-  
-                {/* Share link — /:id feeds into WalkerFeed's shared-card logic */}
-                <Route path='/:id' element={<Navigate to='/feed/carousel' replace />} />
-              </Routes>
-            </OnboardingGate>
+                
+                {/* Public Postcard View — needs the FeedLayout context */}
+                <Route path='/postcard/:id' element={<FeedCarouselPage />} />
+                
+                {/* Public Album View */}
+                <Route path='/album/:albumId' element={<AlbumPage />} />
+              </Route>
+
+              {/* Dedicated Game Route */}
+              <Route path='/game/:shortcode' element={<GamePage />} />
+
+              {/* ── Admin console (protected, nested routes) ── */}
+              {isAdmin ? (
+                <Route
+                  path='/admin'
+                  element={<AdminPage user={user} onPostcardGenerated={() => {}} />}
+                >
+                  <Route index            element={<AdminDashboard />} />
+                  <Route path='generation' element={<AdminGeneration />} />
+                  <Route path='queue'      element={<AdminQueuePage />} />
+                  <Route path='browser'    element={<AdminBrowser />} />
+                  <Route path='postcards'  element={<AdminPostcards />} />
+                  <Route path='albums'     element={<AdminAlbums />} />
+                  <Route path='sync'       element={<AdminSync />} />
+                  <Route path='settings'   element={<AdminSettings />} />
+                  <Route path='stamps'     element={<AdminStamps />} />
+                  <Route path='instagram'  element={<AdminInstagram />} />
+                </Route>
+              ) : (
+                <Route path='/admin/*' element={<Navigate to='/feed' replace />} />
+              )}
+
+              {/* Postcard admin detail — /preview/:id */}
+              <Route path='/preview/:id' element={<PostcardDetailPage />} />
+
+              {/* Share link — /:id redirects to /postcard/:id */}
+              <Route path='/:id' element={<ShareRedirect />} />
+            </Routes>
           </OnboardingProvider>
         </StampProvider>
       </GameModeProvider>

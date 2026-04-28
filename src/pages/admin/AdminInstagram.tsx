@@ -100,7 +100,7 @@ export function AdminInstagram() {
           <p className="text-sm font-medium text-white/90">Bot Estado</p>
           <p className="text-xs text-white/50 mt-1">El bot busca automáticamente postales pendientes para publicar. Usa este botón para forzar un posteo ahora (tomará la más antigua pendiente).</p>
         </div>
-        <ActionBtn onClick={() => forcePublish()} disabled={runStatus.status === 'loading'} variant="primary">
+        <ActionBtn onClick={() => forcePublish()} disabled={runStatus.status === 'loading'} variant="default">
           {runStatus.status === 'loading' ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           <span>Publicar Siguiente Ahora</span>
         </ActionBtn>

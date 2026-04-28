@@ -63,7 +63,6 @@ interface BrowserPostcard {
   category: { es: string; en: string } | string | null;
   has_detailed: boolean;
   has_illus_tags: boolean;
-  has_illus_tags: boolean;
   has_storytelling: boolean;
   strategy: string | null;
   ig_media_id: string | null;
@@ -88,7 +87,6 @@ interface PostcardDetail {
   human_activity: string | null;
   original_image_url: string | null;
   illustration_url: string | null;
-  generation_metadata: Record<string, unknown> | null;
   generation_metadata: Record<string, unknown> | null;
   game_stats: { hp: number; attack: number; defense: number; magic: number; element: string; rarity: string; } | null;
   created_at: string;
