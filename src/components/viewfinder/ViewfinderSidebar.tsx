@@ -155,10 +155,10 @@ export function ViewfinderSidebar({
       </div>
 
       {/* Back to Globe */}
-      <div className="px-3 py-3 border-t border-white/5">
+      <div className="px-4 py-4 border-t border-white/5">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors duration-200 text-sm font-medium w-full"
+          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-all duration-200 text-sm font-semibold border border-white/10 cursor-pointer md:cursor-zoom-out shadow-lg"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Globe

@@ -29,13 +29,17 @@ import { useLang, t } from '../../utils/i18n';
 interface ViewfinderPanelProps {
   sourceItem: FeedItem;
   userId: string | undefined;
+  userIsAnonymous?: boolean;
   onPostcardCreated?: () => void;
+  onAuthRequired?: () => void;
 }
 
 export function ViewfinderPanel({
   sourceItem,
   userId,
+  userIsAnonymous,
   onPostcardCreated,
+  onAuthRequired,
 }: ViewfinderPanelProps) {
   const lang = useLang();
   const panoramaRef = useRef<StreetViewPanoramaHandle>(null);
@@ -71,6 +75,48 @@ export function ViewfinderPanel({
   const systemPostcardUrl = sourceItem.illustration_url
     ? cdnImage(sourceItem.illustration_url, { width: 480 })
     : null;
+
+  // Download or share the generated postcard
+  const handleSaveOrShare = useCallback(async () => {
+    if (!capturedPostcard?.illustration_url) return;
+
+    if (userIsAnonymous && onAuthRequired) {
+      onAuthRequired();
+      return;
+    }
+    
+    try {
+      const locationName = `${sourceItem.city}-${sourceItem.country}`.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+      const fileName = `postalpeek-${locationName}.jpg`;
+
+      const response = await fetch(capturedPostcard.illustration_url);
+      const blob = await response.blob();
+      const file = new File([blob], fileName, { type: blob.type });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'My PostalPeek Postcard',
+          text: `Check out this postcard I captured from ${sourceItem.city}, ${sourceItem.country} on PostalPeek!`,
+          url: `https://postalpeek.com/postcard/${capturedPostcard.id}`,
+          files: [file],
+        });
+      } else {
+        // Fallback: trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error sharing/saving postcard:', error);
+      }
+    }
+  }, [capturedPostcard?.illustration_url, sourceItem.city, sourceItem.country, userIsAnonymous, onAuthRequired]);
 
   return (
     <div className="relative w-full h-full bg-[#0a0a0e] overflow-hidden">
@@ -206,9 +252,7 @@ export function ViewfinderPanel({
                     {t({ es: 'Capturar otro rincón', en: 'Capture another corner' }, lang)}
                   </button>
                   <button
-                    onClick={() => {
-                      // Future: Download or share
-                    }}
+                    onClick={handleSaveOrShare}
                     className="w-full py-3.5 px-8 rounded-2xl bg-white/10 backdrop-blur-md text-white text-sm font-bold border border-white/20 hover:bg-white/20 transition-all duration-200 shadow-lg"
                   >
                     {t({ es: 'Guardar / Compartir', en: 'Save / Share' }, lang)}

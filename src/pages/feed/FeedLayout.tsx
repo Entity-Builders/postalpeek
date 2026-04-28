@@ -264,7 +264,7 @@ export function FeedLayout({
   }, [user?.id, claim, refetchCollection, refetchAlbums]);
 
   const handleAuthRequiredAction = useCallback((action: () => void) => {
-    if (!user) {
+    if (!user || user.is_anonymous) {
       setShowAuthGate(true);
     } else {
       action();

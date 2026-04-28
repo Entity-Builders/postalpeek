@@ -4,6 +4,7 @@ import './index.css';
 // WalkerFeed was replaced with FeedLayout + Pages
 import { useMouseIdle } from './hooks/useMouseIdle';
 import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { supabase } from '@eb-packages/logic/src/supabase';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminPage } from './pages/AdminPage';
 import { PostcardDetailPage } from './pages/PostcardDetailPage';
@@ -139,6 +140,11 @@ function App() {
 
   // Identify user in PostHog when auth state changes
   useEffect(() => {
+    // If auth loading finished and we have no user, sign in anonymously
+    if (!loading && !user) {
+      supabase.auth.signInAnonymously().catch(console.error);
+    }
+
     if (user) {
       analytics.identify(user.id, {
         email: user.email,
