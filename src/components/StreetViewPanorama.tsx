@@ -14,32 +14,60 @@ export interface StreetViewPOV {
   zoom: number;
   lat: number;
   lng: number;
+  panoId?: string;
 }
 
 /** Imperative handle to allow parent components to trigger capture */
 export interface StreetViewPanoramaHandle {
   capture: () => void;
+  navigateTo: (lat: number, lng: number) => void;
+  setZoomLevel: (zoom: number) => void;
+  getZoomLevel: () => number;
 }
 
 interface StreetViewPanoramaProps {
   address: string | null;
+  /** When provided, skip geocoding and position the panorama exactly */
+  lat?: number | null;
+  lng?: number | null;
+  /** Google Street View pano ID — opens the exact panorama sphere */
+  panoId?: string | null;
+  /** Initial heading in degrees (0-360) */
+  initialHeading?: number | null;
+  /** Initial pitch in degrees */
+  initialPitch?: number | null;
   onCapture: (pov: StreetViewPOV) => void;
   isCapturing: boolean;
   /** When true, hides the built-in bottom bar (toolbar manages capture externally) */
   hideControls?: boolean;
+  onPositionChanged?: (pos: { lat: number; lng: number }) => void;
+  onZoomChanged?: (zoom: number) => void;
 }
 
 export const StreetViewPanorama = forwardRef<
   StreetViewPanoramaHandle,
   StreetViewPanoramaProps
 >(function StreetViewPanorama(
-  { address, onCapture, isCapturing, hideControls = false },
+  { address, lat, lng, panoId, initialHeading, initialPitch, onCapture, isCapturing, hideControls = false, onPositionChanged, onZoomChanged },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep a stable ref to onPositionChanged so the position_changed listener
+  // always calls the latest callback WITHOUT causing initPanorama to be
+  // recreated (which would re-trigger the init effect and reset the view).
+  const onPositionChangedRef = useRef(onPositionChanged);
+  useEffect(() => {
+    onPositionChangedRef.current = onPositionChanged;
+  }, [onPositionChanged]);
+
+  const onZoomChangedRef = useRef(onZoomChanged);
+  useEffect(() => {
+    onZoomChangedRef.current = onZoomChanged;
+  }, [onZoomChanged]);
 
   // Expose capture method to parent via ref
   const handleCapture = useCallback(() => {
@@ -48,6 +76,7 @@ export const StreetViewPanorama = forwardRef<
     const pov = panoramaRef.current.getPov();
     const pos = panoramaRef.current.getPosition();
     const zoom = panoramaRef.current.getZoom();
+    const panoId = panoramaRef.current.getPano();
 
     if (!pos) return;
 
@@ -57,20 +86,118 @@ export const StreetViewPanorama = forwardRef<
       zoom: zoom,
       lat: pos.lat(),
       lng: pos.lng(),
+      panoId: panoId || undefined,
     });
   }, [onCapture]);
+
+  const handleNavigateTo = useCallback((lat: number, lng: number) => {
+    if (!panoramaRef.current) return;
+    const sv = new window.google.maps.StreetViewService();
+    const pos = new window.google.maps.LatLng(lat, lng);
+    sv.getPanorama({ location: pos, radius: 100 }, (data, status) => {
+      if (status === 'OK' && data?.location?.latLng && panoramaRef.current) {
+        panoramaRef.current.setPosition(data.location.latLng);
+      }
+    });
+  }, []);
+
+  const handleSetZoom = useCallback((zoom: number) => {
+    if (!panoramaRef.current) return;
+    panoramaRef.current.setZoom(zoom);
+  }, []);
+
+  const handleGetZoom = useCallback(() => {
+    return panoramaRef.current?.getZoom() ?? 0;
+  }, []);
 
   useImperativeHandle(
     ref,
     () => ({
       capture: handleCapture,
+      navigateTo: handleNavigateTo,
+      setZoomLevel: handleSetZoom,
+      getZoomLevel: handleGetZoom,
     }),
-    [handleCapture],
+    [handleCapture, handleNavigateTo, handleSetZoom, handleGetZoom],
   );
 
-  // Initialize panorama when address changes
+  // Helper to create or reposition the panorama
+  const initPanorama = useCallback(
+    (
+      target: { pano?: string; position?: google.maps.LatLng },
+      heading: number,
+      pitch: number,
+    ) => {
+      if (!containerRef.current) return;
+
+      try {
+        if (panoramaRef.current) {
+          if (target.pano) {
+            panoramaRef.current.setPano(target.pano);
+          } else if (target.position) {
+            panoramaRef.current.setPosition(target.position);
+          }
+          panoramaRef.current.setPov({ heading, pitch });
+          panoramaRef.current.setZoom(0);
+        } else {
+          panoramaRef.current = new window.google.maps.StreetViewPanorama(
+            containerRef.current,
+            {
+              ...(target.pano ? { pano: target.pano } : { position: target.position }),
+              pov: { heading, pitch },
+              zoom: 0,
+              addressControl: false,
+              showRoadLabels: false,
+              linksControl: true,
+              panControl: false,
+              enableCloseButton: false,
+              fullscreenControl: false,
+              zoomControl: false,
+              motionTracking: false,
+              keyboardShortcuts: false,
+            },
+          );
+
+          // Read from the ref so this listener always fires the latest callback
+          // without forcing initPanorama to be recreated on every render.
+          panoramaRef.current.addListener('position_changed', () => {
+            const pos = panoramaRef.current?.getPosition();
+            if (pos && onPositionChangedRef.current) {
+              onPositionChangedRef.current({ lat: pos.lat(), lng: pos.lng() });
+            }
+          });
+
+          // Sync zoom when user scrolls or pinches natively
+          panoramaRef.current.addListener('pov_changed', () => {
+            const z = panoramaRef.current?.getZoom();
+            if (z !== undefined && onZoomChangedRef.current) {
+              onZoomChangedRef.current(z);
+            }
+          });
+
+          // Catch post-init failures (pano found but no imagery → black screen)
+          panoramaRef.current.addListener('status_changed', () => {
+            const status = panoramaRef.current?.getStatus();
+            if (status === 'ZERO_RESULTS' || status === 'UNKNOWN_ERROR') {
+              setError('No Street View imagery available at this location.');
+              setIsReady(false);
+            }
+          });
+        }
+        setIsReady(true);
+      } catch (err) {
+        // Google Maps internal errors (e.g. imagery_viewer.js "a.B is not a function")
+        console.warn('Street View init error (Google internal):', err);
+        setError('Street View failed to load for this location.');
+        setIsReady(false);
+      }
+    },
+    [], // no dependency on onPositionChanged — uses ref instead
+  );
+
+  // Initialize panorama — prefer panoId > lat/lng > address geocoding
   useEffect(() => {
-    if (!address || !containerRef.current) return;
+    if (!containerRef.current) return;
     if (!window.google?.maps) {
       setError('Google Maps not loaded. Check your API key.');
       return;
@@ -78,6 +205,39 @@ export const StreetViewPanorama = forwardRef<
 
     setError(null);
     setIsReady(false);
+
+    const heading = initialHeading ?? 0;
+    const pitch = initialPitch ?? 0;
+
+    // ── Strategy 1: Exact pano ID (best precision) ──────────────────────
+    if (panoId) {
+      initPanorama({ pano: panoId }, heading, pitch);
+      return;
+    }
+
+    // ── Strategy 2: Exact coordinates ───────────────────────────────────
+    if (lat != null && lng != null) {
+      const location = new window.google.maps.LatLng(lat, lng);
+      const sv = new window.google.maps.StreetViewService();
+
+      sv.getPanorama(
+        { location, radius: 1000 },
+        (
+          data: google.maps.StreetViewPanoramaData | null,
+          svStatus: google.maps.StreetViewStatus,
+        ) => {
+          if (svStatus !== 'OK' || !data?.location?.latLng) {
+            setError('No Street View available at these coordinates.');
+            return;
+          }
+          initPanorama({ position: data.location.latLng }, heading, pitch);
+        },
+      );
+      return;
+    }
+
+    // ── Strategy 3: Address geocoding (fallback) ────────────────────────
+    if (!address) return;
 
     const geocoder = new window.google.maps.Geocoder();
 
@@ -88,7 +248,6 @@ export const StreetViewPanorama = forwardRef<
       }
 
       const location = results[0].geometry.location;
-
       const sv = new window.google.maps.StreetViewService();
 
       sv.getPanorama(
@@ -101,35 +260,11 @@ export const StreetViewPanorama = forwardRef<
             setError('No Street View available for this location.');
             return;
           }
-
-          if (panoramaRef.current) {
-            panoramaRef.current.setPosition(data.location.latLng);
-            panoramaRef.current.setPov({ heading: 0, pitch: 0 });
-            panoramaRef.current.setZoom(0);
-          } else {
-            panoramaRef.current = new window.google.maps.StreetViewPanorama(
-              containerRef.current!,
-              {
-                position: data.location.latLng,
-                pov: { heading: 0, pitch: 0 },
-                zoom: 0,
-                addressControl: false,
-                showRoadLabels: false,
-                linksControl: true,
-                panControl: false,
-                enableCloseButton: false,
-                fullscreenControl: false,
-                zoomControl: true,
-                motionTracking: false,
-              },
-            );
-          }
-
-          setIsReady(true);
+          initPanorama({ position: data.location.latLng }, heading, pitch);
         },
       );
     });
-  }, [address]);
+  }, [address, lat, lng, panoId, initialHeading, initialPitch, initPanorama]);
 
   return (
     <div className='w-full h-full relative overflow-hidden bg-black/20'>

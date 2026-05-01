@@ -252,6 +252,12 @@ export const WIDTHS = {
   blur: 64,
   /** Thumbnails (welcome, auth gate stacked cards) */
   thumb: 280,
+  /** Album slot cards — small 3/4 ratio grid items in AlbumDetail & CollectionGrid */
+  albumSlot: 200,
+  /** Album slot srcSet — responsive for 1×/2× DPR on small slot cards */
+  albumSlotSrcSet: [200, 400] as readonly number[],
+  /** Album list cover cards — horizontal scroll cards (~192-224px wide) */
+  albumCard: 280,
   /** Grid cards — fallback width (src attribute) */
   grid: 480,
   /** Grid cards — srcSet widths for 1×/2×/3× DPR */

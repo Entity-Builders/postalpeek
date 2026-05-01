@@ -7,12 +7,23 @@ export interface AlbumSlot {
   slot_order: number;
   postcard_id: string | null;
   illustration_url: string | null;
+  original_image_url: string | null;
   city: string | null;
   country: string | null;
   category: string | null;
+  lat: number | null;
+  lng: number | null;
   is_owned: boolean;
   is_claimed: boolean;
   is_hint: boolean;
+  streetview_pov?: {
+    heading?: number;
+    pitch?: number;
+    fov?: number;
+    pano_id?: string;
+    lens?: string;
+    date?: string;
+  } | null;
 }
 
 export interface AlbumDetailData {
@@ -50,6 +61,8 @@ export function useAlbumDetail() {
         return;
       }
       setDetail(data as AlbumDetailData);
+      const d = data as AlbumDetailData;
+      console.log('[useAlbumDetail] Slots count:', d?.slots?.length, 'First slot illustration_url:', d?.slots?.[0]?.illustration_url);
     } finally {
       setIsLoading(false);
     }

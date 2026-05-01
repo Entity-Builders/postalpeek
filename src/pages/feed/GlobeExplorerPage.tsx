@@ -1,72 +1,143 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
-import Globe from 'react-globe.gl';
-import Supercluster from 'supercluster';
-import { useFeedContext } from './FeedLayout';
-import { FeedItem } from '../../components/Postcard';
-import { GlobeHeader } from './components/globe/GlobeHeader';
-import { GlobeReticle } from './components/globe/GlobeReticle';
-import { GlobeZoomControls } from './components/globe/GlobeZoomControls';
-import { GlobeSelectionPanel } from './components/globe/GlobeSelectionPanel';
-import { ViewfinderPanel } from '../../components/viewfinder/ViewfinderPanel';
-import { ViewfinderSidebar } from '../../components/viewfinder/ViewfinderSidebar';
-import { useLang, t } from '../../utils/i18n';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cdnImage } from '../../utils/imageUtils';
-import { analytics } from '../../lib/analytics';
+import React, {
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import Globe from "react-globe.gl";
+import Supercluster from "supercluster";
+import { useFeedContext } from "./FeedLayout";
+import { FeedItem } from "../../components/Postcard";
+import { GlobeProgressHeader } from "./components/globe/GlobeProgressHeader";
+import { GlobeReticle } from "./components/globe/GlobeReticle";
+import { GlobeZoomControls } from "./components/globe/GlobeZoomControls";
+import { ViewfinderPanel } from "../../components/viewfinder/ViewfinderPanel";
+import { ViewfinderSidebar } from "../../components/viewfinder/ViewfinderSidebar";
+import { MissionBriefing } from "../../components/viewfinder/MissionBriefing";
+import { GlobeBottomCarousel } from "./components/globe/GlobeBottomCarousel";
+import { MissionCTACard } from "./components/globe/MissionCTACard";
+import { PostcardFullscreenModal } from "./components/globe/PostcardFullscreenModal";
+import { GlobeWelcomeOverlay, shouldShowWelcome } from "./components/globe/GlobeWelcomeOverlay";
+import { useAlbumDetail } from "../../hooks/useAlbumDetail";
+import { useLang, t } from "../../utils/i18n";
+import { motion, AnimatePresence } from "framer-motion";
+import { cdnImage } from "../../utils/imageUtils";
+import { analytics } from "../../lib/analytics";
+
+import { supabase } from '@eb-packages/logic/src/supabase';
 
 export function GlobeExplorerPage() {
   const lang = useLang();
-  const { items, handleAuthRequiredAction, user, toggleFavorite, favoriteIds } = useFeedContext();
+  const { items, handleAuthRequiredAction, user, toggleFavorite, favoriteIds } =
+    useFeedContext();
   const globeEl = useRef<any>(null);
 
-
-
-  // Filter items that have lat/lng
+  // Filter feed items that have lat/lng — used for background globe markers
   const globeData = useMemo(() => {
     return items.filter((item) => item.lat != null && item.lng != null);
   }, [items]);
 
-  const [selectedItem, setSelectedItem] = useState<FeedItem | FeedItem[] | null>(null);
+  // --- Real Album Data ---
+  const { detail: albumDetail, isLoading: albumLoading, fetchDetail } = useAlbumDetail();
+
+  // Fetch the active album dynamically (admin controls which album is active)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('postalpeek_albums')
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (!cancelled && data?.id) {
+        console.log('[Globe] Active album:', data.id);
+        fetchDetail(data.id);
+      } else if (error) {
+        console.error('[Globe] Failed to fetch active album:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fetchDetail]);
+
+  // Convert album slots to FeedItem-compatible objects for the globe
+  const activeTrackData = useMemo(() => {
+    if (!albumDetail?.slots) return [];
+    return albumDetail.slots
+      .filter((slot) => slot.lat != null && slot.lng != null)
+      .map((slot) => ({
+        id: slot.postcard_id ?? `empty-${slot.slot_order}`,
+        city: slot.city ?? '???',
+        country: slot.country ?? '',
+        lat: slot.lat,
+        lng: slot.lng,
+        illustration_url: slot.illustration_url ?? '',
+        original_image_url: slot.original_image_url ?? '',
+        owner_id: slot.is_owned ? user?.id : null,
+        category: slot.category,
+        description: slot.slot_label ?? '',
+        created_at: '',
+        slot_label: slot.slot_label,
+        slot_order: slot.slot_order,
+        is_hint: slot.is_hint,
+        streetview_pov: slot.streetview_pov ?? undefined,
+      } as FeedItem));
+  }, [albumDetail, user]);
+
+  const [selectedItem, setSelectedItem] = useState<
+    FeedItem | FeedItem[] | null
+  >(null);
+  const [carouselItems, setCarouselItems] = useState<FeedItem[]>([]);
+  const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<FeedItem | null>(null);
+  const [ctaItem, setCtaItem] = useState<FeedItem | null>(null);
   const [globeReady, setGlobeReady] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => shouldShowWelcome());
   const isAutoPanning = useRef(false);
+  const isUserFlying = useRef(false);
+  const hasInitialFocus = useRef(false);
   const zoomLevelRef = useRef(2);
   const [zoomLevel, setZoomLevel] = useState(2);
 
   // ── Viewfinder Mode State ──
-  const [mode, setMode] = useState<'globe' | 'viewfinder'>('globe');
-  const [viewfinderTarget, setViewfinderTarget] = useState<FeedItem | null>(null);
+  const [mode, setMode] = useState<"globe" | "briefing" | "diving" | "viewfinder">("globe");
+  const [viewfinderTarget, setViewfinderTarget] = useState<FeedItem | null>(
+    null,
+  );
+  const [viewfinderCurrentPos, setViewfinderCurrentPos] = useState<{lat: number; lng: number} | null>(null);
 
   // Initialize Supercluster
   const clusterIndex = useMemo(() => {
     const sc = new Supercluster({
-      radius: 20,   // Very tight — only nearby postcards cluster together
-      maxZoom: 14,  // Break into individual pins very early
+      radius: 20, // Very tight — only nearby postcards cluster together
+      maxZoom: 14, // Break into individual pins very early
     });
-    
-    const features = globeData.map(item => ({
-      type: 'Feature' as const,
+
+    const features = activeTrackData.map((item) => ({
+      type: "Feature" as const,
       properties: { cluster: false, item },
       geometry: {
-        type: 'Point' as const,
-        coordinates: [item.lng!, item.lat!]
-      }
+        type: "Point" as const,
+        coordinates: [item.lng!, item.lat!],
+      },
     }));
-    
+
     sc.load(features);
     return sc;
-  }, [globeData]);
+  }, [activeTrackData]);
 
   // Get clusters based on zoom level — anchor each cluster to a REAL postcard location
   // (not the centroid, which shifts when zoom changes)
   const clusters = useMemo(() => {
     if (!clusterIndex) return [];
     const raw = clusterIndex.getClusters([-180, -90, 180, 90], zoomLevel);
-    
+
     // Replace cluster centroids with the first leaf's real coordinates
-    return raw.map(feature => {
+    return raw.map((feature) => {
       if (!feature.properties.cluster) return feature; // individual point — already real coords
-      
+
       // Get the first actual postcard in this cluster
       try {
         const leaves = clusterIndex.getLeaves(feature.properties.cluster_id, 1);
@@ -75,11 +146,13 @@ export function GlobeExplorerPage() {
             ...feature,
             geometry: {
               ...feature.geometry,
-              coordinates: leaves[0].geometry.coordinates // use REAL postcard coords
-            }
+              coordinates: leaves[0].geometry.coordinates, // use REAL postcard coords
+            },
           };
         }
-      } catch { /* fallback to centroid */ }
+      } catch {
+        /* fallback to centroid */
+      }
       return feature;
     });
   }, [clusterIndex, zoomLevel]);
@@ -90,20 +163,28 @@ export function GlobeExplorerPage() {
   }, []);
 
   // Fly to a location (used only for cluster zoom and skip-next)
-  const flyTo = useCallback((lat: number, lng: number, altitude: number, duration = 1000) => {
-    if (globeEl.current) {
-      isAutoPanning.current = true;
+  const flyTo = useCallback(
+    (lat: number, lng: number, altitude: number, duration: number) => {
+      if (!globeEl.current) return;
+
+      isUserFlying.current = true;
       globeEl.current.pointOfView({ lat, lng, altitude }, duration);
+
+      // Resume auto-select after flying completes + 100ms
       setTimeout(() => {
-        isAutoPanning.current = false;
-      }, duration + 50);
-    }
-  }, []);
+        isUserFlying.current = false;
+      }, duration + 100);
+    },
+    [],
+  );
 
   // On mount: center on the user's DENSEST cluster at country zoom, auto-select closest
-  const hasInitialFocus = useRef(false);
   useEffect(() => {
-    if (globeData.length > 0 && clusterIndex && !hasInitialFocus.current) {
+    if (
+      activeTrackData.length > 0 &&
+      clusterIndex &&
+      !hasInitialFocus.current
+    ) {
       hasInitialFocus.current = true;
 
       // Find the largest cluster at a global zoom level
@@ -125,7 +206,7 @@ export function GlobeExplorerPage() {
         // Find the actual closest postcard to this cluster center
         let closestDist = Infinity;
         let closestItem: FeedItem | null = null;
-        for (const item of globeData) {
+        for (const item of activeTrackData) {
           const dLat = item.lat! - clusterLat;
           const dLng = item.lng! - clusterLng;
           const dist = dLat * dLat + dLng * dLng;
@@ -138,16 +219,16 @@ export function GlobeExplorerPage() {
         // Fly to the REAL postcard location, not the cluster centroid
         const targetLat = closestItem?.lat ?? clusterLat;
         const targetLng = closestItem?.lng ?? clusterLng;
-        flyTo(targetLat, targetLng, 0.001, 1500);
+        flyTo(targetLat, targetLng, 1.8, 1500);
 
         // Select it and reveal the globe after tiles load
         setTimeout(() => {
           if (closestItem) setSelectedItem(closestItem);
           setGlobeReady(true);
-        }, 2500);
+        }, 1500);
       }
     }
-  }, [globeData, clusterIndex, flyTo]);
+  }, [activeTrackData, clusterIndex, flyTo]);
 
   // Hydrate the globe with more postcards in the background so it feels populated
   const { isFetchingMore, hasMore, fetchMoreFeed } = useFeedContext();
@@ -168,7 +249,7 @@ export function GlobeExplorerPage() {
   // Polling loop: instant zoom tracking + debounced reticle auto-selection.
   // The auto-select only fires after the user STOPS moving for 500ms.
   useEffect(() => {
-    if (globeData.length === 0) return;
+    if (activeTrackData.length === 0) return;
     let reqId: number;
     let lastLat = 0;
     let lastLng = 0;
@@ -180,7 +261,10 @@ export function GlobeExplorerPage() {
         if (pov) {
           // ── Instant zoom tracking ──
           const altitude = Math.max(0.0001, pov.altitude);
-          const calculatedZoom = Math.max(0, Math.min(20, Math.floor(15 - Math.log10(altitude * 1000) * 5)));
+          const calculatedZoom = Math.max(
+            0,
+            Math.min(20, Math.floor(15 - Math.log10(altitude * 1000) * 5)),
+          );
           if (calculatedZoom !== zoomLevelRef.current) {
             zoomLevelRef.current = calculatedZoom;
             setZoomLevel(calculatedZoom);
@@ -188,7 +272,9 @@ export function GlobeExplorerPage() {
 
           // ── Debounced reticle auto-selection ──
           if (!isAutoPanning.current && altitude < 0.15) {
-            const moved = Math.abs(pov.lat - lastLat) > 0.0001 || Math.abs(pov.lng - lastLng) > 0.0001;
+            const moved =
+              Math.abs(pov.lat - lastLat) > 0.0001 ||
+              Math.abs(pov.lng - lastLng) > 0.0001;
             lastLat = pov.lat;
             lastLng = pov.lng;
 
@@ -199,34 +285,63 @@ export function GlobeExplorerPage() {
                 // User stopped for 500ms — now find closest dot
                 const currentPov = globeEl.current?.pointOfView();
                 if (!currentPov) return;
-                
+
                 let closestDist = Infinity;
                 let closestItem: FeedItem | null = null;
-                
+                const itemsWithDist: { item: FeedItem; dist: number }[] = [];
+
                 for (const feature of clustersRef.current) {
                   if (feature.properties.cluster) continue;
                   const lat = feature.geometry.coordinates[1];
                   const lng = feature.geometry.coordinates[0];
-                  
+
                   const p = 0.017453292519943295;
                   const c = Math.cos;
-                  const a = 0.5 - c((lat - currentPov.lat) * p)/2 + 
-                          c(currentPov.lat * p) * c(lat * p) * 
-                          (1 - c((lng - currentPov.lng) * p))/2;
+                  const a =
+                    0.5 -
+                    c((lat - currentPov.lat) * p) / 2 +
+                    (c(currentPov.lat * p) *
+                      c(lat * p) *
+                      (1 - c((lng - currentPov.lng) * p))) /
+                      2;
                   const dist = 12742 * Math.asin(Math.sqrt(a));
-                  
+
+                  itemsWithDist.push({ item: feature.properties.item, dist });
+
                   if (dist < closestDist) {
                     closestDist = dist;
                     closestItem = feature.properties.item;
                   }
                 }
-                
-                if (closestItem) {
-                  setSelectedItem(prev => {
-                    if (!Array.isArray(prev) && prev?.id === closestItem!.id) return prev;
+
+                // Sort by distance and take closest 15
+                itemsWithDist.sort((a, b) => a.dist - b.dist);
+                const closest15 = itemsWithDist.slice(0, 15).map((x) => x.item);
+
+                // Stable sort to prevent carousel items from jumping around when distance changes
+                closest15.sort((a, b) => a.id.localeCompare(b.id));
+
+                if (closestItem && !isUserFlying.current) {
+                  setSelectedItem((prev) => {
+                    if (!Array.isArray(prev) && prev?.id === closestItem!.id)
+                      return prev;
                     return closestItem;
                   });
                 }
+
+                // Only update carousel if the set of items actually changed to avoid reshuffling
+                setCarouselItems((prev) => {
+                  const prevIds = new Set(prev.map((i) => i.id));
+                  const nextIds = new Set(closest15.map((i) => i.id));
+
+                  if (
+                    prevIds.size === nextIds.size &&
+                    [...prevIds].every((id) => nextIds.has(id))
+                  ) {
+                    return prev;
+                  }
+                  return closest15;
+                });
               }, 500);
             }
           }
@@ -240,19 +355,20 @@ export function GlobeExplorerPage() {
       cancelAnimationFrame(reqId);
       if (stableTimer) clearTimeout(stableTimer);
     };
-  }, [globeData]);
+  }, [activeTrackData]);
 
   // Handle skip to random next — fly to the area but don't zoom to street level
   const handleSkipNext = useCallback(() => {
-    if (globeData.length > 0) {
-      const randomItem = globeData[Math.floor(Math.random() * globeData.length)];
+    if (activeTrackData.length > 0) {
+      const randomItem =
+        activeTrackData[Math.floor(Math.random() * activeTrackData.length)];
       setSelectedItem(randomItem);
       if (randomItem.lat != null && randomItem.lng != null) {
         // Fly to the area at a comfortable altitude where clusters start to break apart
         flyTo(randomItem.lat, randomItem.lng, 0.3, 1200);
       }
     }
-  }, [globeData, flyTo]);
+  }, [activeTrackData, flyTo]);
 
   const handleToggleFavorite = useCallback(() => {
     if (selectedItem && !Array.isArray(selectedItem)) {
@@ -270,8 +386,8 @@ export function GlobeExplorerPage() {
     if (!item) return;
     handleAuthRequiredAction(() => {
       setViewfinderTarget(item);
-      setMode('viewfinder');
-      analytics.track('viewfinder_entered', {
+      setMode("briefing");
+      analytics.track("briefing_entered", {
         source_postcard_id: item.id,
         city: item.city,
         country: item.country,
@@ -280,10 +396,8 @@ export function GlobeExplorerPage() {
   }, [selectedItem, handleAuthRequiredAction]);
 
   const handleBackToGlobe = useCallback(() => {
-    setGlobeReady(false);
-    hasInitialFocus.current = false;
-    setMode('globe');
-    analytics.track('viewfinder_exited_to_globe');
+    setMode("globe");
+    analytics.track("viewfinder_exited_to_globe");
   }, []);
 
   const handleSelectNearby = useCallback((item: FeedItem) => {
@@ -295,143 +409,211 @@ export function GlobeExplorerPage() {
   const nearbyItems = useMemo(() => {
     if (!viewfinderTarget?.lat || !viewfinderTarget?.lng) return [];
     const radiusKm = 5;
-    return globeData.filter((item) => {
-      if (item.id === viewfinderTarget.id) return false;
-      if (!item.lat || !item.lng) return false;
-      const dLat = item.lat - viewfinderTarget.lat!;
-      const dLng = item.lng - viewfinderTarget.lng!;
-      const approxKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
-      return approxKm < radiusKm;
-    }).slice(0, 6);
-  }, [viewfinderTarget, globeData]);
+    return activeTrackData
+      .filter((item) => {
+        if (item.id === viewfinderTarget.id) return false;
+        if (!item.lat || !item.lng) return false;
+        const dLat = item.lat - viewfinderTarget.lat!;
+        const dLng = item.lng - viewfinderTarget.lng!;
+        const approxKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
+        return approxKm < radiusKm;
+      })
+      .slice(0, 6);
+  }, [viewfinderTarget, activeTrackData]);
 
   // ── Radio Garden-style markers: tiny dots ──
   // Dot size helper: scales with altitude so pins are visible at street level
   const getDotSize = useCallback((base: number) => {
     const alt = globeEl.current?.pointOfView()?.altitude ?? 1;
-    if (alt > 0.3) return base;           // Far away — standard size
-    if (alt > 0.05) return base * 1.5;    // Region level — slightly bigger
-    return base * 2;                       // Street level — double size
+    if (alt > 0.3) return base; // Far away — standard size
+    if (alt > 0.05) return base * 1.5; // Region level — slightly bigger
+    return base * 2; // Street level — double size
   }, []);
 
-  const renderHtmlElement = useCallback((d: object) => {
-    const feature = d as any;
-    const isCluster = feature.properties.cluster;
-    const count = feature.properties.point_count || 0;
-    
-    const el = document.createElement('div');
-    el.className = 'globe-marker cursor-pointer pointer-events-auto select-none';
-    
-    // If "cluster" has only 1 item, treat it as an individual dot
-    if (isCluster && count > 1) {
-      // Cluster dot — small circle with count badge
-      const clusterSize = Math.min(14, 8 + Math.log2(count) * 2);
-      el.innerHTML = `
+  const renderHtmlElement = useCallback(
+    (d: object) => {
+      const feature = d as any;
+      const isCluster = feature.properties.cluster;
+      const count = feature.properties.point_count || 0;
+
+      const el = document.createElement("div");
+      el.className =
+        "globe-marker cursor-pointer pointer-events-auto select-none";
+
+      // If "cluster" has only 1 item, treat it as an individual dot
+      if (isCluster && count > 1) {
+        // Cluster dot — small circle with count badge
+        const clusterSize = Math.min(14, 8 + Math.log2(count) * 2);
+        el.innerHTML = `
         <div style="position:relative;display:flex;align-items:center;justify-content:center">
           <div style="width:${clusterSize}px;height:${clusterSize}px;border-radius:50%;background:rgba(52,211,153,0.7);box-shadow:0 0 6px rgba(52,211,153,0.5)"></div>
-          <span style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap">${count}</span>
+          <span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap">${count} 📮</span>
         </div>
       `;
-      
-      const handleClick = (e?: Event) => {
-        if (e) { e.stopPropagation(); e.preventDefault(); }
-        
-        // Select the cluster's anchor postcard so the panel updates
-        try {
-          const leaves = clusterIndex.getLeaves(feature.properties.cluster_id, 1);
-          if (leaves[0]?.properties?.item) {
-            setSelectedItem(leaves[0].properties.item);
+
+        const handleClick = (e?: Event) => {
+          if (e) {
+            e.stopPropagation();
+            e.preventDefault();
           }
-        } catch { /* ignore */ }
-        
-        if (globeEl.current) {
-          const currentPov = globeEl.current.pointOfView();
-          const currentAlt = currentPov?.altitude ?? 2;
-          const newAlt = Math.max(0.005, currentAlt / 8);
+
+          // Select the cluster's anchor postcard so the panel updates
+          try {
+            const leaves = clusterIndex.getLeaves(
+              feature.properties.cluster_id,
+              1,
+            );
+            if (leaves[0]?.properties?.item) {
+              setSelectedItem(leaves[0].properties.item);
+            }
+          } catch {
+            /* ignore */
+          }
+
+          if (globeEl.current) {
+            const currentPov = globeEl.current.pointOfView();
+            const currentAlt = currentPov?.altitude ?? 2;
+            const newAlt = Math.max(0.005, currentAlt / 8);
+
+            flyTo(
+              feature.geometry.coordinates[1],
+              feature.geometry.coordinates[0],
+              newAlt,
+              800,
+            );
+          }
+        };
+
+        el.onclick = handleClick;
+        el.ontouchend = handleClick;
+        return el;
+      }
+
+      // Individual postcard (or cluster of 1) — green dot
+      // For cluster-of-1, extract the item from the cluster
+      let item: FeedItem;
+      if (isCluster && count <= 1) {
+        // Get the single item from this cluster
+        const leaves = clusterIndex.getLeaves(feature.properties.cluster_id, 1);
+        item = leaves[0]?.properties?.item;
+        if (!item) return el;
+      } else {
+        item = feature.properties.item as FeedItem;
+      }
+
+      const isSelected =
+        !Array.isArray(selectedItem) && selectedItem?.id === item.id;
+      const isOwned =
+        item?.owner_id === user?.id || item?.owner_id === "mock_user";
+      const currentAltitude = zoomLevelRef.current;
+      const isStreetLevel = currentAltitude >= 14; // very close zoom
+
+      if (isStreetLevel) {
+        if (isOwned && (item as any).image_url) {
+          // 📍 Thumbnail Pin — rich preview at street level
+          const imgUrl = cdnImage((item as any).image_url, { width: 96 });
+          const size = isSelected ? 56 : 44;
+          const borderColor = isSelected
+            ? "#34d399"
+            : "rgba(255,255,255,0.9)";
+          const shadow = isSelected
+            ? "0 2px 12px rgba(52,211,153,0.6), 0 4px 20px rgba(0,0,0,0.4)"
+            : "0 2px 8px rgba(0,0,0,0.4)";
+
+          el.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-${size / 2 + 6}px)">
+            <div style="width:${size}px;height:${size}px;border-radius:8px;border:2.5px solid ${borderColor};overflow:hidden;box-shadow:${shadow};background:#1a1a2e">
+              <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover" loading="lazy" />
+            </div>
+            <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid ${borderColor};margin-top:-1px"></div>
+          </div>
+        `;
+        } else {
+          // 🔒 Mystery Slot Pin at street level
+          const size = isSelected ? 56 : 44;
+          const borderColor = isSelected ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)";
           
-          flyTo(
-            feature.geometry.coordinates[1],
-            feature.geometry.coordinates[0],
-            newAlt,
-            800
-          );
+          el.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-${size / 2 + 6}px)">
+            <div style="width:${size}px;height:${size}px;border-radius:8px;border:2.5px dashed ${borderColor};display:flex;align-items:center;justify-content:center;background:#1a1a1a;box-shadow:0 4px 12px rgba(0,0,0,0.5)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid ${borderColor};margin-top:-1px"></div>
+          </div>
+        `;
+        }
+      } else {
+        // 🟢 Simple dot — compact at higher altitudes
+        const baseSize = isSelected ? 12 : isOwned ? 8 : 6;
+        const dotSize = getDotSize(baseSize);
+
+        // Extract emoji from slot_label
+        const slotLabel = (item as any).slot_label || '';
+        const emojiMatch = slotLabel.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)/u);
+        const emoji = emojiMatch ? emojiMatch[0] : '';
+
+        let bg, glow, border;
+        if (isOwned) {
+          bg = isSelected ? "rgba(52,211,153,1)" : "rgba(52,211,153,0.85)";
+          glow = isSelected
+            ? "0 0 10px rgba(52,211,153,0.9), 0 0 20px rgba(52,211,153,0.4)"
+            : "0 0 4px rgba(52,211,153,0.4)";
+          border = "none";
+        } else {
+          // Locked dot (empty slot)
+          bg = isSelected ? "rgba(100,100,100,0.9)" : "rgba(26,26,26,0.9)";
+          glow = isSelected ? "0 0 8px rgba(255,255,255,0.4)" : "none";
+          border = "1px dashed rgba(255,255,255,0.3)";
+        }
+
+        const emojiLabel = emoji
+          ? `<span style="position:absolute;bottom:${dotSize + 2}px;left:50%;transform:translateX(-50%);font-size:16px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8));pointer-events:none">${emoji}</span>`
+          : '';
+
+        el.innerHTML = `
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+          ${emojiLabel}
+          <div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;background:${bg};box-shadow:${glow};border:${border};transition:all 0.2s ease${!isOwned ? ';animation:pulse-dot 2s ease-in-out infinite' : ''}"></div>
+        </div>
+        ${!isOwned ? '<style>@keyframes pulse-dot{0%,100%{opacity:0.7}50%{opacity:1}}</style>' : ''}
+      `;
+      }
+
+      const handleItemClick = (e?: Event) => {
+        if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+        setSelectedItem(item);
+        // Pan to center on this dot and show CTA card
+        if (globeEl.current && item.lat != null && item.lng != null) {
+          const currentAlt = globeEl.current.pointOfView()?.altitude ?? 0.05;
+          flyTo(item.lat, item.lng, Math.min(currentAlt, 0.08), 800);
+          setCtaItem(item);
         }
       };
 
-      el.onclick = handleClick;
-      el.ontouchend = handleClick;
+      el.onclick = handleItemClick;
+      el.ontouchend = handleItemClick;
+
       return el;
-    }
-
-    // Individual postcard (or cluster of 1) — green dot
-    // For cluster-of-1, extract the item from the cluster
-    let item: FeedItem;
-    if (isCluster && count <= 1) {
-      // Get the single item from this cluster
-      const leaves = clusterIndex.getLeaves(feature.properties.cluster_id, 1);
-      item = leaves[0]?.properties?.item;
-      if (!item) return el;
-    } else {
-      item = feature.properties.item as FeedItem;
-    }
-
-    const isSelected = !Array.isArray(selectedItem) && selectedItem?.id === item.id;
-    const currentAltitude = zoomLevelRef.current;
-    const isStreetLevel = currentAltitude >= 14; // very close zoom
-
-    if (isStreetLevel && item.image_url) {
-      // 📍 Thumbnail Pin — rich preview at street level
-      const imgUrl = cdnImage(item.image_url, 96);
-      const size = isSelected ? 56 : 44;
-      const borderColor = isSelected ? '#34d399' : 'rgba(255,255,255,0.9)';
-      const shadow = isSelected 
-        ? '0 2px 12px rgba(52,211,153,0.6), 0 4px 20px rgba(0,0,0,0.4)' 
-        : '0 2px 8px rgba(0,0,0,0.4)';
-      
-      el.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-${size/2 + 6}px)">
-          <div style="width:${size}px;height:${size}px;border-radius:8px;border:2.5px solid ${borderColor};overflow:hidden;box-shadow:${shadow};background:#1a1a2e">
-            <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover" loading="lazy" />
-          </div>
-          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid ${borderColor};margin-top:-1px"></div>
-        </div>
-      `;
-    } else {
-      // 🟢 Simple dot — compact at higher altitudes
-      const baseSize = isSelected ? 12 : 8;
-      const dotSize = getDotSize(baseSize);
-      const glow = isSelected 
-        ? '0 0 10px rgba(52,211,153,0.9), 0 0 20px rgba(52,211,153,0.4)' 
-        : '0 0 4px rgba(52,211,153,0.4)';
-      const bg = isSelected ? 'rgba(52,211,153,1)' : 'rgba(52,211,153,0.85)';
-      
-      el.innerHTML = `
-        <div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;background:${bg};box-shadow:${glow};transition:all 0.2s ease"></div>
-      `;
-    }
-
-    const handleItemClick = (e?: Event) => {
-      if (e) { e.stopPropagation(); e.preventDefault(); }
-      setSelectedItem(item);
-      // Pan to center on this dot — keep same altitude (Radio Garden style)
-      if (globeEl.current && item.lat != null && item.lng != null) {
-        const currentAlt = globeEl.current.pointOfView()?.altitude ?? 0.05;
-        flyTo(item.lat, item.lng, currentAlt, 600);
-      }
-    };
-
-    el.onclick = handleItemClick;
-    el.ontouchend = handleItemClick;
-
-    return el;
-  }, [selectedItem, clusterIndex, getDotSize, zoomLevel]);
+    },
+    [selectedItem, clusterIndex, getDotSize, zoomLevel],
+  );
 
   // Setup globe size dynamically
-  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   useEffect(() => {
-    const handleResize = () => setDimensions({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const handleResize = () =>
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Initial spin (disabled per user request so the user moves it manually)
@@ -450,13 +632,14 @@ export function GlobeExplorerPage() {
   }, []);
 
   // Manual zoom controls — proportional to current altitude for smooth feel at any level
-  const handleZoom = useCallback((direction: 'in' | 'out') => {
+  const handleZoom = useCallback((direction: "in" | "out") => {
     if (globeEl.current) {
       const pov = globeEl.current.pointOfView();
       if (pov) {
-        const newAlt = direction === 'in'
-          ? Math.max(0.001, pov.altitude / 2)   // zoom in: halve altitude
-          : Math.min(3, pov.altitude * 2);        // zoom out: double altitude
+        const newAlt =
+          direction === "in"
+            ? Math.max(0.001, pov.altitude / 2) // zoom in: halve altitude
+            : Math.min(3, pov.altitude * 2); // zoom out: double altitude
         globeEl.current.pointOfView({ ...pov, altitude: newAlt }, 400);
       }
     }
@@ -468,19 +651,37 @@ export function GlobeExplorerPage() {
       // Force an update of the HTML elements by resetting the data array reference
       // This makes react-globe.gl re-evaluate the elements
       // We don't really want to do this on every single render, just when selection changes
-      // Actually, since renderHtmlElement depends on selectedItem, react-globe.gl might not 
+      // Actually, since renderHtmlElement depends on selectedItem, react-globe.gl might not
       // automatically re-render existing markers. We might need to trigger an update.
       // A safe way is just letting React handle it, but react-globe.gl caches markers.
       // We'll see if it updates. If not, it's a minor UX thing.
     }
   }, [selectedItem, globeData]);
 
-  const isFavorited = selectedItem && !Array.isArray(selectedItem) 
-    ? favoriteIds.has(selectedItem.id) 
-    : false;
+  const isFavorited =
+    selectedItem && !Array.isArray(selectedItem)
+      ? favoriteIds.has(selectedItem.id)
+      : false;
 
   // ── Viewfinder Mode ──
-  if (mode === 'viewfinder' && viewfinderTarget) {
+  if (mode === "briefing" && viewfinderTarget) {
+    return (
+      <MissionBriefing
+        sourceItem={viewfinderTarget}
+        onStartMission={() => {
+          setMode("viewfinder");
+          analytics.track("viewfinder_entered", {
+            source_postcard_id: viewfinderTarget.id,
+            city: viewfinderTarget.city,
+            country: viewfinderTarget.country,
+          });
+        }}
+        onBack={() => setMode("globe")}
+      />
+    );
+  }
+
+  if (mode === "viewfinder" && viewfinderTarget) {
     return (
       <div className="w-full h-full relative bg-[#0a0a0e] overflow-hidden flex">
         {/* Left Sidebar - hidden on mobile to maximize camera space */}
@@ -490,76 +691,186 @@ export function GlobeExplorerPage() {
             nearbyItems={nearbyItems}
             onBack={handleBackToGlobe}
             onSelectNearby={handleSelectNearby}
+            currentLat={viewfinderCurrentPos?.lat}
+            currentLng={viewfinderCurrentPos?.lng}
           />
         </div>
 
         {/* Right Panel — Street View Viewfinder */}
         <div className="flex-1 relative z-0">
-          {/* Mobile Back Button Overlay */}
-          <div className="md:hidden absolute top-safe-4 left-4 z-50 pt-[env(safe-area-inset-top)]">
-            <button
-              onClick={handleBackToGlobe}
-              className="mt-2 flex items-center gap-2 px-4 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 text-white/90 hover:text-white hover:bg-black/80 transition-all shadow-2xl active:scale-95 cursor-pointer md:cursor-zoom-out"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-              <span className="text-sm font-semibold tracking-wide">Back to Globe</span>
-            </button>
-          </div>
-
           <ViewfinderPanel
             sourceItem={viewfinderTarget}
             userId={user?.id}
             userIsAnonymous={user?.is_anonymous}
-            onAuthRequired={() => handleAuthRequiredAction(() => {})}
+            onAuthRequired={(action) => handleAuthRequiredAction(action)}
             onPostcardCreated={() => {
-              analytics.track('viewfinder_postcard_saved');
+              analytics.track("viewfinder_postcard_saved");
             }}
+            onBack={handleBackToGlobe}
+            onPositionChanged={setViewfinderCurrentPos}
           />
         </div>
       </div>
     );
   }
 
+  // ── Compute progress for header ──
+  const ownedCount = albumDetail
+    ? albumDetail.slots.filter((s) => s.is_owned).length
+    : 0;
+  const totalCount = albumDetail?.slots.length ?? 0;
+  const albumTitle = albumDetail?.album.title ?? 'World Wonders';
+
   // ── Globe Mode (default) ──
   return (
-    <div className="w-full h-full relative bg-[#0a0a0e] overflow-hidden">
-      <GlobeHeader />
+    <div className="w-full h-full relative bg-[#050510] overflow-hidden">
+      {!showWelcome && (
+        <GlobeProgressHeader
+          ownedCount={ownedCount}
+          totalCount={totalCount}
+        />
+      )}
 
       {/* Globe Container */}
-      <div className="absolute inset-0 flex items-center justify-center cursor-move">
+      <div className="absolute inset-0 z-0 flex items-center justify-center cursor-move">
         <Globe
           ref={globeEl}
           width={dimensions.width}
           height={dimensions.height}
-          
-          // CartoDB Voyager — free, no API key, crisp vector tiles
-          globeTileEngineUrl={(x, y, l) => `https://a.basemaps.cartocdn.com/rastertiles/voyager/${l}/${x}/${y}@2x.png`}
-          backgroundColor="#1a1a2e"
-          
-          // Atmosphere — subtle cyan glow
+          // ESRI World Imagery — satellite tiles, free for visualization
+          globeTileEngineUrl={(x, y, l) =>
+            `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`
+          }
+          // Starry sky background
+          backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+          // Atmosphere — subtle emerald glow
           atmosphereColor="#34d399"
-          atmosphereAltitude={0.12}
-          
+          atmosphereAltitude={0.15}
           // HTML Markers for postcards and clusters
-          htmlElementsData={clusters}
+          htmlElementsData={showWelcome ? [] : clusters}
           htmlElement={renderHtmlElement}
           htmlLat={(d: any) => d.geometry.coordinates[1]}
           htmlLng={(d: any) => d.geometry.coordinates[0]}
         />
       </div>
 
+      {/* Globe UI — hidden during diving transition and welcome overlay */}
+      {mode !== "diving" && !showWelcome && (
+        <>
       <GlobeReticle />
       <GlobeZoomControls onZoom={handleZoom} />
-      <GlobeSelectionPanel
-        selectedItem={selectedItem}
-        isFavorited={isFavorited}
-        onToggleFavorite={handleToggleFavorite}
-        onSkipNext={handleSkipNext}
-        onCreateOwn={handleCreateOwn}
+      <GlobeBottomCarousel
+        items={activeTrackData}
+        activeItemId={
+          Array.isArray(selectedItem)
+            ? selectedItem[0]?.id
+            : selectedItem?.id || null
+        }
+        onItemSelect={(item) => {
+          setSelectedItem(item);
+          if (item.lat != null && item.lng != null) {
+            const currentAlt = globeEl.current?.pointOfView()?.altitude ?? 0.05;
+            flyTo(item.lat, item.lng, currentAlt, 600);
+          }
+        }}
+        onItemClick={(item) => {
+          setSelectedItem(item);
+          if (item.lat != null && item.lng != null) {
+            const currentAlt = globeEl.current?.pointOfView()?.altitude ?? 0.05;
+            flyTo(item.lat, item.lng, Math.min(currentAlt, 0.08), 800);
+            setCtaItem(item);
+          }
+        }}
       />
 
-      {/* Top Gradient for readability of header */}
-      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#0a0a0e] to-transparent pointer-events-none" />
+      {/* Mission CTA Card — floating above carousel */}
+      <AnimatePresence>
+        {ctaItem && (
+          <MissionCTACard
+            key={ctaItem.id}
+            item={ctaItem}
+            onStartMission={(item) => {
+              setCtaItem(null);
+              setViewfinderTarget(item);
+
+              // Cinematic zoom-in: dive from globe into street level
+              setMode("diving");
+              if (globeEl.current && item.lat != null && item.lng != null) {
+                globeEl.current.pointOfView(
+                  { lat: item.lat, lng: item.lng, altitude: 0.0005 },
+                  1400,
+                );
+              }
+              // After the zoom completes, transition to viewfinder
+              setTimeout(() => {
+                setMode("viewfinder");
+              }, 1500);
+
+              analytics.track("mission_cta_start", {
+                postcard_id: item.id,
+                city: item.city,
+                country: item.country,
+              });
+            }}
+            onDismiss={() => setCtaItem(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <PostcardFullscreenModal
+        isOpen={isFullscreenModalOpen}
+        items={activeTrackData}
+        activeItemId={
+          Array.isArray(selectedItem)
+            ? selectedItem[0]?.id
+            : selectedItem?.id || null
+        }
+        onClose={() => setIsFullscreenModalOpen(false)}
+        onChangeActive={(item) => {
+          setSelectedItem(item);
+          if (item.lat != null && item.lng != null) {
+            const currentAlt = globeEl.current?.pointOfView()?.altitude ?? 0.05;
+            flyTo(item.lat, item.lng, currentAlt, 600);
+          }
+        }}
+        onCreateOwn={(item) => {
+          setIsFullscreenModalOpen(false);
+          // Wait a tick for modal to unmount before transitioning to viewfinder
+          setTimeout(() => handleCreateOwn(), 100);
+        }}
+        isFavorited={(id) => favoriteIds.has(id)}
+        onToggleFavorite={(id) => {
+          handleAuthRequiredAction(() => {
+            if (toggleFavorite) toggleFavorite(id);
+          });
+        }}
+      />
+      </>
+      )}
+
+      {/* Diving Overlay — cinematic zoom-to-street transition */}
+      <AnimatePresence>
+        {mode === "diving" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2, ease: "easeIn" }}
+            className="absolute inset-0 z-[90] pointer-events-none flex items-center justify-center"
+            style={{
+              background: "radial-gradient(circle at 50% 50%, transparent 0%, rgba(5,5,16,0.6) 40%, rgba(5,5,16,0.95) 100%)",
+            }}
+          >
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="text-white/60 text-sm font-medium tracking-widest uppercase"
+            >
+              {t({ es: "Entrando a Street View...", en: "Entering Street View..." }, lang)}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading Splash — covers ugly tile loading */}
       <AnimatePresence>
@@ -567,14 +878,48 @@ export function GlobeExplorerPage() {
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="absolute inset-0 z-[100] bg-[#0a0a0e] flex flex-col items-center justify-center gap-4 pointer-events-none"
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="absolute inset-0 z-[100] bg-[#050510] flex flex-col items-center justify-center gap-4 pointer-events-none"
           >
             <div className="w-12 h-12 rounded-full border-2 border-emerald-400/30 border-t-emerald-400 animate-spin" />
             <p className="text-white/40 text-sm font-medium tracking-wide">
-              {t({ es: 'Cargando mapa...', en: 'Loading map...' }, lang)}
+              {t({ es: "Cargando mapa...", en: "Loading map..." }, lang)}
             </p>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Welcome Overlay — first visit only */}
+      <AnimatePresence>
+        {showWelcome && globeReady && (
+          <GlobeWelcomeOverlay
+            destinations={activeTrackData}
+            onSelectDestination={(item) => {
+              setShowWelcome(false);
+              setSelectedItem(item);
+              setViewfinderTarget(item);
+
+              // Trigger the same cinematic dive as "EXPLORAR ZONA"
+              setMode("diving");
+              if (globeEl.current && item.lat != null && item.lng != null) {
+                globeEl.current.pointOfView(
+                  { lat: item.lat, lng: item.lng, altitude: 0.0005 },
+                  1400,
+                );
+              }
+              // After the zoom completes, transition to viewfinder
+              setTimeout(() => {
+                setMode("viewfinder");
+              }, 1500);
+
+              analytics.track("welcome_destination_selected", {
+                postcard_id: item.id,
+                city: item.city,
+                country: item.country,
+              });
+            }}
+            onDismiss={() => setShowWelcome(false)}
+          />
         )}
       </AnimatePresence>
     </div>

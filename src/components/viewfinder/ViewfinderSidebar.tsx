@@ -12,11 +12,15 @@ import { ArrowLeft, MapPin, Heart } from 'lucide-react';
 import type { FeedItem } from '../Postcard';
 import { cdnImage } from '../../utils/imageUtils';
 
+import { DynamicMiniMap } from './DynamicMiniMap';
+
 interface ViewfinderSidebarProps {
   sourceItem: FeedItem;
   nearbyItems: FeedItem[];
   onBack: () => void;
   onSelectNearby: (item: FeedItem) => void;
+  currentLat?: number;
+  currentLng?: number;
 }
 
 export function ViewfinderSidebar({
@@ -24,28 +28,9 @@ export function ViewfinderSidebar({
   nearbyItems,
   onBack,
   onSelectNearby,
+  currentLat,
+  currentLng,
 }: ViewfinderSidebarProps) {
-  // Mini map tile URL centered on the source postcard location
-  const mapTileUrl = useMemo(() => {
-    if (!sourceItem.lat || !sourceItem.lng) return null;
-    const zoom = 14;
-    const lat = sourceItem.lat;
-    const lng = sourceItem.lng;
-    // Use CartoDB dark tiles for consistent aesthetic
-    return `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${Math.floor(
-      ((lng + 180) / 360) * Math.pow(2, zoom),
-    )}/${Math.floor(
-      ((1 -
-        Math.log(
-          Math.tan((lat * Math.PI) / 180) +
-            1 / Math.cos((lat * Math.PI) / 180),
-        ) /
-          Math.PI) /
-        2) *
-        Math.pow(2, zoom),
-    )}@2x.png`;
-  }, [sourceItem.lat, sourceItem.lng]);
-
   // Filter nearby items that aren't the source
   const otherNearby = useMemo(
     () => nearbyItems.filter((item) => item.id !== sourceItem.id).slice(0, 5),
@@ -56,11 +41,14 @@ export function ViewfinderSidebar({
     <div className="w-[280px] h-full flex flex-col bg-[#0d0d14]/95 backdrop-blur-xl border-r border-white/5 overflow-hidden">
       {/* Mini Map */}
       <div className="relative w-full h-[200px] bg-[#1a1a2e] overflow-hidden">
-        {mapTileUrl ? (
-          <img
-            src={mapTileUrl}
-            alt="Map"
-            className="w-full h-full object-cover opacity-70"
+        {currentLat && currentLng ? (
+          <DynamicMiniMap 
+            currentLat={currentLat} 
+            currentLng={currentLng} 
+            targetLat={sourceItem.lat || undefined}
+            targetLng={sourceItem.lng || undefined}
+            zoom={15}
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-white/20">
@@ -68,16 +56,8 @@ export function ViewfinderSidebar({
           </div>
         )}
 
-        {/* Pin overlay */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative">
-            <div className="w-4 h-4 bg-emerald-400 rounded-full shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
-            <div className="absolute inset-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping opacity-40" />
-          </div>
-        </div>
-
         {/* Location label */}
-        <div className="absolute bottom-2 left-2 right-2">
+        <div className="absolute bottom-2 left-2 right-2 pointer-events-none z-20">
           <div className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/5">
             <p className="text-white text-xs font-medium truncate flex items-center gap-1.5">
               <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />

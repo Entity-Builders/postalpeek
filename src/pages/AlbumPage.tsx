@@ -66,7 +66,7 @@ function SlotCard({ slot, index, onClick }: { slot: AlbumSlot; index: number; on
   // Always load the image URL — needed for mystery blur preview too
   const imgUrl = useSignedImage(
     slot.illustration_url ?? null,
-    { width: WIDTHS.mobile },
+    { width: WIDTHS.albumSlot },
   );
 
   return (

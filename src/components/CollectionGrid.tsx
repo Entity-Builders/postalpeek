@@ -53,7 +53,7 @@ function CollectionCard({
   onClick?: () => void;
 }) {
   const imgUrl = useSignedImage(item.illustration_url, {
-    width: WIDTHS.mobile,
+    width: WIDTHS.albumSlot,
   });
 
   // Track postcards with missing images in PostHog Error Tracking

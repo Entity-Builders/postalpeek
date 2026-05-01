@@ -10,7 +10,7 @@ export function GlobeZoomControls({ onZoom }: GlobeZoomControlsProps) {
   const lang = useLang();
   
   return (
-    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="absolute right-4 top-24 md:top-1/2 md:-translate-y-1/2 z-[60] flex flex-col gap-2 pointer-events-none">
       <div className="bg-stone-900/60 backdrop-blur-md border border-white/10 rounded-full p-1 flex flex-col pointer-events-auto shadow-2xl">
         <button 
           onClick={() => onZoom('in')}

@@ -35,7 +35,7 @@ function SlotCard({
   // Load image for all slots — mystery slots get the URL too for blur effect
   const imgUrl = useSignedImage(
     slot.illustration_url,
-    { width: WIDTHS.mobile },
+    { width: WIDTHS.albumSlot },
   );
 
   return (

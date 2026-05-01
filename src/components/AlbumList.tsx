@@ -33,7 +33,7 @@ function AlbumCard({
 }) {
   const lang = useLang();
   const coverUrl = useSignedImage(album.cover_image_url, {
-    width: WIDTHS.mobile,
+    width: WIDTHS.albumCard,
   });
   const isComplete = album.completed_at !== null;
   const progress =

@@ -93,21 +93,7 @@ function FeedApp({
         />
       </div>
 
-      {/* Footer */}
-      <footer
-        className={`absolute bottom-4 left-0 right-0 text-center z-50 text-white/30 text-[10px] md:text-xs font-light tracking-widest uppercase transition-all duration-1000 ${isIdle || isOnWelcome ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}
-      >
-        <span
-          onClick={handleFooterClick}
-          className='cursor-default select-none inline-flex items-center gap-1.5'
-        >
-          Powered by{' '}
-          <strong className='text-white/60 font-medium'>Entity Builders</strong>
-          {isAdmin && (
-            <span className='inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse' />
-          )}
-        </span>
-      </footer>
+      {/* Footer removed to prevent overlap and clean up mobile UI */}
 
       {/* Secret Admin Login Modal */}
       {showLogin && (

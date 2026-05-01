@@ -35,117 +35,97 @@ export function ViewfinderToolbar({
   onCapture,
   errorMessage,
 }: ViewfinderToolbarProps) {
-  const [showStyles, setShowStyles] = React.useState(false);
-
-  const isProcessing = step === 'capturing' || step === 'illustrating';
+  const isProcessing = step === 'preview' || step === 'illustrating';
   const isSuccess = step === 'success';
   const isError = step === 'error';
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-3">
-      {/* Style picker — expands upward */}
+    <div className="relative w-full flex flex-col items-center pb-12 pt-6">
+      
+      {/* Error message toast */}
       <AnimatePresence>
-        {showStyles && step === 'idle' && (
+        {isError && errorMessage && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="flex gap-1.5 bg-black/70 backdrop-blur-xl rounded-2xl p-2 border border-white/10 shadow-2xl"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute -top-12 bg-red-500/90 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md shadow-lg"
           >
-            {ILLUSTRATION_STYLES.map((style) => (
-              <button
-                key={style.id}
-                onClick={() => {
-                  onStyleChange(style.id);
-                  setShowStyles(false);
-                }}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-xs transition-all duration-200 ${
-                  illustrationStyle === style.id
-                    ? 'bg-white/15 text-white'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <span className="text-lg">{style.emoji}</span>
-                <span className="font-medium">{style.label}</span>
-              </button>
-            ))}
+            {errorMessage}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main toolbar */}
-      <div className="flex items-center gap-3 bg-black/70 backdrop-blur-xl rounded-full px-4 py-2.5 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
-        {/* Style button */}
-        <button
-          onClick={() => setShowStyles(!showStyles)}
-          disabled={isProcessing || isSuccess}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200 disabled:opacity-40"
-        >
-          <Palette className="w-4 h-4" />
-          <span className="hidden sm:inline">
-            {ILLUSTRATION_STYLES.find((s) => s.id === illustrationStyle)
-              ?.emoji || '🎨'}
-          </span>
-        </button>
+      {/* Style picker — iOS Camera modes style */}
+      <div className="w-full max-w-sm overflow-x-auto no-scrollbar flex items-center justify-start sm:justify-center gap-6 mb-8 px-6 mask-edges">
+        {ILLUSTRATION_STYLES.map((style) => (
+          <button
+            key={style.id}
+            onClick={() => onStyleChange(style.id)}
+            disabled={isProcessing || isSuccess}
+            className={`text-xs uppercase tracking-widest font-bold transition-all whitespace-nowrap ${
+              illustrationStyle === style.id
+                ? 'text-[#F5D44F] scale-105'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            {style.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Capture button — the main CTA */}
+      {/* Main capture button — iOS Shutter style */}
+      <div className="flex items-center justify-center w-full relative">
         <button
           onClick={onCapture}
           disabled={isProcessing || isSuccess}
-          className={`relative flex items-center justify-center w-16 h-16 rounded-full transition-all duration-300 ${
-            isProcessing
-              ? 'bg-purple-500/30 border-2 border-purple-400/40 cursor-wait'
-              : isSuccess
-                ? 'bg-emerald-500/30 border-2 border-emerald-400/40'
-                : isError
-                  ? 'bg-red-500/30 border-2 border-red-400/40 hover:bg-red-500/40'
-                  : 'bg-gradient-to-br from-indigo-500 to-pink-500 border-2 border-white/20 hover:from-indigo-400 hover:to-pink-400 hover:scale-105 active:scale-95 shadow-[0_4px_20px_rgba(99,102,241,0.4)]'
+          className={`relative flex items-center justify-center w-[72px] h-[72px] rounded-full transition-all duration-300 ${
+            isProcessing || isSuccess || isError
+              ? 'border-[3px] border-white/30'
+              : 'border-[3px] border-white hover:scale-105 active:scale-95'
           }`}
         >
-          {isProcessing && (
-            <Loader2 className="w-7 h-7 text-white animate-spin" />
-          )}
-          {isSuccess && <Check className="w-7 h-7 text-emerald-400" />}
-          {isError && <AlertCircle className="w-7 h-7 text-red-400" />}
-          {step === 'idle' && <Camera className="w-7 h-7 text-white" />}
-        </button>
-
-        {/* Status label */}
-        <div className="min-w-[80px] text-center">
-          <span
-            className={`text-xs font-medium tracking-wide ${
+          {/* Inner circle */}
+          <div
+            className={`absolute rounded-full transition-all duration-300 flex items-center justify-center ${
               isProcessing
-                ? 'text-purple-300 animate-pulse'
+                ? 'bg-transparent inset-0 m-0'
                 : isSuccess
-                  ? 'text-emerald-300'
+                  ? 'bg-emerald-500 inset-1'
                   : isError
-                    ? 'text-red-300'
-                    : 'text-white/50'
+                    ? 'bg-red-500 inset-1'
+                    : 'bg-white inset-[3px]'
             }`}
           >
-            {step === 'capturing' && 'Capturing...'}
-            {step === 'illustrating' && 'Creating art...'}
-            {step === 'success' && 'Created!'}
-            {step === 'error' && 'Try again'}
-            {step === 'idle' && 'Capture'}
-          </span>
+            {isProcessing && <Loader2 className="w-8 h-8 text-white animate-spin" />}
+            {isSuccess && <Check className="w-8 h-8 text-white" />}
+            {isError && <AlertCircle className="w-8 h-8 text-white" />}
+          </div>
+        </button>
+
+        {/* Status text (optional) */}
+        <div className="absolute right-6 sm:right-10 text-xs font-medium text-white/50 w-24 text-right">
+            {step === 'preview' && 'Preview...'}
+            {step === 'illustrating' && 'Creating...'}
+            {step === 'success' && 'Saved!'}
+            {step === 'error' && 'Failed'}
         </div>
       </div>
 
-      {/* Error message toast */}
-      <AnimatePresence>
-        {isError && errorMessage && (
-          <motion.p
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 5 }}
-            className="text-xs text-red-300/80 bg-black/50 px-3 py-1.5 rounded-lg backdrop-blur-sm"
-          >
-            {errorMessage}
-          </motion.p>
-        )}
-      </AnimatePresence>
+      {/* Global CSS to hide scrollbar and fade edges */}
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .mask-edges {
+          mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+          -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+        }
+      `}</style>
     </div>
   );
 }

@@ -59,6 +59,8 @@ interface SlotData {
   illustration_url: string | null;
   city: string;
   country: string;
+  target_lat: number | null;
+  target_lng: number | null;
 }
 
 interface ExistingAlbum {
@@ -405,6 +407,7 @@ function SlotRow({
   onMoveUp,
   onMoveDown,
   onLabelChange,
+  onCoordsChange,
 }: {
   slot: SlotData;
   index: number;
@@ -413,6 +416,7 @@ function SlotRow({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onLabelChange: (label: string) => void;
+  onCoordsChange: (lat: number | null, lng: number | null) => void;
 }) {
   return (
     <motion.div
@@ -459,11 +463,30 @@ function SlotRow({
           value={slot.slot_label}
           onChange={(e) => onLabelChange(e.target.value)}
           className="w-full bg-transparent text-white/80 text-xs font-medium outline-none border-b border-transparent focus:border-indigo-400/50 transition-colors"
-          placeholder="Slot label…"
+          placeholder="Slot label (e.g. 🗼 Eiffel Tower)…"
         />
-        <p className="text-white/25 text-[9px] truncate">
-          {slot.city}{slot.country ? `, ${slot.country}` : ''} · {(slot.postcard_id || '').slice(0, 8)}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <p className="text-white/25 text-[9px] truncate">
+            {slot.city}{slot.country ? `, ${slot.country}` : ''}
+          </p>
+          <span className="text-white/10 text-[9px]">·</span>
+          <input
+            type="number"
+            step="any"
+            value={slot.target_lat ?? ''}
+            onChange={(e) => onCoordsChange(e.target.value ? parseFloat(e.target.value) : null, slot.target_lng)}
+            placeholder="lat"
+            className="w-16 bg-transparent text-white/40 text-[9px] font-mono outline-none border-b border-transparent focus:border-emerald-400/50 transition-colors"
+          />
+          <input
+            type="number"
+            step="any"
+            value={slot.target_lng ?? ''}
+            onChange={(e) => onCoordsChange(slot.target_lat, e.target.value ? parseFloat(e.target.value) : null)}
+            placeholder="lng"
+            className="w-16 bg-transparent text-white/40 text-[9px] font-mono outline-none border-b border-transparent focus:border-emerald-400/50 transition-colors"
+          />
+        </div>
       </div>
 
       {/* Preview link */}
@@ -634,7 +657,7 @@ export function AdminAlbumCreator() {
     // Load slots
     const { data: slotsData, error } = await supabase
       .from('postalpeek_album_slots')
-      .select('id, postcard_id, slot_label, slot_order')
+      .select('id, postcard_id, slot_label, slot_order, target_lat, target_lng')
       .eq('album_id', album.id)
       .order('slot_order', { ascending: true });
 
@@ -673,6 +696,8 @@ export function AdminAlbumCreator() {
         illustration_url: pcMap[s.postcard_id]?.illustration_url || null,
         city: pcMap[s.postcard_id]?.city || '—',
         country: pcMap[s.postcard_id]?.country || '',
+        target_lat: (s as any).target_lat ?? null,
+        target_lng: (s as any).target_lng ?? null,
       })),
     );
   }, []);
@@ -697,6 +722,8 @@ export function AdminAlbumCreator() {
         illustration_url: pc.illustration_url,
         city: pc.city,
         country: pc.country,
+        target_lat: null,
+        target_lng: null,
       },
     ]);
   }, []);
@@ -717,6 +744,10 @@ export function AdminAlbumCreator() {
 
   const updateSlotLabel = useCallback((index: number, label: string) => {
     setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, slot_label: label } : s)));
+  }, []);
+
+  const updateSlotCoords = useCallback((index: number, lat: number | null, lng: number | null) => {
+    setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, target_lat: lat, target_lng: lng } : s)));
   }, []);
 
   // ── Save album ──
@@ -782,6 +813,8 @@ export function AdminAlbumCreator() {
           postcard_id: s.postcard_id,
           slot_label: s.slot_label,
           slot_order: i + 1,
+          target_lat: s.target_lat,
+          target_lng: s.target_lng,
         }));
 
         const { error: slotError } = await supabase
@@ -1059,6 +1092,7 @@ export function AdminAlbumCreator() {
                       onMoveUp={() => moveSlot(i, i - 1)}
                       onMoveDown={() => moveSlot(i, i + 1)}
                       onLabelChange={(label) => updateSlotLabel(i, label)}
+                      onCoordsChange={(lat, lng) => updateSlotCoords(i, lat, lng)}
                     />
                   ))}
                 </AnimatePresence>
