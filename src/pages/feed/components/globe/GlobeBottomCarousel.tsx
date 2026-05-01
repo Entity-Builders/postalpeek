@@ -63,11 +63,11 @@ export function GlobeBottomCarousel({
       if (dist < closestDist) {
         closestDist = dist;
         const id = card.getAttribute("data-id");
-        closestItem = items.find((i) => i.id === id) || null;
+        closestItem = items.find((i) => i.id === id) ?? null;
       }
     });
 
-    if (closestItem && closestItem.id !== activeItemId) {
+    if (closestItem && (closestItem as FeedItem).id !== activeItemId) {
       scrollingByCode.current = true;
       onItemSelect(closestItem);
       setTimeout(() => {

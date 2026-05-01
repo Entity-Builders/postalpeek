@@ -139,8 +139,10 @@ export function DynamicMiniMap({
 
     return () => {
       // Clean up markers if any
-      if (userMarkerRef.current) userMarkerRef.current.map = null;
-      if (targetMarkerRef.current) targetMarkerRef.current.map = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (userMarkerRef.current) (userMarkerRef.current as any).map = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (targetMarkerRef.current) (targetMarkerRef.current as any).map = null;
     };
   }, []);
 

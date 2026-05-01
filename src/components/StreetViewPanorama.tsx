@@ -154,7 +154,6 @@ export const StreetViewPanorama = forwardRef<
               fullscreenControl: false,
               zoomControl: false,
               motionTracking: false,
-              keyboardShortcuts: false,
             },
           );
 

@@ -20,7 +20,7 @@ export function MissionBriefing({ sourceItem, onStartMission, onBack }: MissionB
     ? sourceItem.illustration_url
     : sourceItem.original_image_url;
 
-  const title = sourceItem.slot_label || "Unknown Location";
+  const title = sourceItem.location_name || "Unknown Location";
   const locationText = sourceItem.city ? `${sourceItem.city}, ${sourceItem.country}` : "Unknown Location";
 
   return (
