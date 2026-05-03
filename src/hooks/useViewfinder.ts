@@ -75,7 +75,12 @@ export function useViewfinder(
 
   // Step 2: User confirms preview → generate AI illustration
   const handleGenerate = useCallback(async () => {
-    const effectiveUserId = userId || 'anonymous';
+    if (!userId) {
+      setErrorMessage('Please sign in to generate postcards');
+      setStep('error');
+      return;
+    }
+    const effectiveUserId = userId;
     if (!sourceItem || !capturedPov) {
       setErrorMessage('Missing capture data — please retake the photo');
       setStep('error');
