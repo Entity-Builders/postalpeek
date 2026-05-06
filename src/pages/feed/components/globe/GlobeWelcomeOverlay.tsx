@@ -77,7 +77,7 @@ export function GlobeWelcomeOverlay({
 
     if (closestItem && (closestItem as FeedItem).id !== activeItemId) {
       scrollingByCode.current = true;
-      setActiveItemId(closestItem.id);
+      setActiveItemId((closestItem as FeedItem).id);
       setTimeout(() => {
         scrollingByCode.current = false;
       }, 500);

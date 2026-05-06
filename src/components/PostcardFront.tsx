@@ -40,9 +40,9 @@ const DB_TO_MODE: Record<DbGameType, GameMode> = {
 
 interface PostcardFrontProps {
   item: FeedItem;
-  isAdmin: boolean;
-  isPriority: boolean;
-  isLiked: boolean;
+  isAdmin?: boolean;
+  isPriority?: boolean;
+  isLiked?: boolean;
   onToggleFavorite?: (postcardId: string) => void;
   onAuthRequired?: (postcardId: string) => void;
   onFlipCard: (view?: 'info' | 'coupon') => void;
