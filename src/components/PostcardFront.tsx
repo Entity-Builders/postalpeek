@@ -442,7 +442,7 @@ export function PostcardFront({
                           <TripSlide
                             key={slideItem.id}
                             slideItem={slideItem}
-                            isPriority={isPriority && slideItem.id === item.id}
+                            isPriority={!!isPriority && slideItem.id === item.id}
                             handleImageError={handleImageError}
                             fallbackEnabled={fallbackEnabled}
                             isHovered={isHovered}
@@ -491,7 +491,7 @@ export function PostcardFront({
                 ) : (
                   <TripSlide
                     slideItem={item}
-                    isPriority={isPriority}
+                    isPriority={!!isPriority}
                     handleImageError={handleImageError}
                     fallbackEnabled={fallbackEnabled}
                     isHovered={isHovered}
@@ -627,7 +627,7 @@ export function PostcardFront({
             <PostcardActionBar
               item={item}
               activeSlideItem={activeSlideItem}
-              isLiked={isLiked}
+              isLiked={isLiked ?? false}
               onToggleFavorite={onToggleFavorite}
               onAuthRequired={onAuthRequired}
               onFlipCard={(view: 'info' | 'coupon' = 'info') => {

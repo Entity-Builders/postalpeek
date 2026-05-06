@@ -13,6 +13,7 @@
 import { useState, useCallback } from 'react';
 import { t, useLang } from '../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { getDeviceId } from '../utils/deviceId';
 import {
   createUserPostcard,
   enrichPostcardMetadata,
@@ -105,28 +106,6 @@ export function useViewfinder(
 
   // Step 2: User confirms preview → generate AI illustration (now triggered automatically)
   const handleGenerate = useCallback(async (overridePov?: StreetViewPOV) => {
-    let effectiveUserId = userId;
-
-    if (!effectiveUserId) {
-      // Auto-create anonymous session if the user doesn't have an ID yet
-      try {
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        effectiveUserId = data.user?.id;
-      } catch (err) {
-        console.error('Failed to create anonymous session:', err);
-        setErrorMessage('Failed to initialize session for generation');
-        setStep('error');
-        return;
-      }
-    }
-
-    if (!effectiveUserId) {
-      setErrorMessage('Could not initialize session');
-      setStep('error');
-      return;
-    }
-
     const povToUse = overridePov || capturedPov;
 
     if (!sourceItem || !povToUse) {
@@ -153,7 +132,8 @@ export function useViewfinder(
     try {
       const isMockSource = sourceItem.id.startsWith('free-slot-') || sourceItem.id.startsWith('capture-');
       const params: CreateUserPostcardParams = {
-        userId: effectiveUserId,
+        userId: userId || undefined,
+        deviceId: userId ? undefined : getDeviceId(),
         sourcePostcardId: isMockSource ? null : sourceItem.id,
         pov: povToUse,
         city: sourceItem.city || '',

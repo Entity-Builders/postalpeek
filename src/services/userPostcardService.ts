@@ -38,7 +38,8 @@ export interface UserPostcard {
 }
 
 export interface CreateUserPostcardParams {
-  userId: string;
+  userId?: string;
+  deviceId?: string;
   sourcePostcardId: string | null;
   pov: StreetViewPOV;
   city: string;
@@ -68,7 +69,8 @@ export async function createUserPostcard(
   const { data, error } = await supabase
     .from('postalpeek_user_postcards')
     .insert({
-      user_id: params.userId,
+      user_id: params.userId || null,
+      device_id: params.deviceId || null,
       source_postcard_id: params.sourcePostcardId,
       lat: params.pov.lat,
       lng: params.pov.lng,
