@@ -384,32 +384,37 @@ export function FeedLayout({
       </AnimatePresence>
 
       <AnimatePresence>
-        {!isSpotlightMode && !showWelcome && !location.pathname.includes('/carousel') && !location.pathname.includes('/postcard/') && location.pathname !== '/' && (
-          <StatusBar
-            albums={albums}
-            onAlbumTap={(album) => handleAuthRequiredAction(() => {
-              navigate(`/feed/album/${album.id}`);
-              analytics.track('statusbar_album_tapped', { albumId: album.id });
-            })}
-            onAlbumsTap={() => handleAuthRequiredAction(() => {
-              navigate('/feed/collection');
-              analytics.track('statusbar_albums_tapped');
-            })}
-            collectionCount={displayCollectionCount}
-            stampBalances={displayStampBalances}
-            onPlayTap={() => handleAuthRequiredAction(() => {
-              setStatusBarGameOpen(true);
-              analytics.track('statusbar_play_tapped');
-            })}
-            onCollectionTap={() => handleAuthRequiredAction(() => {
-              navigate('/feed/collection');
-              refetchCollection();
-              analytics.track('statusbar_collection_tapped');
-            })}
-            onStampTap={() => handleAuthRequiredAction(() => {
-              analytics.track('statusbar_stamp_tapped');
-            })}
-          />
+        {!isSpotlightMode && !showWelcome && !location.pathname.includes('/carousel') && !location.pathname.includes('/postcard/') && !location.pathname.startsWith('/explore') && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 26, delay: 0.3 }}
+            className='fixed bottom-0 left-0 right-0 z-[60] px-3 pb-[env(safe-area-inset-bottom,8px)]'
+          >
+            <div className='max-w-lg mx-auto'>
+              <button
+                onClick={() => {
+                  const withPano = items.filter((i: any) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null);
+                  const pool = withPano.length > 0 ? withPano : items.filter((i: any) => i.lat != null && i.lng != null);
+                  if (pool.length === 0) return;
+                  const random = pool[Math.floor(Math.random() * pool.length)];
+                  analytics.track('teleport_surprise_trip', { destination_id: random.id, city: random.city, country: random.country });
+                  navigate(`/explore?id=${random.id}`);
+                }}
+                className='w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-base tracking-wide rounded-2xl shadow-[0_8px_32px_rgba(16,185,129,0.35)] hover:shadow-[0_12px_48px_rgba(16,185,129,0.5)] transition-all duration-300 cursor-pointer active:scale-[0.97]'
+              >
+                <motion.span
+                  animate={{ x: [0, 3, 0], y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  className='text-xl'
+                >
+                  ✈️
+                </motion.span>
+                <span>{t({ es: 'Viaje Sorpresa', en: 'Surprise Trip' }, lang)}</span>
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -70,7 +70,7 @@ export function FeedGridPage() {
           sessionStorage.removeItem(AUTH_GATE_KEY);
           sessionStorage.removeItem(AUTH_GATE_CARDS_KEY);
         }}
-        onCardClick={(index) => handleAuthRequiredAction(() => {
+        onCardClick={(index) => {
           const sourceItems =
             isSpotlightMode && spotlightResults.length > 0
               ? spotlightResults
@@ -79,7 +79,7 @@ export function FeedGridPage() {
           if (clickedItem) {
             navigate(`/feed/carousel?index=${index}${isSpotlightMode ? '&spotlight=1' : ''}`);
           }
-        })}
+        }}
         viewedItems={items.slice(0, 5)}
         user={user}
         claimedIds={user ? claimedIds : new Set()}

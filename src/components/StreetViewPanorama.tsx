@@ -220,7 +220,7 @@ export const StreetViewPanorama = forwardRef<
       const sv = new window.google.maps.StreetViewService();
 
       sv.getPanorama(
-        { location, radius: 1000 },
+        { location, radius: 5000 },
         (
           data: google.maps.StreetViewPanoramaData | null,
           svStatus: google.maps.StreetViewStatus,

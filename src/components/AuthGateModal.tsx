@@ -131,6 +131,10 @@ export function AuthGateModal({
       });
       if (error) throw error;
       analytics.track('signup_otp_verified');
+      
+      // Clear the anonymous rate limit upon successful login
+      localStorage.removeItem('postalpeek_anon_gen_count');
+      
       onSuccess();
     } catch (err: unknown) {
       analytics.track('signup_otp_failed', {

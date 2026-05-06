@@ -30,6 +30,8 @@ export interface UserPostcard {
   illustration_style: string;
   title: string | null;
   description: string | null;
+  category: string | null;
+  generation_metadata: Record<string, unknown> | null;
   status: string;
   is_public: boolean;
   created_at: string;
@@ -37,7 +39,7 @@ export interface UserPostcard {
 
 export interface CreateUserPostcardParams {
   userId: string;
-  sourcePostcardId: string;
+  sourcePostcardId: string | null;
   pov: StreetViewPOV;
   city: string;
   country: string;
@@ -80,6 +82,7 @@ export async function createUserPostcard(
       illustration_url: illustration.illustrationUrl,
       illustration_style: params.style || 'default',
       description: illustration.description,
+      category: illustration.category,
     })
     .select()
     .single();
@@ -136,4 +139,31 @@ export async function getNearbyUserPostcards(
 
   if (error) throw error;
   return (data as UserPostcard[]) || [];
+}
+
+/**
+ * Enrich postcard metadata in the background.
+ * Calls the existing postalpeek-enrich-metadata edge function
+ * which adds storytelling, stats, trivia via Gemini text analysis.
+ * Returns the enriched metadata or null on failure.
+ */
+export async function enrichPostcardMetadata(
+  postcardId: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      'postalpeek-enrich-metadata',
+      { body: { postcard_id: postcardId, table: 'postalpeek_user_postcards' } },
+    );
+
+    if (error) {
+      console.warn('[Enrich] Edge function error:', error);
+      return null;
+    }
+
+    return data as Record<string, unknown>;
+  } catch (err) {
+    console.warn('[Enrich] Failed to enrich postcard metadata:', err);
+    return null;
+  }
 }

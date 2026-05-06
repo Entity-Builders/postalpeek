@@ -15,6 +15,8 @@ interface PostcardBackProps {
   isClaimedByMe?: boolean;
   onClaimPostcard?: (postcardId: string, rarity: 'common' | 'rare' | 'epic' | 'legendary') => void;
   isClaimLoading?: boolean;
+  /** When true, hides game/claim UI (stamp button, game_stats). Used in viewfinder capture flow. */
+  simplified?: boolean;
 }
 
 export function PostcardBack({
@@ -27,6 +29,7 @@ export function PostcardBack({
   isClaimedByMe = false,
   onClaimPostcard,
   isClaimLoading = false,
+  simplified = false,
 }: PostcardBackProps) {
   const [viewMode, setViewMode] = useState<'main' | 'photo'>('main');
   
@@ -143,6 +146,7 @@ export function PostcardBack({
                   </div>
                 </div>
                 
+                {!simplified && (
                 <button 
                   className={`w-10 h-12 border rounded flex items-center justify-center rotate-3 shadow-sm shrink-0 transition-colors ${
                     isClaimedByMe 
@@ -167,6 +171,7 @@ export function PostcardBack({
                     </span>
                   )}
                 </button>
+                )}
               </div>
 
               {/* Scrollable Main Content */}
@@ -194,13 +199,13 @@ export function PostcardBack({
                 )}
 
                 {/* Visual Stats */}
-                {((item.game_stats && item.game_stats.hp !== undefined) || item.generation_metadata?.stats) && (
+                {((simplified ? false : (item.game_stats && item.game_stats.hp !== undefined)) || item.generation_metadata?.stats) && (
                   <div className="shrink-0">
                     <div className="flex items-center justify-between mb-2 border-b border-black/5 pb-1">
                       <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
-                        {item.game_stats && item.game_stats.hp !== undefined ? "Postcard Stats" : "Radar de Vibes"}
+                        {!simplified && item.game_stats && item.game_stats.hp !== undefined ? "Postcard Stats" : "Radar de Vibes"}
                       </p>
-                      {item.game_stats && item.game_stats.hp !== undefined && (
+                      {!simplified && item.game_stats && item.game_stats.hp !== undefined && (
                         <div className="flex gap-1.5">
                           <span className="text-[8px] font-mono text-amber-700 bg-amber-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">{item.game_stats.rarity || 'common'}</span>
                           <span className="text-[8px] font-mono text-indigo-700 bg-indigo-100/50 px-1.5 py-0.5 rounded uppercase tracking-wider">{item.game_stats.element || 'neutral'}</span>
@@ -208,7 +213,7 @@ export function PostcardBack({
                       )}
                     </div>
                     <div className="flex flex-col gap-2 px-1">
-                      {(item.game_stats && item.game_stats.hp !== undefined ? [
+                      {(!simplified && item.game_stats && item.game_stats.hp !== undefined ? [
                         { label: 'HP', value: item.game_stats.hp, color: 'bg-rose-500', icon: '❤️' },
                         { label: 'Attack', value: item.game_stats.attack, color: 'bg-orange-500', icon: '⚔️' },
                         { label: 'Defense', value: item.game_stats.defense, color: 'bg-blue-500', icon: '🛡️' },
@@ -366,6 +371,7 @@ export function PostcardBack({
             {/* RIGHT: Stamp + Coords + Polaroid */}
             <div className={`flex flex-col ${isGridMode ? 'items-start w-full' : 'items-end w-[100px] sm:w-[130px] md:w-[160px]'} shrink-0`}>
               {/* Stamp */}
+              {!simplified && (
               <button 
                 className={`w-14 h-16 sm:w-18 sm:h-20 border rounded flex items-center justify-center rotate-3 shadow-sm mb-3 transition-colors ${
                   isClaimedByMe 
@@ -392,6 +398,7 @@ export function PostcardBack({
                   </span>
                 )}
               </button>
+              )}
 
               {/* Address / Coords */}
               <div className='w-full flex flex-col gap-0 mb-3'>

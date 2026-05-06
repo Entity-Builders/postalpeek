@@ -42,6 +42,10 @@ export interface FeedItem {
   should_animate?: boolean;
   owner_id?: string | null;
   claimed_at?: string | null;
+  is_free?: boolean;
+  slot_order?: number;
+  slot_label?: string;
+  is_hint?: boolean;
   last_played_at?: string | null;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
   visual_tags?: string[];

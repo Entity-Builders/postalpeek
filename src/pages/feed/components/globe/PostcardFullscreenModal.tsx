@@ -43,8 +43,8 @@ export function PostcardFullscreenModal({
 
   const activeItem = items[currentIndex];
 
-  const handleNext = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleNext = (e?: React.MouseEvent | any) => {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if (currentIndex < items.length - 1) {
       const nextItem = items[currentIndex + 1];
       setCurrentIndex(currentIndex + 1);
@@ -52,8 +52,8 @@ export function PostcardFullscreenModal({
     }
   };
 
-  const handlePrev = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handlePrev = (e?: React.MouseEvent | any) => {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if (currentIndex > 0) {
       const prevItem = items[currentIndex - 1];
       setCurrentIndex(currentIndex - 1);
@@ -140,11 +140,11 @@ export function PostcardFullscreenModal({
             {...swipeHandlers}
             className="flex-1 relative flex items-center justify-center overflow-hidden"
           >
-            {/* Desktop Left Button */}
+            {/* Left Button */}
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className="hidden md:flex absolute left-4 z-20 p-3 bg-black/40 hover:bg-black/60 rounded-full text-white disabled:opacity-20 transition-all cursor-pointer"
+              className="flex absolute left-2 md:left-4 z-20 p-2 md:p-3 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white disabled:opacity-20 transition-all cursor-pointer"
             >
               <ChevronLeft size={24} />
             </button>
@@ -159,89 +159,86 @@ export function PostcardFullscreenModal({
               className="w-full max-w-2xl px-4 md:px-0 h-full max-h-[70vh] flex items-center justify-center"
             >
               <div
-                className={`relative w-full h-full rounded-2xl overflow-hidden shadow-2xl bg-[#111] ${
-                  isLocked ? "border border-white/[0.06]" : "border border-white/10"
-                }`}
+                className="relative w-full h-full flex flex-col bg-white p-2 pb-14 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all"
               >
-                {isLocked ? (
-                  /* ── LOCKED STATE: System postcard preview + mystery overlay ── */
-                  <>
-                    {/* Background: system postcard with heavy blur */}
-                    {fullImgUrl ? (
+                {/* Inner Image Container */}
+                <div className="relative flex-1 w-full rounded-lg overflow-hidden bg-[#111] shadow-inner">
+                  {isLocked ? (
+                    /* ── LOCKED STATE: System postcard preview ── */
+                    <>
+                      {/* Background: system postcard clearly visible but stylized to indicate unowned */}
+                      {fullImgUrl ? (
+                        <img
+                          src={fullImgUrl}
+                          alt={landmarkName}
+                          className="absolute inset-0 w-full h-full object-cover grayscale-[0.4] brightness-[0.8] contrast-[1.1]"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#0a0a14] flex items-center justify-center">
+                          <span className="text-5xl opacity-50">{emoji}</span>
+                        </div>
+                      )}
+
+                      {/* Subtle gradient overlay to ensure badges are readable */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent h-24" />
+
+                      {/* Category badge */}
+                      {t(activeItem.category) && (
+                        <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white/90 text-xs font-medium rounded-full border border-white/10 shadow-lg">
+                          {t(activeItem.category)}
+                        </div>
+                      )}
+
+
+                    </>
+                  ) : (
+                    /* ── OWNED STATE: Full quality postcard ── */
+                    <>
                       <img
                         src={fullImgUrl}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover blur-[6px] scale-105 brightness-[0.4]"
+                        alt={landmarkName}
+                        className="w-full h-full object-cover transition-all duration-300"
                       />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] to-[#0a0a14]" />
-                    )}
 
-                    {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/50" />
+                      {/* Category badge */}
+                      {t(activeItem.category) && (
+                        <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white/90 text-xs font-medium rounded-full border border-white/10 shadow-lg">
+                          {t(activeItem.category)}
+                        </div>
+                      )}
 
-                    {/* Center content */}
-                    <div className="relative h-full flex flex-col items-center justify-center gap-4 px-6">
-                      {/* Big emoji */}
-                      <span className="text-5xl drop-shadow-xl">{emoji}</span>
-
-                      {/* Lock badge */}
-                      <div className="w-14 h-14 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center backdrop-blur-sm">
-                        <Lock size={22} className="text-white/40" />
+                      {/* Collected badge */}
+                      <div className="absolute top-3 right-3 px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30 flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span className="text-white text-[10px] font-bold uppercase tracking-widest">
+                          {t({ es: 'Coleccionada', en: 'Collected' }, lang)}
+                        </span>
                       </div>
-
-                      {/* Text */}
-                      <div className="flex flex-col items-center gap-1.5 text-center">
-                        <p className="text-white/80 font-bold text-lg tracking-tight">
-                          {landmarkName}
-                        </p>
-                        <p className="text-white/40 text-sm max-w-[240px] leading-relaxed">
-                          {t(
-                            {
-                              es: 'Viaja a este lugar y captura tu propia postal para desbloquear',
-                              en: 'Travel to this location and capture your own postcard to unlock',
-                            },
-                            lang,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  /* ── OWNED STATE: Full quality postcard ── */
-                  <>
-                    <img
-                      src={fullImgUrl}
-                      alt={landmarkName}
-                      className="w-full h-full object-contain transition-all duration-300"
-                    />
-
-                    {/* Category badge */}
-                    {t(activeItem.category) && (
-                      <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-md text-white/90 text-xs font-medium rounded-full border border-white/10 shadow-lg">
-                        {t(activeItem.category)}
-                      </div>
-                    )}
-
-                    {/* Collected badge */}
-                    <div className="absolute top-3 right-3 px-2.5 py-1 bg-emerald-500/20 backdrop-blur-md rounded-full border border-emerald-400/30 flex items-center gap-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                      <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
-                        {t({ es: 'Coleccionada', en: 'Collected' }, lang)}
-                      </span>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
+                
+                {/* Polaroid Bottom Chin */}
+                <div className="absolute bottom-0 left-0 right-0 h-16 flex flex-col items-center justify-center px-4">
+                  <p className="text-stone-800 font-bold text-sm tracking-tight truncate max-w-full">
+                    {landmarkName}
+                  </p>
+                  <p className="text-stone-500 text-[10px] tracking-wide mt-0.5 truncate max-w-full">
+                    {isLocked 
+                      ? t({ es: "Disponible para explorar", en: "Available to explore" }, lang)
+                      : `${t({ es: "Capturada por", en: "Captured by" }, lang)} ${activeItem.owner_id ? "Explorer" : "Anonymous"}`}
+                  </p>
+                </div>
               </div>
             </motion.div>
 
-            {/* Desktop Right Button */}
+            {/* Right Button */}
             <button
               onClick={handleNext}
               disabled={currentIndex === items.length - 1}
-              className="hidden md:flex absolute right-4 z-20 p-3 bg-black/40 hover:bg-black/60 rounded-full text-white disabled:opacity-20 transition-all cursor-pointer"
+              className="flex absolute right-2 md:right-4 z-20 p-2 md:p-3 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full text-white disabled:opacity-20 transition-all cursor-pointer"
             >
               <ChevronRight size={24} />
             </button>
@@ -253,11 +250,11 @@ export function PostcardFullscreenModal({
               /* ── LOCKED CTA ── */
               <button
                 onClick={() => onCreateOwn(activeItem)}
-                className="flex-1 py-3.5 bg-gradient-to-r from-fuchsia-500 to-cyan-500 hover:opacity-90 active:scale-[0.98] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-fuchsia-500/20 cursor-pointer"
+                className="flex-1 py-3.5 bg-white text-black font-bold tracking-wide rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_4px_20px_rgba(255,255,255,0.2)] hover:bg-white/90 active:scale-[0.98] cursor-pointer group"
               >
-                <Camera size={18} />
+                <Camera size={18} className="transition-transform group-hover:scale-110" />
                 {t(
-                  { es: '📸 Capturar tu postal', en: '📸 Capture your postcard' },
+                  { es: 'Iniciar Expedición', en: 'Start Expedition' },
                   lang,
                 )}
               </button>
@@ -266,20 +263,20 @@ export function PostcardFullscreenModal({
               <>
                 <button
                   onClick={() => onCreateOwn(activeItem)}
-                  className="flex-1 py-3.5 bg-white/10 hover:bg-white/15 active:scale-[0.98] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all border border-white/10 cursor-pointer"
+                  className="flex-1 py-3.5 bg-white/10 hover:bg-white/20 active:scale-[0.98] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all border border-white/20 cursor-pointer"
                 >
                   <Camera size={16} />
                   {t({ es: 'Crear otra', en: 'Create another' }, lang)}
                 </button>
                 <button
                   onClick={() => onToggleFavorite(activeItem.id)}
-                  className="p-3.5 bg-white/10 hover:bg-white/15 active:scale-95 rounded-xl transition-all cursor-pointer"
+                  className="p-3.5 bg-white/10 hover:bg-white/20 active:scale-95 rounded-xl transition-all cursor-pointer border border-white/20"
                 >
                   <Heart
                     size={20}
                     className={
                       isFavorited(activeItem.id)
-                        ? "fill-emerald-400 text-emerald-400"
+                        ? "fill-white text-white"
                         : "text-white/80"
                     }
                   />

@@ -22,7 +22,7 @@ import { CollectionPage } from './pages/feed/CollectionPage';
 import { ProfilePage } from './pages/feed/ProfilePage';
 import { GamePage } from './pages/GamePage';
 
-import { GlobeExplorerPage } from './pages/feed/GlobeExplorerPage';
+import { ExplorePage } from './pages/feed/ExplorePage';
 
 // ── Admin sub-pages ────────────────────────────────────────────────────
 import { AdminDashboard }  from './pages/admin/AdminDashboard';
@@ -136,6 +136,11 @@ function App() {
         email: user.email,
         created_at: user.created_at,
       });
+      
+      // If the user has a real account, ensure we clear any anonymous limits
+      if (!user.is_anonymous) {
+        localStorage.removeItem('postalpeek_anon_gen_count');
+      }
     } else {
       analytics.reset();
     }
@@ -166,17 +171,24 @@ function App() {
             <Routes>
               {/* SEO-friendly feed route AND Postcard view use the same layout */}
               <Route element={feedElement}>
-                {/* The new 3D Globe Explorer Mode is the default root */}
-                <Route path='/' element={<GlobeExplorerPage />} />
+                {/* Feed-first home — postcards grid */}
+                <Route path='/' element={<FeedGridPage />} />
+                <Route path='country/:country' element={<FeedGridPage />} />
+                <Route path='carousel' element={<FeedCarouselPage />} />
+                <Route path='collection' element={<CollectionPage />} />
+                <Route path='album/:albumId' element={<AlbumPage />} />
+                <Route path='profile' element={<ProfilePage />} />
 
-                <Route path='/feed'>
-                  <Route index element={<FeedGridPage />} />
-                  <Route path='country/:country' element={<FeedGridPage />} />
-                  <Route path='carousel' element={<FeedCarouselPage />} />
-                  <Route path='collection' element={<CollectionPage />} />
-                  <Route path='album/:albumId' element={<AlbumPage />} />
-                  <Route path='profile' element={<ProfilePage />} />
-                </Route>
+                {/* Teleporter — direct Street View exploration */}
+                <Route path='/explore' element={<ExplorePage />} />
+
+                {/* Legacy feed routes — redirect to root */}
+                <Route path='/feed' element={<FeedGridPage />} />
+                <Route path='/feed/country/:country' element={<FeedGridPage />} />
+                <Route path='/feed/carousel' element={<FeedCarouselPage />} />
+                <Route path='/feed/collection' element={<CollectionPage />} />
+                <Route path='/feed/album/:albumId' element={<AlbumPage />} />
+                <Route path='/feed/profile' element={<ProfilePage />} />
                 
                 {/* Public Postcard View — needs the FeedLayout context */}
                 <Route path='/postcard/:id' element={<FeedCarouselPage />} />

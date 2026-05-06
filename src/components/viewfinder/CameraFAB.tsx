@@ -39,7 +39,7 @@ export function CameraFAB({ onClick }: CameraFABProps) {
         <Camera className="w-4.5 h-4.5 text-white/80 group-hover:text-white transition-colors" />
       </div>
       <span className="text-white/90 text-sm font-semibold tracking-wide group-hover:text-white transition-colors">
-        {t({ es: 'Tomar Foto', en: 'Take Photo' }, lang)}
+        {t({ es: 'Generar Postal', en: 'Generate Postcard' }, lang)}
       </span>
     </motion.button>
   );

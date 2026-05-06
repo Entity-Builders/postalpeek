@@ -184,40 +184,8 @@ export const GridCard = React.memo(function GridCard({
               bg-gradient-to-t from-black/35 via-black/10 to-transparent pointer-events-none'
             />
 
-            {/* Scarcity lock badge — unclaimed only */}
-            <AnimatePresence>
-              {!hasOwner ? (
-                <motion.div
-                  key="unowned"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[10px] font-semibold px-1.5 py-1 rounded-full pointer-events-none'
-                >
-                  <CircleUserRound className='w-3 h-3 opacity-80' /> {t({ es: 'Sin dueño', en: 'Unowned' }, lang)}
-                </motion.div>
-              ) : isClaimedByMe && user ? (
-                <motion.div
-                  key="owned"
-                  initial={{ opacity: 0, scale: 0.8, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.25, type: 'spring', stiffness: 400, damping: 25 }}
-                  className='absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur-md text-white/90 text-[10px] font-semibold pr-2 pl-1 py-1 rounded-full pointer-events-none border border-white/10 shadow-lg'
-                >
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-4 h-4 shadow-inner rounded-[8px] bg-amber-500 flex items-center justify-center text-[8px] text-white">
-                      {initial}
-                    </div>
-                  )}
-                  <span className="truncate max-w-[80px]">
-                    {name}
-                  </span>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+
+            {/* MVP: ownership badges disabled */}
 
             {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
           </div>
