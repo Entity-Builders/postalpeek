@@ -31,6 +31,8 @@ import { motion, AnimatePresence, useMotionValue, useAnimate } from 'framer-moti
 import { useLang, t } from '../../utils/i18n';
 import { DynamicMiniMap } from './DynamicMiniMap';
 import { CameraFAB } from './CameraFAB';
+import { ViewfinderOnboarding } from './ViewfinderOnboarding';
+import { TripCounter } from '../ui/TripCounter';
 
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -97,6 +99,8 @@ export function ViewfinderPanel({
     handleGenerate,
     handleConfirmName,
     handleSave,
+    tripRemaining,
+    tripLimit,
     reset,
   } = useViewfinder(userId, sourceItem, userIsAnonymous);
 
@@ -587,9 +591,15 @@ export function ViewfinderPanel({
         )}
       </AnimatePresence>
 
-      {/* ─── Bottom Toolbar — single CameraFAB that captures directly ─── */}
+      {/* ─── Viewfinder Onboarding Overlay (first-time only) ─── */}
+      <ViewfinderOnboarding active={step === 'viewfinder'} />
+
+      {/* ─── Bottom Toolbar — CameraFAB + Trip Counter ─── */}
       {step === 'viewfinder' && !isMapFullscreen && (
-        <div className="absolute bottom-12 left-0 right-0 z-30 flex flex-col items-center pointer-events-none">
+        <div className="absolute bottom-12 left-0 right-0 z-30 flex flex-col items-center gap-2 pointer-events-none">
+          <div className="pointer-events-auto">
+            <TripCounter remaining={tripRemaining} limit={tripLimit} />
+          </div>
           <div className="pointer-events-auto">
             <CameraFAB onClick={triggerCapture} />
           </div>

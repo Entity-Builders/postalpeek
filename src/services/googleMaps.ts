@@ -1,5 +1,6 @@
 import { supabase } from '@eb-packages/logic/src/supabase';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
+import { getDeviceId } from '../utils/deviceId';
 
 /**
  * Capture a Street View static image with specific POV params.
@@ -48,6 +49,10 @@ export interface IllustrationResult {
   illustrationUrl: string;
   category: string;
   description: string;
+  /** How many generations remain today for this device/user */
+  remaining: number;
+  /** Daily generation limit */
+  limit: number;
 }
 
 /**
@@ -74,7 +79,7 @@ export async function generateIllustration(
   const { data, error } = await supabase.functions.invoke(
     'postalpeek-illustrate',
     {
-      body: { imageUrl, style },
+      body: { imageUrl, style, deviceId: getDeviceId() },
     },
   );
 
@@ -101,6 +106,8 @@ export async function generateIllustration(
       illustrationUrl: data.illustrationUrl,
       category: data.category || '🎨 Arte Generado',
       description: data.description || 'Una vista artística de esta ubicación.',
+      remaining: typeof data.remaining === 'number' ? data.remaining : 5,
+      limit: typeof data.limit === 'number' ? data.limit : 5,
     };
   }
 

@@ -17,7 +17,7 @@
     "sync:catalog": "npx tsx scripts/sync-catalog.ts",
     "seed:users": "npx tsx scripts/create-test-users.ts",
     "deploy:staging": "npm run build -- --mode staging && wrangler deploy --name postal-peek-staging --config dist/postal_peek/wrangler.json",
-    "deploy:prod": "npm run build -- --mode production && wrangler deploy --name postal-peek --config dist/postal_peek/wrangler.json",
+    "deploy:prod": "npm run build -- --mode production && wrangler deploy --name postal-peek-production --config dist/postal_peek/wrangler.json",
     "db:push:staging": "cd ../../eb-infra && npx supabase link --project-ref xfcvuzcxvdpzkqpnahyx && npx supabase db push",
     "db:push:prod": "npx supabase link --project-ref okwcsiyuzlrayaptjlqy && npx supabase db push"
   },

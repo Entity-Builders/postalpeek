@@ -52,13 +52,21 @@ export interface CreateUserPostcardParams {
   style?: string;
 }
 
+export interface CreateUserPostcardResult {
+  postcard: UserPostcard;
+  /** Remaining daily generations for this device/user */
+  remaining: number;
+  /** Daily generation limit */
+  limit: number;
+}
+
 /**
  * Full capture pipeline: Street View capture → AI illustration → save to DB.
  * Cost: ~$0.01 per call ($0.007 Static API + ~$0.002 Gemini Flash).
  */
 export async function createUserPostcard(
   params: CreateUserPostcardParams,
-): Promise<UserPostcard> {
+): Promise<CreateUserPostcardResult> {
   // 1. Capture static image from the user's chosen POV ($0.007)
   const imageUrl = await captureStreetView(params.locationName, params.pov);
 
@@ -99,7 +107,11 @@ export async function createUserPostcard(
     throw error;
   }
 
-  return data as UserPostcard;
+  return {
+    postcard: data as UserPostcard,
+    remaining: illustration.remaining,
+    limit: illustration.limit,
+  };
 }
 
 /**

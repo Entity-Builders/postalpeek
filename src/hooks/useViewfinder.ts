@@ -19,6 +19,7 @@ import {
   enrichPostcardMetadata,
   type UserPostcard,
   type CreateUserPostcardParams,
+  type CreateUserPostcardResult,
 } from '../services/userPostcardService';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 import type { FeedItem } from '../components/Postcard';
@@ -57,6 +58,10 @@ export interface UseViewfinderReturn {
   handleConfirmName: (name: string) => Promise<void>;
   /** Save postcard to user's album */
   handleSave: () => Promise<boolean>;
+  /** Daily trip counter — remaining generations today */
+  tripRemaining: number;
+  /** Daily trip limit */
+  tripLimit: number;
   reset: () => void;
 }
 
@@ -159,6 +164,8 @@ export function useViewfinder(
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [illustrationStyle, setIllustrationStyle] = useState('watercolor');
   const [isSaving, setIsSaving] = useState(false);
+  const [tripRemaining, setTripRemaining] = useState(5);
+  const [tripLimit, setTripLimit] = useState(5);
 
   // Load persisted creator name from localStorage
   const [creatorName, setCreatorNameState] = useState<string>(
@@ -213,7 +220,12 @@ export function useViewfinder(
         style: randomStyle,
       };
 
-      const postcard = await createUserPostcard(params);
+      const result = await createUserPostcard(params);
+      const postcard = result.postcard;
+
+      // Update trip counter from edge function response
+      setTripRemaining(result.remaining);
+      setTripLimit(result.limit);
 
       setCapturedPostcard(postcard);
       
@@ -375,6 +387,8 @@ export function useViewfinder(
     illustrationStyle,
     isSaving,
     creatorName,
+    tripRemaining,
+    tripLimit,
     setCreatorName,
     setIllustrationStyle,
     handleSnapshot,

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Share2, Check, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
@@ -15,10 +16,26 @@ interface ShareButtonProps {
 export function ShareButton({ postcardId, country, isUserPostcard }: ShareButtonProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Recalculate tooltip position when isCopied changes
+  useEffect(() => {
+    if (isCopied && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setTooltipPos({
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
+      });
+    } else {
+      setTooltipPos(null);
+    }
+  }, [isCopied]);
 
   return (
     <div className="relative flex items-center justify-center">
       <button
+        ref={buttonRef}
         className={cn(
           'p-2 md:p-2.5 rounded-full transition-colors',
           isCopied
@@ -86,19 +103,34 @@ export function ShareButton({ postcardId, country, isUserPostcard }: ShareButton
         )}
       </button>
 
-      <AnimatePresence>
-        {isCopied && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 5, scale: 0.9 }}
-            className="absolute bottom-[110%] right-0 md:left-1/2 md:-translate-x-1/2 px-3 py-1.5 bg-stone-800 text-white text-[11px] font-bold tracking-wide rounded-lg shadow-lg whitespace-nowrap pointer-events-none z-50"
-          >
-            ¡Enlace copiado!
-            <div className="absolute top-[98%] right-3 md:left-1/2 md:-translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-stone-800" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Portal: tooltip rendered at body level to escape all overflow-hidden ancestors */}
+      {createPortal(
+        <AnimatePresence>
+          {isCopied && tooltipPos && (
+            <div
+              style={{
+                position: 'fixed',
+                top: tooltipPos.top,
+                left: tooltipPos.left,
+                transform: 'translate(-50%, -100%)',
+                zIndex: 9999,
+                pointerEvents: 'none',
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.9 }}
+                className="px-3 py-1.5 bg-stone-800 text-white text-[11px] font-bold tracking-wide rounded-lg shadow-lg whitespace-nowrap"
+              >
+                ¡Enlace copiado!
+                <div className="absolute top-[98%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-stone-800" />
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }
