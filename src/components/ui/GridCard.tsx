@@ -133,7 +133,7 @@ export const GridCard = React.memo(function GridCard({
       <motion.div
         className="w-full h-full relative"
         style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' }}
-        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        animate={{ rotateY: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 28, duration: 0.1 }}
       >
         {/* ── Postcard frame (Front) ── */}
@@ -185,7 +185,38 @@ export const GridCard = React.memo(function GridCard({
             />
 
 
-            {/* MVP: ownership badges disabled */}
+            {/* Owner / creator badge */}
+            <AnimatePresence>
+              {isClaimedByMe && user ? (
+                <motion.div
+                  key="owned"
+                  initial={{ opacity: 0, scale: 0.8, y: -6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.2, type: 'spring', stiffness: 400, damping: 25 }}
+                  className='absolute top-1.5 left-1.5 flex items-center gap-1.5 bg-black/50 backdrop-blur-md text-white/90 text-[10px] font-semibold pr-2 pl-1.5 py-1 rounded-full pointer-events-none z-20 border border-white/10 shadow-md'
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-4 h-4 shadow-inner rounded-full bg-amber-500 flex items-center justify-center text-[9px] text-white">
+                      {initial}
+                    </div>
+                  )}
+                  <span className="truncate max-w-[80px]">{name}</span>
+                </motion.div>
+              ) : item.creator_name ? (
+                <motion.div
+                  key="creator"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className='absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[10px] font-semibold px-2 py-1 rounded-full pointer-events-none z-20'
+                >
+                  <CircleUserRound className='w-3 h-3 opacity-60' />
+                  <span className="truncate max-w-[80px]">@{item.creator_name}</span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
             {item.rarity && <RarityBadge rarity={item.rarity} variant='grid' />}
           </div>
@@ -196,9 +227,6 @@ export const GridCard = React.memo(function GridCard({
             isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
             onClick={onClick}
             onClaim={onClaimPostcard ? (rarity) => onClaimPostcard(item.id, rarity) : undefined}
-            onFlipCard={() => {
-              setIsFlipped(true);
-            }}
           />
         </div>
 
@@ -207,8 +235,7 @@ export const GridCard = React.memo(function GridCard({
           item={item}
           polaroidUrl={polaroidUrl}
           handleImageError={() => {}}
-          onFlipBack={() => setIsFlipped(false)}
-          isActive={isFlipped}
+          isActive={false}
           isGridMode={true}
           isClaimedByMe={isClaimedByMe}
           onClaimPostcard={onClaimPostcard}

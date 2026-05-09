@@ -17,6 +17,7 @@ import {
   Dice5,
   ArrowRightLeft,
   RotateCw,
+  PlaneTakeoff,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
@@ -83,6 +84,10 @@ export interface PostcardChinProps {
   onClick?: () => void;
   /** Show the coupon/ticket button */
   isBusiness?: boolean;
+  /** Travel to this postcard's location in Street View (only rendered when item has pano_id) */
+  onTravelHere?: () => void;
+  /** Whether the preflight check is running */
+  isTravelChecking?: boolean;
 }
 
 // ── Component ────────────────────────────────────────────────────────
@@ -105,6 +110,8 @@ export function PostcardChin({
   onFlipCard,
   onClick,
   isBusiness = false,
+  onTravelHere,
+  isTravelChecking = false,
 }: PostcardChinProps) {
   const lang = useLang();
   const navigate = useNavigate();
@@ -146,56 +153,35 @@ export function PostcardChin({
     >
       {/* ── Storytelling expandable fact ─────────────────────────── */}
       {showStorytelling && (
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className='w-full mt-2 px-3 py-2.5 rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50 to-orange-50/80 shadow-[0_2px_10px_rgba(251,191,36,0.12)] flex items-start justify-between gap-3 text-left'
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className='w-full mt-3 mb-1 px-2 flex flex-col text-left cursor-pointer'
           onClick={(e) => {
             e.stopPropagation();
             if (!storyExpanded) {
               setStoryExpanded(true);
             } else {
-              // Second tap: flip card (carousel) or open carousel (grid)
               if (onFlipCard) onFlipCard('info');
               else if (onClick) onClick();
             }
           }}
         >
-          <div className='flex-1 min-w-0'>
-            <div className='flex items-center gap-1.5 mb-1'>
-              <span className='text-[10px] bg-amber-200/60 rounded-full w-5 h-5 flex items-center justify-center shrink-0'>
-                {FACT_EMOJI[storytelling.fact_type] || '📖'}
-              </span>
-              <span className='text-[10px] font-bold text-amber-800/80 uppercase tracking-widest'>
-                {t(
-                  FACT_LABEL[storytelling.fact_type] ?? {
-                    es: 'Dato Curioso',
-                    en: 'Fun Fact',
-                  },
-                  lang,
-                )}
-              </span>
+          <p
+            className={cn(
+              'text-[13px] md:text-sm text-stone-700 font-sans leading-relaxed',
+              !storyExpanded && 'line-clamp-2',
+            )}
+          >
+            {t(storytelling.did_you_know, lang)}
+          </p>
+          {!storyExpanded && (
+            <div className='flex items-center gap-1 mt-1'>
+              <span className='text-[9px] text-stone-400 font-bold uppercase tracking-wider'>Leer más</span>
+              <ChevronDown className='w-3 h-3 text-stone-400' />
             </div>
-            <p
-              className={cn(
-                'text-xs text-stone-700/90 font-medium leading-relaxed',
-                !storyExpanded && 'line-clamp-2',
-              )}
-            >
-              {t(storytelling.did_you_know, lang)}
-            </p>
-          </div>
-          <div className='text-amber-600 shrink-0 mt-0.5'>
-            <div className='w-6 h-6 bg-amber-200/40 rounded-full flex items-center justify-center'>
-              {storyExpanded ? (
-                <ChevronUp className='w-3.5 h-3.5' />
-              ) : (
-                <ChevronDown className='w-3.5 h-3.5' />
-              )}
-            </div>
-          </div>
-        </motion.button>
+          )}
+        </motion.div>
       )}
 
       {/* ── Bottom row: context + actions ───────────────────────── */}
@@ -220,20 +206,7 @@ export function PostcardChin({
         <div className='flex flex-wrap items-center justify-end gap-1.5'>
           {/* MVP: stamp/claim/trade/play buttons disabled for launch */}
 
-          {/* Flip / Info */}
-          {onFlipCard && (
-            <button
-              className='p-1.5 md:p-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 hover:text-stone-700 transition-colors shadow-sm'
-              onClick={(e) => {
-                e.stopPropagation();
-                onFlipCard('info');
-                analytics.track('postcard_flip_clicked', { postcard_id: item.id });
-              }}
-              title={t({ es: 'Ver reverso', en: 'View back' }, lang)}
-            >
-              <RotateCw className='w-4 h-4 md:w-5 md:h-5' />
-            </button>
-          )}
+          {/* MVP: Flip removed since storytelling is on the front */}
 
           {/* Share */}
           {!hideActions && (
@@ -256,6 +229,37 @@ export function PostcardChin({
           )}
         </div>
       </div>
+
+      {/* ── "Viaja aquí" CTA — only when card has verified pano_id ── */}
+      {onTravelHere && !hideActions && item.streetview_pov?.pano_id && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isTravelChecking) onTravelHere();
+          }}
+          disabled={isTravelChecking}
+          className={cn(
+            'w-full mt-2 mb-1 mx-auto flex items-center justify-center gap-2',
+            'py-2.5 rounded-xl text-[13px] font-semibold transition-all border',
+            'bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200',
+            'text-emerald-700 border-emerald-200/70',
+            'disabled:opacity-60 disabled:cursor-not-allowed',
+          )}
+        >
+          {isTravelChecking ? (
+            <>
+              <div className='w-3.5 h-3.5 border-2 border-emerald-500/40 border-t-emerald-600 rounded-full animate-spin' />
+              <span>{t({ es: 'Verificando cobertura...', en: 'Checking coverage...' }, lang)}</span>
+            </>
+          ) : (
+            <>
+              <PlaneTakeoff className='w-3.5 h-3.5' />
+              <span>{t({ es: 'Viaja aquí', en: 'Travel here' }, lang)}</span>
+            </>
+          )}
+        </button>
+      )}
+
     </div>
   );
 }

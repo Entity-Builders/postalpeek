@@ -15,7 +15,7 @@ import { Camera } from "lucide-react";
 
 export function GlobeExplorerPage() {
   const lang = useLang();
-  const { items, handleAuthRequiredAction, user, toggleFavorite, favoriteIds, isFetchingMore, hasMore, fetchMoreFeed } = useFeedContext();
+  const { items, setItems, handleAuthRequiredAction, user, toggleFavorite, favoriteIds, isFetchingMore, hasMore, fetchMoreFeed } = useFeedContext();
   const globeEl = useRef<any>(null);
 
   const globeData = useMemo(() => {
@@ -169,10 +169,40 @@ export function GlobeExplorerPage() {
     }
   }, []);
 
-  const handleBackToGlobe = useCallback(() => {
-    setMode("globe");
-    setViewfinderTarget(null);
-  }, []);
+  const handleBackToGlobe = useCallback((options?: { isFromSuccess?: boolean; newCard?: FeedItem }) => {
+    // If a new postcard was generated, prepend it to the feed immediately
+    if (options?.newCard) {
+      setItems((prev) => {
+        // Avoid duplicates if somehow already in feed
+        const withoutDup = prev.filter(i => i.id !== options.newCard!.id);
+        return [options.newCard!, ...withoutDup];
+      });
+    }
+    if (options?.isFromSuccess) {
+      setMode("returning" as any);
+      setTimeout(() => {
+        if (globeEl.current) {
+          const pov = globeEl.current.pointOfView();
+          if (pov) {
+            globeEl.current.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: 2.8 }, 1500);
+          }
+        }
+        setTimeout(() => {
+          setMode("globe");
+          setViewfinderTarget(null);
+        }, 1500);
+      }, 600);
+    } else {
+      if (globeEl.current) {
+        const pov = globeEl.current.pointOfView();
+        if (pov) {
+          globeEl.current.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: 2.8 }, 1000);
+        }
+      }
+      setMode("globe");
+      setViewfinderTarget(null);
+    }
+  }, [setItems]);
 
   useEffect(() => {
     if (!hasInitialFocus.current && globeEl.current) {
@@ -252,36 +282,43 @@ export function GlobeExplorerPage() {
     checkStreetViewAndDive(pov.lat, pov.lng, mockItem);
   }, [checkStreetViewAndDive]);
 
-  if (mode === "viewfinder" && viewfinderTarget) {
-    return (
-      <div className="w-full h-full relative bg-[#0a0a0e] overflow-hidden flex">
-        <div className="hidden md:block">
-          <ViewfinderSidebar
-            sourceItem={viewfinderTarget}
-            nearbyItems={nearbyItems}
-            onBack={handleBackToGlobe}
-            onSelectNearby={handleSelectNearby}
-            currentLat={viewfinderCurrentPos?.lat}
-            currentLng={viewfinderCurrentPos?.lng}
-          />
-        </div>
-        <div className="flex-1 relative z-0">
-          <ViewfinderPanel
-            sourceItem={viewfinderTarget}
-            userId={user?.id}
-            userIsAnonymous={user?.is_anonymous}
-            onAuthRequired={(action) => handleAuthRequiredAction(action)}
-            onPostcardCreated={() => analytics.track("viewfinder_postcard_saved")}
-            onBack={handleBackToGlobe}
-            onPositionChanged={setViewfinderCurrentPos}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full h-full relative bg-[#050510] overflow-hidden">
+      <AnimatePresence>
+        {(mode === "viewfinder" || mode === "returning" as any) && viewfinderTarget && (
+          <motion.div
+            key="viewfinder-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: mode === "returning" as any ? 0 : 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.0, ease: "easeInOut" }}
+            className="absolute inset-0 z-[100] bg-[#0a0a0e] flex"
+          >
+            <div className="hidden md:block">
+              <ViewfinderSidebar
+                sourceItem={viewfinderTarget}
+                nearbyItems={nearbyItems}
+                onBack={handleBackToGlobe}
+                onSelectNearby={handleSelectNearby}
+                currentLat={viewfinderCurrentPos?.lat}
+                currentLng={viewfinderCurrentPos?.lng}
+              />
+            </div>
+            <div className="flex-1 relative z-0">
+              <ViewfinderPanel
+                sourceItem={viewfinderTarget}
+                userId={user?.id}
+                userIsAnonymous={user?.is_anonymous}
+                onAuthRequired={(action) => handleAuthRequiredAction(action)}
+                onPostcardCreated={() => analytics.track("viewfinder_postcard_saved")}
+                onBack={handleBackToGlobe}
+                onPositionChanged={setViewfinderCurrentPos}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {errorToast && (
           <motion.div
@@ -309,7 +346,7 @@ export function GlobeExplorerPage() {
         />
       </div>
 
-      {mode !== "diving" && (
+      {mode !== "diving" && mode !== "viewfinder" && mode !== "returning" as any && (
         <>
           <GlobeReticle />
           <GlobeZoomControls onZoom={handleZoom} />

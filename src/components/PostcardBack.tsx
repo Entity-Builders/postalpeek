@@ -80,19 +80,7 @@ export function PostcardBack({
         }}
       ></div>
 
-      {/* Flip-back button — positioned to mirror the ℹ️ button on the front */}
-      {onFlipBack && (
-        <button
-          className='absolute bottom-3 right-3 z-40 p-2 md:p-2.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 transition-colors shadow-sm'
-          onClick={(e) => {
-            e.stopPropagation();
-            onFlipBack();
-          }}
-          title='Volver al frente'
-        >
-          <RotateCcw className='w-4 h-4 md:w-5 md:h-5' />
-        </button>
-      )}
+      {/* Flip-back button removed for MVP (storytelling moved to front) */}
 
       {/* Main content – scrollable */}
       <div className={`relative flex flex-col w-full h-full text-black/80 pb-2 ${isGridMode ? 'overflow-y-auto overflow-x-hidden pr-1.5' : 'overflow-hidden'}`}>

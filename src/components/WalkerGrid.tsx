@@ -10,6 +10,8 @@ import { GridCard } from './ui/GridCard';
 import { type CardLayout, computeCardLayout } from './ui/cardLayout';
 import { WalkerWelcome } from './WalkerWelcome';
 import { WalkerWelcomeAnimated } from './WalkerWelcomeAnimated';
+import { useNavigate } from 'react-router-dom';
+import { checkStreetViewAvailability } from './explorer-utils';
 
 const USE_NEW_WELCOME = true; // Temporary flag for A/B testing onboarding UX
 import { markWelcomeSeen } from '../utils/welcomeStorage';
@@ -75,6 +77,7 @@ export function WalkerGrid({
   onClaimPostcard,
   profileWidgetNode,
 }: WalkerGridProps) {
+  const navigate = useNavigate();
   const displayItems = spotlightQuery && spotlightResults.length > 0 ? spotlightResults : items;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -166,17 +169,46 @@ export function WalkerGrid({
     return () => obs.disconnect();
   }, [showWelcome]);
 
-  const handleStartOnboarding = useCallback(() => {
-    markWelcomeSeen();
-    setGridRevealed(true);
+  const handleStartOnboarding = useCallback(async () => {
     addLocalStamps(50);
     analytics.track('welcome_onboarding_started', { initial_stamps: 50 });
     
-    // Scroll past welcome screen
-    setTimeout(() => {
-      gridSentinelRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, [addLocalStamps]);
+    // Perform "Surprise Trip" logic
+    const withPano = items.filter((i: any) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null);
+    const pool = withPano.length > 0 ? withPano : items.filter((i: any) => i.lat != null && i.lng != null);
+    if (pool.length > 0) {
+      const random = pool[Math.floor(Math.random() * pool.length)];
+      analytics.track('teleport_surprise_trip', { destination_id: random.id, city: random.city, country: random.country });
+      
+      // Preflight check before navigating — avoid landing on "No Street View" screen
+      const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+      const available = await checkStreetViewAvailability({
+        panoId: random.streetview_pov?.pano_id,
+        lat: random.lat,
+        lng: random.lng,
+        mapsKey: MAPS_KEY,
+      });
+
+      if (available) {
+        navigate(`/explore?id=${random.id}`);
+        setTimeout(() => markWelcomeSeen(), 500);
+      } else {
+        // Imagery not available — fall through to grid reveal
+        markWelcomeSeen();
+        setGridRevealed(true);
+        setTimeout(() => {
+          gridSentinelRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    } else {
+      // Fallback
+      markWelcomeSeen();
+      setGridRevealed(true);
+      setTimeout(() => {
+        gridSentinelRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [addLocalStamps, items, navigate]);
 
   return (
     <div ref={scrollContainerRef} className="w-full h-full overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>

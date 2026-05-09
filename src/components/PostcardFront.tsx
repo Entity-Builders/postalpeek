@@ -29,6 +29,7 @@ import { GameProgressBar } from './GameProgressBar';
 import { useGameMode } from '../contexts/GameModeContext';
 import { useStampContext } from '../contexts/StampContext';
 import { PostalPeekStampSVG } from './ui/PostalPeekStampSVG';
+import { useNavigateToExplore } from '../hooks/useNavigateToExplore';
 
 // Map DB game types to UI game modes (module-level for stable reference)
 const DB_TO_MODE: Record<DbGameType, GameMode> = {
@@ -123,6 +124,15 @@ export function PostcardFront({
 }: PostcardFrontProps) {
   const { setGameActive } = useGameMode();
   const { addLocalStamps } = useStampContext();
+
+  // ── "Viaja aquí" — teleport to this postcard's Street View location ──
+  const { navigateToExplore, isChecking: isTravelChecking } = useNavigateToExplore({
+    onUnavailable: () => {
+      // Silently swallow — the preflight already aborts navigation
+      // A toast could be added here if desired
+    },
+  });
+
   // ── Inline game mode ──
   const [playingMode, setPlayingMode] = useState<GameMode | 'trivia' | null>(null);
   const [showSelector, setShowSelector] = useState(false);
@@ -237,8 +247,9 @@ export function PostcardFront({
   const { discoverTag, isDiscovered, isGenerating } = useDiscoveries();
   useLang(); // subscribe to language changes
 
-  const isBusiness =
-    item.generation_metadata?.strategy === 'Zigzag Shared Place';
+  // MVP: hide coupon/ticket button — re-enable once business accounts are live
+  // const isBusiness = item.generation_metadata?.strategy === 'Zigzag Shared Place';
+  const isBusiness = false;
   const [isHovered, setIsHovered] = useState(false);
   const [albumItems, setAlbumItems] = useState<FeedItem[]>([item]);
   const [albumStops, setAlbumStops] = useState<Record<number, { stop_name: string; stop_description?: string }>>({});
@@ -326,18 +337,8 @@ export function PostcardFront({
   // storytelling is now derived inside PostcardChin from activeItem
   const trivia = activeSlideItem.generation_metadata?.trivia;
   const hasCompletedTrivia = gameProgress.completedGames.has('trivia');
-  const isTriviaLocked = !!trivia && !isClaimedByMe && !hasOwner && !hasCompletedTrivia;
-
-  const prevIsTriviaLocked = React.useRef(isTriviaLocked);
-  
-  React.useEffect(() => {
-    if (isTriviaLocked && playingMode !== 'trivia') {
-      setPlayingMode('trivia');
-    } else if (!isTriviaLocked && prevIsTriviaLocked.current && playingMode === 'trivia') {
-      setPlayingMode(null);
-    }
-    prevIsTriviaLocked.current = isTriviaLocked;
-  }, [isTriviaLocked, playingMode]);
+  // MVP: disable trivia lock so storytelling text always appears
+  const isTriviaLocked = false; 
 
   const hasAutoStarted = React.useRef(false);
   useEffect(() => {
@@ -653,6 +654,8 @@ export function PostcardFront({
               isOwned={isClaimedByMe}
               hasOwner={hasOwner}
               onOpenAlbum={onOpenAlbum}
+              onTravelHere={() => navigateToExplore(activeSlideItem)}
+              isTravelChecking={isTravelChecking}
             />
           </>
         ) : playingMode === 'trivia' ? (

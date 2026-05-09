@@ -16,6 +16,8 @@ import type { StreetViewPOV } from '../components/StreetViewPanorama';
 export interface UserPostcard {
   id: string;
   user_id: string;
+  device_id: string | null;
+  creator_name: string | null;
   source_postcard_id: string | null;
   lat: number;
   lng: number;
@@ -40,6 +42,8 @@ export interface UserPostcard {
 export interface CreateUserPostcardParams {
   userId?: string;
   deviceId?: string;
+  /** Display name chosen by the user (MVP anonymous username) */
+  creatorName?: string;
   sourcePostcardId: string | null;
   pov: StreetViewPOV;
   city: string;
@@ -71,6 +75,7 @@ export async function createUserPostcard(
     .insert({
       user_id: params.userId || null,
       device_id: params.deviceId || null,
+      creator_name: params.creatorName || null,
       source_postcard_id: params.sourcePostcardId,
       lat: params.pov.lat,
       lng: params.pov.lng,

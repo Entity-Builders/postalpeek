@@ -60,6 +60,8 @@ export interface FeedItem {
   weather?: string | null;
   human_activity?: string | null;
   stamp_cost?: number;
+  /** Anonymous display name set by the creator during MVP onboarding */
+  creator_name?: string | null;
   game_stats?: {
     hp: number;
     attack: number;

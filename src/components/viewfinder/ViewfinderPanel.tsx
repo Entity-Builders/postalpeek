@@ -13,7 +13,8 @@
  * ref #94
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   StreetViewPanorama,
   type StreetViewPOV,
@@ -24,7 +25,8 @@ import { useViewfinder } from '../../hooks/useViewfinder';
 import type { FeedItem } from '../Postcard';
 import { PostcardBack } from '../PostcardBack';
 import { PostcardFront } from '../PostcardFront';
-import { MapPin, ArrowLeft, Sparkles, RotateCcw, AlertCircle, Map, X, BookmarkPlus, Compass, Loader2 } from 'lucide-react';
+import { FullscreenOverlay } from '../FullscreenOverlay';
+import { MapPin, ArrowLeft, Sparkles, RotateCcw, AlertCircle, Map, X, Compass, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useAnimate } from 'framer-motion';
 import { useLang, t } from '../../utils/i18n';
 import { DynamicMiniMap } from './DynamicMiniMap';
@@ -47,7 +49,7 @@ interface ViewfinderPanelProps {
   userIsAnonymous?: boolean;
   onPostcardCreated?: () => void;
   onAuthRequired?: (action: () => void) => void;
-  onBack?: () => void;
+  onBack?: (options?: { isFromSuccess?: boolean; newCard?: FeedItem }) => void;
   onPositionChanged?: (pos: { lat: number; lng: number } | null) => void;
   /** Called when a postcard is saved — provides data to update local progress */
   onSlotCompleted?: (data: {
@@ -88,9 +90,12 @@ export function ViewfinderPanel({
     errorMessage,
     illustrationStyle,
     isSaving,
+    creatorName,
+    setCreatorName,
     setIllustrationStyle,
     handleSnapshot,
     handleGenerate,
+    handleConfirmName,
     handleSave,
     reset,
   } = useViewfinder(userId, sourceItem, userIsAnonymous);
@@ -112,6 +117,22 @@ export function ViewfinderPanel({
     },
     [animateFlip, flipScope, rotateY],
   );
+
+  /** Clean/expand mode — hides chrome, enables fullscreen overlay */
+  const [isClean, setIsClean] = useState(false);
+  const toggleClean = useCallback(() => {
+    setIsClean((prev) => !prev);
+  }, []);
+
+  const [showOverlay, setShowOverlay] = useState(false);
+  useEffect(() => {
+    if (isClean) {
+      const timer = setTimeout(() => setShowOverlay(true), 150);
+      return () => clearTimeout(timer);
+    } else {
+      setShowOverlay(false);
+    }
+  }, [isClean]);
 
   // State for tracking current position (for mini map)
   const [currentPos, setCurrentPos] = useState<{lat: number; lng: number} | null>(
@@ -175,7 +196,7 @@ export function ViewfinderPanel({
       }
       onPostcardCreated?.();
       reset();
-      onBack?.();
+      onBack?.({ isFromSuccess: true, newCard: capturedFeedItem ?? undefined });
     }
   }, [userIsAnonymous, onAuthRequired, handleSave, onPostcardCreated, reset, onBack, onSlotCompleted, capturedPostcard, capturedFeedItem, sourceItem]);
 
@@ -230,7 +251,7 @@ export function ViewfinderPanel({
       {/* ─── Back button ─── top-left, viewfinder step only */}
       {step === 'viewfinder' && onBack && (
         <button
-          onClick={onBack}
+          onClick={() => onBack?.()}
           className="absolute top-6 left-4 z-30 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/15 text-white/80 hover:text-white hover:bg-black/70 transition-all active:scale-90 cursor-pointer shadow-lg"
           aria-label="Back"
         >
@@ -293,6 +314,70 @@ export function ViewfinderPanel({
 
 
 
+
+      {/* ─── NAMING STATE ─── User enters their display name before seeing the result */}
+      <AnimatePresence>
+        {step === 'naming' && capturedFeedItem && (
+          <motion.div
+            key="naming-screen"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 120 }}
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center px-6"
+          >
+            {/* Blurred postcard preview in background */}
+            <div className="absolute inset-0 z-0 overflow-hidden">
+              {capturedDataUrl && (
+                <img
+                  src={capturedDataUrl}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-40"
+                />
+              )}
+              <div className="absolute inset-0 bg-[#0a0a0e]/70" />
+            </div>
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-[360px]">
+              {/* Postcard mini preview */}
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 20 }}
+                className="w-24 h-24 rounded-xl overflow-hidden shadow-2xl border border-white/10"
+              >
+                <img
+                  src={capturedFeedItem.illustration_url || capturedDataUrl || ''}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-center"
+              >
+                <h2 className="text-white font-black text-2xl tracking-tight">
+                  {t({ es: '¡Postal lista! 🎉', en: 'Postcard ready! 🎉' }, lang)}
+                </h2>
+                <p className="text-white/50 text-sm mt-1">
+                  {t({ es: '¿Cómo quieres que te llamen?', en: 'What should we call you?' }, lang)}
+                </p>
+              </motion.div>
+
+              {/* Name input */}
+              <NamingForm
+                initialName={creatorName}
+                lang={lang}
+                onConfirm={handleConfirmName}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── ILLUSTRATING STATE ─── Polaroid with photo and watercolor blobs overlay */}
       <AnimatePresence>
@@ -402,11 +487,11 @@ export function ViewfinderPanel({
               >
                 {/* FRONT — Illustration Postcard (using unified PostcardFront) */}
                 <div
-                  className="absolute inset-0 w-full h-full bg-white rounded-xl overflow-hidden"
+                  className={`absolute inset-0 w-full h-full rounded-xl overflow-hidden transition-colors duration-300 ${isClean ? 'bg-transparent' : 'bg-white'}`}
                   style={{
                     backfaceVisibility: 'hidden',
                     WebkitBackfaceVisibility: 'hidden',
-                    boxShadow: `0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.05)${
+                    boxShadow: isClean ? 'none' : `0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.05)${
                       capturedFeedItem.rarity === 'legendary' ? ', 0 0 30px rgba(245, 158, 11, 0.4)' :
                       capturedFeedItem.rarity === 'epic' ? ', 0 0 25px rgba(139, 92, 246, 0.3)' :
                       capturedFeedItem.rarity === 'rare' ? ', 0 0 20px rgba(59, 130, 246, 0.25)' : ''
@@ -421,6 +506,8 @@ export function ViewfinderPanel({
                     }}
                     handleImageError={() => {}}
                     hideActions={true}
+                    isClean={isClean}
+                    onToggleClean={toggleClean}
                   />
                 </div>
 
@@ -436,6 +523,7 @@ export function ViewfinderPanel({
               </motion.div>
             </div>
 
+
             {/* ─── Action Buttons ─── */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -443,31 +531,21 @@ export function ViewfinderPanel({
               transition={{ delay: 0.3 }}
               className="mt-6 w-[85vw] max-w-[420px] flex flex-col gap-3 pointer-events-auto"
             >
-              {/* Primary: Save to Album */}
+
+              {/* Action: Save and Back to Feed */}
               <button
-                onClick={handleSaveAndReturn}
-                disabled={isSaving}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold transition-all shadow-lg flex justify-center items-center gap-2 active:scale-95 disabled:opacity-60"
+                onClick={() => {
+                  setIsFlipped(false);
+                  handleSaveAndReturn();
+                }}
+                className="w-full py-3.5 px-4 rounded-xl bg-white/10 backdrop-blur-md text-white/90 text-sm font-semibold hover:bg-white/20 transition-all flex justify-center items-center gap-2 border border-white/15 active:scale-95 shadow-lg"
               >
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <BookmarkPlus className="w-4 h-4" />
+                  <Compass className="w-4 h-4" />
                 )}
-                {t({ es: '📬 Guardar en Mi Álbum', en: '📬 Save to My Album' }, lang)}
-              </button>
-              
-              {/* Secondary: Explore another place */}
-              <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  reset();
-                  onBack?.();
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-white/10 backdrop-blur-md text-white/90 text-sm font-semibold hover:bg-white/20 transition-all flex justify-center items-center gap-2 border border-white/15 active:scale-95"
-              >
-                <Compass className="w-4 h-4" />
-                {t({ es: '🌍 Explorar otro lugar', en: '🌍 Explore another place' }, lang)}
+                {t({ es: '🌍 Volver al feed', en: '🌍 Back to feed' }, lang)}
               </button>
             </motion.div>
           </motion.div>
@@ -493,6 +571,73 @@ export function ViewfinderPanel({
         }
       `}
       </style>
+
+      {/* Fullscreen overlay — portaled to body to escape transforms */}
+      {createPortal(
+        <AnimatePresence>
+          {showOverlay && capturedFeedItem && (
+            <FullscreenOverlay
+              item={capturedFeedItem}
+              cachedUrl={capturedFeedItem.illustration_url}
+              onClose={toggleClean}
+            />
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
+  );
+}
+
+// ─── NamingForm ──────────────────────────────────────────────────────────────
+// Compact name input shown once when first postcard is generated.
+
+function NamingForm({
+  initialName,
+  lang,
+  onConfirm,
+}: {
+  initialName: string;
+  lang: ReturnType<typeof useLang>;
+  onConfirm: (name: string) => void;
+}) {
+  const [value, setValue] = React.useState(initialName);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onConfirm(value);
+  };
+
+  return (
+    <motion.form
+      onSubmit={handleSubmit}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="w-full flex flex-col gap-3"
+    >
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={t({ es: 'Tu nombre o apodo...', en: 'Your name or nickname...' }, lang)}
+        maxLength={32}
+        autoFocus
+        className="w-full px-4 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/30 text-base font-medium focus:outline-none focus:border-white/50 focus:bg-white/15 transition-all backdrop-blur-md"
+      />
+      <button
+        type="submit"
+        className="w-full py-3.5 rounded-xl bg-white text-black font-bold text-sm tracking-wide hover:bg-white/90 active:scale-95 transition-all shadow-lg"
+      >
+        {t({ es: '✉️ Ver mi postal', en: '✉️ See my postcard' }, lang)}
+      </button>
+      <button
+        type="button"
+        onClick={() => onConfirm('')}
+        className="text-white/30 text-xs hover:text-white/50 transition-colors py-1"
+      >
+        {t({ es: 'Continuar sin nombre', en: 'Continue without a name' }, lang)}
+      </button>
+    </motion.form>
   );
 }

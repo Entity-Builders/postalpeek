@@ -146,6 +146,82 @@ function TeleportIntro({
 }
 
 /* ──────────────────────────────────────────────────────────────────
+   Teleport Outro — globe zoom-out animation
+   ────────────────────────────────────────────────────────────────── */
+
+function TeleportOutro({ onComplete }: { onComplete: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 1800);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0e] overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      {/* Stars background */}
+      <div className="absolute inset-0 overflow-hidden">
+        {Array.from({ length: 40 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-[2px] h-[2px] bg-white rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            initial={{ opacity: 0.2 }}
+            animate={{ opacity: [0.2, 0.8, 0.2] }}
+            transition={{
+              duration: 1.5 + Math.random() * 2,
+              repeat: Infinity,
+              delay: Math.random() * 1.5,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Globe zooming out */}
+      <motion.div
+        className="text-[100px] leading-none select-none"
+        initial={{ scale: 8, opacity: 0, y: 0 }}
+        animate={{
+          scale: [8, 1.2, 0.4],
+          opacity: [0, 1, 0],
+          y: [0, 0, 0],
+        }}
+        transition={{
+          duration: 1.8,
+          times: [0, 0.4, 1],
+          ease: 'easeInOut',
+        }}
+      >
+        🌍
+      </motion.div>
+
+      {/* Return text */}
+      <motion.div
+        className="absolute flex flex-col items-center gap-2"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <motion.p
+          className="text-white/60 text-sm uppercase tracking-[0.2em] font-medium"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          {t({ es: 'Volviendo al feed...', en: 'Returning to feed...' }, 'es')}
+        </motion.p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
    ExplorePage
    ────────────────────────────────────────────────────────────────── */
 
@@ -153,8 +229,9 @@ export function ExplorePage() {
   const lang = useLang();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { items, user, handleAuthRequiredAction } = useFeedContext();
+  const { items, setItems, user, handleAuthRequiredAction } = useFeedContext();
   const [showIntro, setShowIntro] = useState(true);
+  const [showOutro, setShowOutro] = useState(false);
 
   const targetId = searchParams.get('id');
 
@@ -166,7 +243,24 @@ export function ExplorePage() {
     return pickRandomWithPano(items);
   }, [targetId, items]);
 
-  const handleBack = () => {
+  const handleBack = (options?: { isFromSuccess?: boolean; newCard?: import('../../components/Postcard').FeedItem }) => {
+    // Prepend the newly generated postcard at position 0 so it shows first in the feed
+    if (options?.newCard) {
+      setItems((prev) => {
+        const withoutDup = prev.filter((i) => i.id !== options.newCard!.id);
+        return [options.newCard!, ...withoutDup];
+      });
+    }
+    if (options?.isFromSuccess) {
+      setTimeout(() => {
+        setShowOutro(true);
+      }, 600);
+    } else {
+      setShowOutro(true);
+    }
+  };
+
+  const completeExit = () => {
     navigate('/');
   };
 
@@ -188,7 +282,7 @@ export function ExplorePage() {
               {t({ es: 'No se encontró el destino', en: 'Destination not found' }, lang)}
             </p>
             <button
-              onClick={handleBack}
+              onClick={() => handleBack()}
               className="mt-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-all border border-white/10"
             >
               {t({ es: 'Volver al inicio', en: 'Back to home' }, lang)}
@@ -209,6 +303,12 @@ export function ExplorePage() {
             country={target.country}
             onComplete={() => setShowIntro(false)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showOutro && (
+          <TeleportOutro onComplete={completeExit} />
         )}
       </AnimatePresence>
 

@@ -2,10 +2,10 @@
  * useViewfinder.ts
  *
  * Hook that manages the Viewfinder capture state.
- * Orchestrates: POV capture → Street View static → AI illustration → save.
+ * Orchestrates: POV capture → Street View static → AI illustration → naming → save.
  *
  * Simplified flow (v2):
- *   idle → preview (show local snapshot) → illustrating → success
+ *   idle → preview (show local snapshot) → illustrating → naming (enter name) → success
  *
  * ref #94
  */
@@ -23,13 +23,17 @@ import {
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 import type { FeedItem } from '../components/Postcard';
 import { analytics } from '../lib/analytics';
+import { RateLimitError } from '../services/googleMaps';
 
 export type ViewfinderStep =
   | 'viewfinder'    // Panorama is interactive, user is composing
   | 'preview'       // User took a snapshot — showing polaroid preview
   | 'illustrating'  // AI illustration in progress
-  | 'success'       // Postcard created successfully
+  | 'naming'        // Postcard ready — user enters their display name
+  | 'success'       // Postcard saved, showing result
   | 'error';        // Something went wrong
+
+const CREATOR_NAME_KEY = 'postalpeek_creator_name';
 
 export interface UseViewfinderReturn {
   step: ViewfinderStep;
@@ -41,11 +45,16 @@ export interface UseViewfinderReturn {
   errorMessage: string | null;
   illustrationStyle: string;
   isSaving: boolean;
+  /** The display name the user entered (persisted in localStorage) */
+  creatorName: string;
+  setCreatorName: (name: string) => void;
   setIllustrationStyle: (style: string) => void;
   /** Called by the panorama's capture — transitions to preview */
   handleSnapshot: (pov: StreetViewPOV, dataUrl: string | null) => void;
   /** User confirms the preview — kicks off AI generation */
   handleGenerate: () => Promise<void>;
+  /** User submits their name — saves postcard and transitions to success */
+  handleConfirmName: (name: string) => Promise<void>;
   /** Save postcard to user's album */
   handleSave: () => Promise<boolean>;
   reset: () => void;
@@ -56,6 +65,7 @@ function buildFeedItem(
   postcard: UserPostcard,
   sourceItem: FeedItem,
   pov: StreetViewPOV | null,
+  creatorName?: string,
 ): FeedItem {
   return {
     id: postcard.id,
@@ -69,6 +79,7 @@ function buildFeedItem(
     category: postcard.category || sourceItem.category || '🎨 Arte Generado',
     description: postcard.description || sourceItem.description || '',
     created_at: postcard.created_at,
+    creator_name: creatorName || postcard.creator_name || null,
     streetview_pov: pov ? {
       heading: pov.heading,
       pitch: pov.pitch,
@@ -79,13 +90,57 @@ function buildFeedItem(
   };
 }
 
+/**
+ * Full illustration style catalog.
+ * Each key is sent to the edge function as `style`.
+ * Weighted distribution: common styles appear more often.
+ */
 const ILLUSTRATION_STYLES = [
-  'default',
+  // ── Fine Art & Traditional ──────────────────────────────────────────
   'watercolor',
-  'vintage',
+  'watercolor',          // 2x weight — fan favourite
+  'gouache',
+  'oil-painting',
+  'acrylic-painting',
+  'pastel-chalk',
+  'ink-wash',            // Chinese/Japanese sumi-e feel
+  'pencil-sketch',
+  'charcoal-sketch',
+  'etching',             // Classical engraving look
+  // ── Retro & Vintage ─────────────────────────────────────────────────
+  'vintage-postcard',
+  'vintage-postcard',    // 2x weight
+  'retro-travel-poster',
+  'soviet-propaganda',   // Bold flat shapes, red/gold
+  'art-nouveau',         // Alphonse Mucha style
+  'art-deco',            // Geometric elegance
+  'linocut',             // Woodblock print texture
+  'risograph',           // Overlapping duotone grain
+  // ── Illustration & Comics ───────────────────────────────────────────
+  'studio-ghibli',       // Warm painted anime
+  'comic-book',          // Halftone dots, bold outlines
+  'ligne-claire',        // Hergé / Tintin clean lines
+  'ukiyo-e',             // Japanese woodblock waves
+  'flat-design',         // Bold shapes, minimal shadows
+  'isometric',           // Geometric 3D flat illustration
+  // ── Modern & Digital ────────────────────────────────────────────────
   'pop-art',
-  'minimalist',
+  'neon-cyberpunk',      // Dark bg, glowing accents
+  'vaporwave',           // Pink/purple retro-digital
+  'pixel-art',           // 8-bit / 16-bit game aesthetic
+  'low-poly',            // Triangulated facets
+  'glitch-art',          // Digital corruption artifacts
+  // ── Atmospheric & Painterly ─────────────────────────────────────────
+  'impressionist',       // Monet / Renoir brushwork
+  'expressionist',       // Munch / Kirchner emotional distortion
+  'pointillist',         // Seurat dot technique
+  'luminism',            // Turner golden light effects
 ];
+
+/** Pick a random style with no memory (pure random) */
+function pickRandomStyle(): string {
+  return ILLUSTRATION_STYLES[Math.floor(Math.random() * ILLUSTRATION_STYLES.length)];
+}
 
 export function useViewfinder(
   userId: string | undefined,
@@ -101,8 +156,17 @@ export function useViewfinder(
   const [capturedPov, setCapturedPov] = useState<StreetViewPOV | null>(null);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [illustrationStyle, setIllustrationStyle] = useState('default');
+  const [illustrationStyle, setIllustrationStyle] = useState('watercolor');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Load persisted creator name from localStorage
+  const [creatorName, setCreatorNameState] = useState<string>(
+    () => localStorage.getItem(CREATOR_NAME_KEY) || ''
+  );
+
+  const setCreatorName = useCallback((name: string) => {
+    setCreatorNameState(name);
+  }, []);
 
   // Step 2: User confirms preview → generate AI illustration (now triggered automatically)
   const handleGenerate = useCallback(async (overridePov?: StreetViewPOV) => {
@@ -114,7 +178,7 @@ export function useViewfinder(
       return;
     }
 
-    const randomStyle = ILLUSTRATION_STYLES[Math.floor(Math.random() * ILLUSTRATION_STYLES.length)];
+    const randomStyle = pickRandomStyle();
     setIllustrationStyle(randomStyle);
 
     setStep('illustrating');
@@ -130,18 +194,22 @@ export function useViewfinder(
     });
 
     try {
-      const isMockSource = sourceItem.id.startsWith('free-slot-') || sourceItem.id.startsWith('capture-');
+      // source_postcard_id is optional traceability — it references postalpeek_postcards(id).
+      // FeedItems can come from postalpeek_postcards (curated) OR postalpeek_user_postcards
+      // (community-generated, prepended to the feed). Passing a user-postcard UUID here
+      // would cause a FK violation. Since we have no reliable discriminator on FeedItem
+      // without an extra query, we always pass null — safe and correct for MVP.
       const params: CreateUserPostcardParams = {
         userId: userId || undefined,
         deviceId: userId ? undefined : getDeviceId(),
-        sourcePostcardId: isMockSource ? null : sourceItem.id,
+        sourcePostcardId: null,
         pov: povToUse,
         city: sourceItem.city || '',
         country: sourceItem.country || '',
         locationName:
           sourceItem.location_name ||
           `${sourceItem.city}, ${sourceItem.country}`,
-        style: randomStyle !== 'default' ? randomStyle : undefined,
+        style: randomStyle,
       };
 
       const postcard = await createUserPostcard(params);
@@ -149,15 +217,17 @@ export function useViewfinder(
       setCapturedPostcard(postcard);
       
       // Build FeedItem for the <Postcard> / <PostcardBack> components
-      const feedItem = buildFeedItem(postcard, sourceItem, povToUse);
+      const savedName = localStorage.getItem(CREATOR_NAME_KEY) || undefined;
+      const feedItem = buildFeedItem(postcard, sourceItem, povToUse, savedName);
       setCapturedFeedItem(feedItem);
       
-      setStep('success');
+      // If user already has a name saved, skip naming step
+      setStep(savedName ? 'success' : 'naming');
 
       analytics.track('viewfinder_postcard_created', {
         postcard_id: postcard.id,
         source_postcard_id: sourceItem.id,
-        style: illustrationStyle,
+        style: randomStyle,
         city: sourceItem.city,
         country: sourceItem.country,
       });
@@ -186,9 +256,27 @@ export function useViewfinder(
 
     } catch (err) {
       console.error('Viewfinder capture failed:', err);
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Failed to create postcard',
-      );
+
+      if (err instanceof RateLimitError) {
+        // Don't go to error screen — show a soft message and let the user retry later
+        const msg = err.code === 'CIRCUIT_OPEN'
+          ? '🌍 Hoy ya se generaron muchas postales. Volvé mañana para crear la tuya.'
+          : '⏳ Demasiadas generaciones seguidas. Esperá unos minutos e intentá de nuevo.';
+        setErrorMessage(msg);
+        setStep('error');
+        analytics.track('viewfinder_rate_limited', {
+          code: err.code,
+          source_postcard_id: sourceItem.id,
+        });
+        return;
+      }
+
+      let userMsg = err instanceof Error ? err.message : 'Failed to create postcard';
+      if (userMsg.includes('Failed to send a request') || userMsg.includes('NetworkError')) {
+        userMsg = '🔌 Error de red. Revisá tu conexión a internet e intentá de nuevo.';
+      }
+
+      setErrorMessage(userMsg);
       setStep('error');
 
       analytics.captureError(err, {
@@ -217,6 +305,35 @@ export function useViewfinder(
     },
     [sourceItem, handleGenerate],
   );
+
+  // User submits their name in the naming step
+  const handleConfirmName = useCallback(async (name: string): Promise<void> => {
+    const trimmed = name.trim();
+    // Persist name for future sessions
+    if (trimmed) {
+      localStorage.setItem(CREATOR_NAME_KEY, trimmed);
+      setCreatorNameState(trimmed);
+    }
+    // Update the FeedItem immediately so the badge shows on the success card
+    if (trimmed) {
+      setCapturedFeedItem(prev => prev ? { ...prev, creator_name: trimmed } : prev);
+    }
+    // Update the postcard in the DB with the creator name
+    if (capturedPostcard && trimmed) {
+      supabase
+        .from('postalpeek_user_postcards')
+        .update({ creator_name: trimmed })
+        .eq('id', capturedPostcard.id)
+        .then(({ error }) => {
+          if (error) console.warn('[Viewfinder] Failed to update creator_name:', error);
+        });
+    }
+    analytics.track('viewfinder_name_submitted', {
+      postcard_id: capturedPostcard?.id,
+      has_name: !!trimmed,
+    });
+    setStep('success');
+  }, [capturedPostcard]);
 
   // Step 3: Save to user's album (already in DB — this marks it as "saved" and signals completion)
   const handleSave = useCallback(async (): Promise<boolean> => {
@@ -256,9 +373,12 @@ export function useViewfinder(
     errorMessage,
     illustrationStyle,
     isSaving,
+    creatorName,
+    setCreatorName,
     setIllustrationStyle,
     handleSnapshot,
     handleGenerate,
+    handleConfirmName,
     handleSave,
     reset,
   };

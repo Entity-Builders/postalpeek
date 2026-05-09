@@ -112,120 +112,11 @@ export function TripSlide({
   const name = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0];
   const initial = typeof name === 'string' && name.length > 0 ? name.charAt(0).toUpperCase() : '?';
 
-  // ── Loupe zoom — ref-based for zero re-renders ──
-  // We render a second <img> (the "lens") on top of the base image.
-  // It's scaled up and clipped to a circle centered on the cursor.
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lensRef = useRef<HTMLImageElement>(null);
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isClean || !lensRef.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const px = (cx / rect.width) * 100;
-      const py = (cy / rect.height) * 100;
-
-      // Map cursor % to the image-content % the base image shows there
-      const imgPx = (px - 50) / CLEAN_SCALE + 50;
-      const imgPy = (py - 50) / CLEAN_SCALE + 50;
-
-      const Z = CLEAN_SCALE * LOUPE_ZOOM;
-      // Where that image point sits in the element (local px)
-      const ox = (imgPx / 100) * rect.width;
-      const oy = (imgPy / 100) * rect.height;
-      // Translate so the scaled content at (ox,oy) lands at cursor (cx,cy)
-      const tx = cx - ox;
-      const ty = cy - oy;
-
-      const lens = lensRef.current;
-      lens.style.opacity = '1';
-      // clipPath in LOCAL space at (ox,oy) — after transform it maps to (cx,cy)
-      lens.style.clipPath = `circle(${LOUPE_RADIUS / Z}px at ${imgPx}% ${imgPy}%)`;
-      lens.style.transformOrigin = `${imgPx}% ${imgPy}%`;
-      lens.style.transform = `translate(${tx}px, ${ty}px) scale(${Z})`;
-    },
-    [isClean],
-  );
-
-  const handleMouseLeave = useCallback(() => {
-    if (lensRef.current) {
-      // Only hide via opacity — keep clipPath & transform so the lens
-      // doesn't flash at its unscaled size during the opacity transition
-      lensRef.current.style.opacity = '0';
-    }
-    setIsHovered(false);
-  }, [setIsHovered]);
-
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-  }, [setIsHovered]);
-
-  // ── Touch-hold loupe for mobile ──
-  // Hold → loupe appears, drag → follows finger, release → disappears
-  const TOUCH_LOUPE_RADIUS = 60;
-
-  const updateLensFromTouch = useCallback((touch: React.Touch) => {
-    if (!lensRef.current || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = touch.clientX - rect.left;
-    const cy = touch.clientY - rect.top;
-    const px = (cx / rect.width) * 100;
-    const py = (cy / rect.height) * 100;
-
-    const imgPx = (px - 50) / CLEAN_SCALE + 50;
-    const imgPy = (py - 50) / CLEAN_SCALE + 50;
-
-    const Z = CLEAN_SCALE * LOUPE_ZOOM;
-    const ox = (imgPx / 100) * rect.width;
-    const oy = (imgPy / 100) * rect.height;
-    const tx = cx - ox;
-    const ty = cy - oy;
-
-    const lens = lensRef.current;
-    lens.style.opacity = '1';
-    lens.style.clipPath = `circle(${TOUCH_LOUPE_RADIUS / Z}px at ${imgPx}% ${imgPy}%)`;
-    lens.style.transformOrigin = `${imgPx}% ${imgPy}%`;
-    lens.style.transform = `translate(${tx}px, ${ty}px) scale(${Z})`;
-  }, []);
-
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      if (!isClean || e.touches.length !== 1) return;
-      updateLensFromTouch(e.touches[0]);
-    },
-    [isClean, updateLensFromTouch],
-  );
-
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      if (!isClean || !lensRef.current) return;
-      e.preventDefault(); // prevent scroll while loupe is active
-      updateLensFromTouch(e.touches[0]);
-    },
-    [isClean, updateLensFromTouch],
-  );
-
-  const handleTouchEnd = useCallback(() => {
-    if (!lensRef.current) return;
-    // Only hide via opacity — keep clipPath & transform to avoid flash
-    lensRef.current.style.opacity = '0';
-  }, []);
-
   return (
     <div
-      ref={containerRef}
       className={cn(
         'relative flex-[0_0_100%] h-full min-w-0',
-        isClean && 'loupe-active',
       )}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseMove={handleMouseMove}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className='absolute inset-0 bg-gradient-to-br from-stone-200/40 via-stone-100/20 to-stone-200/30 animate-pulse pointer-events-none z-0' />
@@ -266,21 +157,11 @@ export function TripSlide({
         />
       )}
 
-      {/* Scarcity lock badge — unclaimed only */}
+      {/* Owner / creator badge */}
       {!isClean && (
         <AnimatePresence>
-          {!hasOwner ? (
-            <motion.div
-              key="unowned"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
-              className='absolute top-2 left-2 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-white/90 text-[11px] font-semibold px-2.5 py-1.5 rounded-full pointer-events-none z-20'
-            >
-              <CircleUserRound className='w-4 h-4 opacity-80' /> {t({ es: 'Sin dueño', en: 'Unowned' })}
-            </motion.div>
-          ) : isClaimedByMe && user ? (
+          {isClaimedByMe && user ? (
+            // Authenticated user badge
             <motion.div
               key="owned"
               initial={{ opacity: 0, scale: 0.8, y: -10 }}
@@ -298,6 +179,18 @@ export function TripSlide({
               <span className="truncate max-w-[100px]">
                 {name}
               </span>
+            </motion.div>
+          ) : slideItem.creator_name ? (
+            // Anonymous creator badge
+            <motion.div
+              key="creator"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className='absolute top-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/80 text-[11px] font-semibold px-2.5 py-1.5 rounded-full pointer-events-none z-20'
+            >
+              <CircleUserRound className='w-3.5 h-3.5 opacity-60' />
+              <span className="truncate max-w-[100px]">@{slideItem.creator_name}</span>
             </motion.div>
           ) : null}
         </AnimatePresence>

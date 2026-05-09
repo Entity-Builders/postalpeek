@@ -9,6 +9,7 @@ import { FeatureFlags } from '../../lib/featureFlags';
 import { useGameMode } from '../../contexts/GameModeContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ProfileWidget } from '../../components/ProfileWidget';
+import { TeleportFAB } from '../../components/TeleportFAB';
 
 function FeedBackButton({
   isFullscreen,
@@ -165,6 +166,11 @@ export function FeedCarouselPage() {
             }
           })}
       />
+
+      {/* Generate Postcard FAB — visible when not in fullscreen */}
+      {!isFullscreen && (
+        <TeleportFAB items={sourceItems} label={t({ es: '✈️ Viaje Sorpresa', en: '✈️ Surprise Trip' }, lang)} />
+      )}
 
       {/* Claim Result Toast */}
       <AnimatePresence>

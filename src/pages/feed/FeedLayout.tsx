@@ -16,6 +16,7 @@ import { WelcomeToast } from '../../components/WelcomeToast';
 import { SearchX } from 'lucide-react';
 import { useFavorites } from '@eb-packages/logic/src/hooks/useFavorites';
 import { analytics } from '../../lib/analytics';
+import { checkStreetViewAvailability } from '../../components/explorer-utils';
 import { useLang, t } from '../../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -25,6 +26,7 @@ import { AuthGateModal } from '../../components/AuthGateModal';
 // --- Types ---
 export type FeedLayoutContextType = {
   items: FeedItem[];
+  setItems: React.Dispatch<React.SetStateAction<FeedItem[]>>;
   availableCountries: string[];
   isLoading: boolean;
   selectedCountry: string | null;
@@ -102,6 +104,7 @@ export function FeedLayout({
 
   const {
     items,
+    setItems,
     availableCountries,
     isLoading,
     selectedCountry,
@@ -288,7 +291,7 @@ export function FeedLayout({
   }, [user, hasGuestClaim, stampBalances]);
 
   const contextValue = useMemo<FeedLayoutContextType>(() => ({
-    items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
+    items, setItems, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
     spotlightResults, spotlightQuery, isSpotlightSearching, handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
     claim, isClaiming, claimStatus, claimedIds,
     collection, isCollectionLoading, refetchCollection,
@@ -298,7 +301,7 @@ export function FeedLayout({
     viewMode, setViewMode,
     handleAuthRequiredAction
   }), [
-    items, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
+    items, setItems, availableCountries, isLoading, selectedCountry, setSelectedCountry, hasSharedCard, hasMore, isFetchingMore, fetchMoreFeed,
     spotlightResults, spotlightQuery, isSpotlightSearching, handleSpotlightSearch, handleSpotlightDismiss, isSpotlightMode,
     claim, isClaiming, claimStatus, claimedIds,
     collection, isCollectionLoading, refetchCollection,
@@ -394,13 +397,36 @@ export function FeedLayout({
           >
             <div className='max-w-lg mx-auto'>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const withPano = items.filter((i: any) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null);
                   const pool = withPano.length > 0 ? withPano : items.filter((i: any) => i.lat != null && i.lng != null);
                   if (pool.length === 0) return;
-                  const random = pool[Math.floor(Math.random() * pool.length)];
-                  analytics.track('teleport_surprise_trip', { destination_id: random.id, city: random.city, country: random.country });
-                  navigate(`/explore?id=${random.id}`);
+
+                  const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+                  const MAX_ATTEMPTS = 3;
+                  const tried = new Set<string>();
+
+                  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                    const candidates = pool.filter((i: any) => !tried.has(i.id));
+                    if (candidates.length === 0) break;
+                    const random = candidates[Math.floor(Math.random() * candidates.length)];
+                    tried.add(random.id);
+
+                    const available = await checkStreetViewAvailability({
+                      panoId: random.streetview_pov?.pano_id,
+                      lat: random.lat,
+                      lng: random.lng,
+                      mapsKey: MAPS_KEY,
+                    });
+
+                    if (available) {
+                      analytics.track('teleport_surprise_trip', { destination_id: random.id, city: random.city, country: random.country, attempt: attempt + 1 });
+                      navigate(`/explore?id=${random.id}`);
+                      return;
+                    }
+                  }
+                  // All attempts failed — silent fail, user can retry
+                  analytics.track('teleport_no_imagery_available', { tried: Array.from(tried) });
                 }}
                 className='w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-base tracking-wide rounded-2xl shadow-[0_8px_32px_rgba(16,185,129,0.35)] hover:shadow-[0_12px_48px_rgba(16,185,129,0.5)] transition-all duration-300 cursor-pointer active:scale-[0.97]'
               >
@@ -409,9 +435,9 @@ export function FeedLayout({
                   transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   className='text-xl'
                 >
-                  ✈️
+                  📸
                 </motion.span>
-                <span>{t({ es: 'Viaje Sorpresa', en: 'Surprise Trip' }, lang)}</span>
+                <span>{t({ es: 'Generar una postal', en: 'Generate postcard' }, lang)}</span>
               </button>
             </div>
           </motion.div>

@@ -51,6 +51,19 @@ export interface IllustrationResult {
 }
 
 /**
+ * Thrown when the server rate-limits or circuit-breaks the illustration request.
+ * code: 'RATE_LIMITED' | 'CIRCUIT_OPEN'
+ */
+export class RateLimitError extends Error {
+  code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.code = code;
+  }
+}
+
+/**
  * Generate an artistic illustration from a Street View image
  * Uses Gemini 2.5 Flash image-to-image generation via Edge Function
  */
@@ -65,7 +78,20 @@ export async function generateIllustration(
     },
   );
 
+  // When edge function returns 4xx, supabase-js puts it in `error` (FunctionsHttpError)
+  // and data is null. We need to read the body from error.context to get our rate limit codes.
   if (error) {
+    // Try to parse the structured error body (our 429 responses have { error, code } )
+    try {
+      const errBody = await (error as { context?: Response }).context?.json?.();
+      if (errBody?.code === 'RATE_LIMITED' || errBody?.code === 'CIRCUIT_OPEN') {
+        throw new RateLimitError(errBody.error || 'Too many requests', errBody.code);
+      }
+    } catch (parseErr) {
+      // Re-throw if it's already a RateLimitError
+      if (parseErr instanceof RateLimitError) throw parseErr;
+      // Otherwise ignore parse failure and fall through to generic error
+    }
     console.error('Illustration edge function error:', error);
     throw error;
   }

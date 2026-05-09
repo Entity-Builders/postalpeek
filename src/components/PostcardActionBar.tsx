@@ -28,6 +28,8 @@ interface PostcardActionBarProps {
   isOwned?: boolean;
   hasOwner?: boolean;
   onOpenAlbum?: (albumId: string) => void;
+  onTravelHere?: () => void;
+  isTravelChecking?: boolean;
 }
 
 export function PostcardActionBar({
@@ -47,6 +49,8 @@ export function PostcardActionBar({
   isOwned = false,
   hasOwner = false,
   onOpenAlbum,
+  onTravelHere,
+  isTravelChecking = false,
 }: PostcardActionBarProps) {
   return (
     <PostcardChin
@@ -66,6 +70,8 @@ export function PostcardActionBar({
       onFlipCard={onFlipCard}
       showClaimGuide={showClaimGuide}
       isBusiness={isBusiness}
+      onTravelHere={onTravelHere}
+      isTravelChecking={isTravelChecking}
     />
   );
 }

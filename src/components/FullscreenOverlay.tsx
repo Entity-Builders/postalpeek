@@ -42,70 +42,6 @@ export function FullscreenOverlay({ item, cachedUrl, onClose }: FullscreenOverla
     };
   }, [onClose]);
 
-  // ── Loupe helpers ──
-  const updateLens = useCallback((clientX: number, clientY: number) => {
-    const hero = heroRef.current;
-    const lens = lensRef.current;
-    if (!hero || !lens) return;
-
-    const rect = hero.getBoundingClientRect();
-
-    // Cursor position relative to the image element (0 to 1)
-    const rx = (clientX - rect.left) / rect.width;
-    const ry = (clientY - rect.top) / rect.height;
-
-    // Ignore if cursor is outside the image bounds
-    if (rx < 0 || rx > 1 || ry < 0 || ry > 1) {
-      lens.style.opacity = '0';
-      return;
-    }
-
-    const px = rx * 100;
-    const py = ry * 100;
-
-    // Position lens: the lens is the same size as the hero, scaled up by LOUPE_ZOOM
-    // We translate it so the point at (px%, py%) lands under the cursor
-    const ox = rx * rect.width;
-    const oy = ry * rect.height;
-    const tx = (clientX - rect.left) - ox * LOUPE_ZOOM;
-    const ty = (clientY - rect.top) - oy * LOUPE_ZOOM;
-
-    lens.style.opacity = '1';
-    lens.style.width = `${rect.width}px`;
-    lens.style.height = `${rect.height}px`;
-    lens.style.left = `${rect.left}px`;
-    lens.style.top = `${rect.top}px`;
-    lens.style.clipPath = `circle(${LOUPE_RADIUS}px at ${clientX - rect.left}px ${clientY - rect.top}px)`;
-    lens.style.transform = `translate(${tx}px, ${ty}px) scale(${LOUPE_ZOOM})`;
-    lens.style.transformOrigin = '0 0';
-  }, []);
-
-  const hideLens = useCallback(() => {
-    if (lensRef.current) {
-      lensRef.current.style.opacity = '0';
-    }
-  }, []);
-
-  // ── Desktop: mouse move ──
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    updateLens(e.clientX, e.clientY);
-  }, [updateLens]);
-
-  // ── Mobile: touch-hold ──
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      e.preventDefault(); // prevent scroll
-      updateLens(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, [updateLens]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      updateLens(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, [updateLens]);
-
   return (
     <motion.div
       className="fixed inset-0 z-[200] flex items-center justify-center"
@@ -115,11 +51,6 @@ export function FullscreenOverlay({ item, cachedUrl, onClose }: FullscreenOverla
       transition={{ duration: 0.3, ease: 'easeOut' }}
       ref={containerRef}
       onClick={onClose}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={hideLens}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={hideLens}
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* Ambient background */}
@@ -145,7 +76,6 @@ export function FullscreenOverlay({ item, cachedUrl, onClose }: FullscreenOverla
           objectFit: 'contain',
           userSelect: 'none',
           WebkitUserSelect: 'none',
-          cursor: 'crosshair',
         }}
         onClick={(e) => e.stopPropagation()} // don't close when clicking image
         transition={{
@@ -153,20 +83,6 @@ export function FullscreenOverlay({ item, cachedUrl, onClose }: FullscreenOverla
           stiffness: 300,
           damping: 30,
           mass: 0.8,
-        }}
-      />
-
-      {/* Loupe lens — same image, zoomed, clipped to circle around cursor */}
-      <img
-        ref={lensRef}
-        src={cachedUrl}
-        alt=""
-        draggable={false}
-        className="fixed z-[5] pointer-events-none select-none will-change-transform"
-        style={{
-          opacity: 0,
-          transition: 'opacity 0.15s ease-out',
-          objectFit: 'contain',
         }}
       />
 

@@ -126,9 +126,10 @@ function App() {
 
   // Identify user in PostHog when auth state changes
   useEffect(() => {
-    // If auth loading finished and we have no user, sign in anonymously
+    // If auth loading finished and we have no user, we rely on deviceId for guest tracking
+    // instead of creating an anonymous Supabase auth user.
     if (!loading && !user) {
-      supabase.auth.signInAnonymously().catch(console.error);
+      // supabase.auth.signInAnonymously().catch(console.error);
     }
 
     if (user) {
