@@ -147,8 +147,8 @@ export function PostcardChin({
   return (
     <div
       className={cn(
-        'transition-all duration-300 overflow-hidden shrink-0',
-        isClean ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100',
+        'transition-all duration-300 shrink-0',
+        isClean ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[500px] opacity-100',
       )}
     >
       {/* ── Storytelling expandable fact ─────────────────────────── */}

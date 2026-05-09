@@ -92,10 +92,10 @@ export function ShareButton({ postcardId, country, isUserPostcard }: ShareButton
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.9 }}
-            className="absolute bottom-[110%] left-1/2 -translate-x-1/2 px-3 py-1.5 bg-stone-800 text-white text-[11px] font-bold tracking-wide rounded-lg shadow-lg whitespace-nowrap pointer-events-none"
+            className="absolute bottom-[110%] right-0 md:left-1/2 md:-translate-x-1/2 px-3 py-1.5 bg-stone-800 text-white text-[11px] font-bold tracking-wide rounded-lg shadow-lg whitespace-nowrap pointer-events-none z-50"
           >
             ¡Enlace copiado!
-            <div className="absolute top-[98%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-stone-800" />
+            <div className="absolute top-[98%] right-3 md:left-1/2 md:-translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-stone-800" />
           </motion.div>
         )}
       </AnimatePresence>
