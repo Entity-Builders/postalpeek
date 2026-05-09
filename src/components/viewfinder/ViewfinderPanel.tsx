@@ -26,7 +26,7 @@ import type { FeedItem } from '../Postcard';
 import { PostcardBack } from '../PostcardBack';
 import { PostcardFront } from '../PostcardFront';
 import { FullscreenOverlay } from '../FullscreenOverlay';
-import { MapPin, ArrowLeft, Sparkles, RotateCcw, AlertCircle, Map, X, Compass, Loader2 } from 'lucide-react';
+import { MapPin, ArrowLeft, Sparkles, RotateCcw, AlertCircle, Map, X, Compass, Loader2, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useAnimate } from 'framer-motion';
 import { useLang, t } from '../../utils/i18n';
 import { DynamicMiniMap } from './DynamicMiniMap';
@@ -101,6 +101,10 @@ export function ViewfinderPanel({
   } = useViewfinder(userId, sourceItem, userIsAnonymous);
 
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+
+  const fullscreenClasses = "absolute inset-0 z-0 transition-all duration-500 ease-in-out rounded-none border-none";
+  const pipClasses = "absolute top-32 right-4 z-40 w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 transition-all duration-500 ease-in-out cursor-pointer hover:scale-105 pointer-events-auto bg-[#0a0a0e]";
 
   // Flip state for the success postcard
   const [isFlipped, setIsFlipped] = useState(false);
@@ -206,8 +210,14 @@ export function ViewfinderPanel({
 
   return (
     <div className="relative w-full h-full bg-[#0a0a0e] overflow-hidden">
-      {/* Street View Panorama — full bleed */}
-      <div className={`absolute inset-0 z-0 ${isPreviewOrBeyond ? 'pointer-events-none' : ''}`}>
+      {/* Street View Panorama Container */}
+      <div className={`${isMapFullscreen ? pipClasses : fullscreenClasses} ${isPreviewOrBeyond ? 'pointer-events-none' : ''}`}>
+        {isMapFullscreen && step === 'viewfinder' && (
+          <div 
+            className="absolute inset-0 z-50 cursor-pointer" 
+            onClick={() => setIsMapFullscreen(false)}
+          />
+        )}
         {sourceItem.is_free && (sourceItem.lat == null || sourceItem.lng == null) ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-[#0a0a0e]">
             <MapPin className="w-16 h-16 text-white/20 mb-4" />
@@ -244,7 +254,9 @@ export function ViewfinderPanel({
           <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-[2px]" />
         )}
         {/* Bottom gradient to cover Google branding */}
-        <div className="absolute bottom-0 left-0 right-0 h-14 z-10 bg-gradient-to-t from-[#0a0a0e] via-[#0a0a0e]/80 to-transparent pointer-events-none" />
+        {!isMapFullscreen && (
+          <div className="absolute bottom-0 left-0 right-0 h-14 z-10 bg-gradient-to-t from-[#0a0a0e] via-[#0a0a0e]/80 to-transparent pointer-events-none" />
+        )}
       </div>
 
 
@@ -272,44 +284,57 @@ export function ViewfinderPanel({
         )}
       </AnimatePresence>
 
-      {/* ─── Mini Map ─── Toggleable, top-right */}
+      {/* ─── Mini Map Toggle Button ─── */}
       {currentPos && step === 'viewfinder' && (
-        <div className="absolute top-20 right-4 z-20 flex flex-col items-end gap-2">
-          {/* Toggle button */}
+        <div className="absolute top-20 right-4 z-50">
           <button
-            onClick={() => setShowMiniMap(v => !v)}
+            onClick={() => {
+              if (showMiniMap && isMapFullscreen) {
+                setIsMapFullscreen(false);
+              }
+              setShowMiniMap(v => !v);
+            }}
             className="pointer-events-auto flex items-center justify-center w-8 h-8 rounded-full bg-black/50 backdrop-blur-md border border-white/15 text-white/70 hover:text-white hover:bg-black/70 transition-all active:scale-90 cursor-pointer shadow-lg"
             aria-label={showMiniMap ? 'Hide mini map' : 'Show mini map'}
           >
             {showMiniMap ? <X size={14} /> : <Map size={14} />}
           </button>
-          {/* Map */}
-          <AnimatePresence>
-            {showMiniMap && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
-                className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden shadow-2xl border border-white/10"
-              >
-                <DynamicMiniMap 
-                  currentLat={currentPos.lat} 
-                  currentLng={currentPos.lng} 
-                  targetLat={sourceItem.lat || undefined}
-                  targetLng={sourceItem.lng || undefined}
-                  zoom={14}
-                  className="w-full h-full"
-                  interactive
-                  onLocationClick={(lat, lng) => {
-                    panoramaRef.current?.navigateTo(lat, lng);
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       )}
+
+      {/* ─── Mini Map Container ─── */}
+      <AnimatePresence>
+        {showMiniMap && currentPos && step === 'viewfinder' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.3 }}
+            className={`${!isMapFullscreen ? pipClasses : fullscreenClasses} bg-[#0a0a0e]`}
+          >
+            <DynamicMiniMap 
+              currentLat={currentPos.lat} 
+              currentLng={currentPos.lng} 
+              targetLat={sourceItem.lat || undefined}
+              targetLng={sourceItem.lng || undefined}
+              zoom={14}
+              className="w-full h-full"
+              interactive={isMapFullscreen}
+              onLocationClick={(lat, lng) => {
+                panoramaRef.current?.navigateTo(lat, lng);
+                setIsMapFullscreen(false);
+              }}
+            />
+            {/* Click overlay for PIP mode */}
+            {!isMapFullscreen && (
+              <div 
+                className="absolute inset-0 z-50 cursor-pointer" 
+                onClick={() => setIsMapFullscreen(true)}
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
 
 
@@ -533,29 +558,39 @@ export function ViewfinderPanel({
             >
 
               {/* Action: Save and Back to Feed */}
-              <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  handleSaveAndReturn();
-                }}
-                className="w-full py-3.5 px-4 rounded-xl bg-white/10 backdrop-blur-md text-white/90 text-sm font-semibold hover:bg-white/20 transition-all flex justify-center items-center gap-2 border border-white/15 active:scale-95 shadow-lg"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Compass className="w-4 h-4" />
-                )}
-                {t({ es: '🌍 Volver al feed', en: '🌍 Back to feed' }, lang)}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => flipTo(!isFlipped)}
+                  className="flex-1 py-3.5 px-4 rounded-xl bg-white/10 backdrop-blur-md text-white/90 text-sm font-semibold hover:bg-white/20 transition-all flex justify-center items-center gap-2 border border-white/15 active:scale-95 shadow-lg"
+                >
+                  <RotateCw className="w-4 h-4" />
+                  {isFlipped ? t({ es: 'Ver frente', en: 'View front' }, lang) : t({ es: 'Acerca de', en: 'About' }, lang)}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsFlipped(false);
+                    handleSaveAndReturn();
+                  }}
+                  className="flex-1 py-3.5 px-4 rounded-xl bg-indigo-500/80 backdrop-blur-md text-white text-sm font-semibold hover:bg-indigo-600/80 transition-all flex justify-center items-center gap-2 border border-indigo-400/30 active:scale-95 shadow-lg"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Compass className="w-4 h-4" />
+                  )}
+                  {t({ es: 'Volver al feed', en: 'Back to feed' }, lang)}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ─── Bottom Toolbar — single CameraFAB that captures directly ─── */}
-      {step === 'viewfinder' && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pointer-events-none">
-          <div className="pointer-events-auto pb-12 pt-6">
+      {step === 'viewfinder' && !isMapFullscreen && (
+        <div className="absolute top-[60vh] -translate-y-1/2 left-0 right-0 z-30 flex flex-col items-center pointer-events-none">
+          <div className="pointer-events-auto">
             <CameraFAB onClick={triggerCapture} />
           </div>
         </div>

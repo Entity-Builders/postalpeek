@@ -174,8 +174,7 @@ export function WalkerGrid({
     analytics.track('welcome_onboarding_started', { initial_stamps: 50 });
     
     // Perform "Surprise Trip" logic
-    const withPano = items.filter((i: any) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null);
-    const pool = withPano.length > 0 ? withPano : items.filter((i: any) => i.lat != null && i.lng != null);
+    const pool = items.filter((i: any) => i.lat != null && i.lng != null);
     if (pool.length > 0) {
       const random = pool[Math.floor(Math.random() * pool.length)];
       analytics.track('teleport_surprise_trip', { destination_id: random.id, city: random.city, country: random.country });

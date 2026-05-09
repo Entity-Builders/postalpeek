@@ -398,8 +398,7 @@ export function FeedLayout({
             <div className='max-w-lg mx-auto'>
               <button
                 onClick={async () => {
-                  const withPano = items.filter((i: any) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null);
-                  const pool = withPano.length > 0 ? withPano : items.filter((i: any) => i.lat != null && i.lng != null);
+                  const pool = items.filter((i: any) => i.lat != null && i.lng != null);
                   if (pool.length === 0) return;
 
                   const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';

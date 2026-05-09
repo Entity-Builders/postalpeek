@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowUpRight, RotateCcw, MapPin, BookOpen, Camera, Loader2 } from 'lucide-react';
+import { ArrowUpRight, RotateCcw, MapPin, BookOpen, Camera, Loader2, RotateCw } from 'lucide-react';
 import { useSignedImage } from '../utils/useSignedImage';
 import type { FeedItem } from './Postcard';
 import { t, useLang, type BilingualText } from '../utils/i18n';
@@ -80,7 +80,19 @@ export function PostcardBack({
         }}
       ></div>
 
-      {/* Flip-back button removed for MVP (storytelling moved to front) */}
+      {/* Flip-back button */}
+      {onFlipBack && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onFlipBack();
+          }}
+          className="absolute top-3 right-3 p-2 rounded-full bg-black/10 hover:bg-black/20 text-stone-700 transition-colors z-20"
+          title="Volver"
+        >
+          <RotateCw className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Main content – scrollable */}
       <div className={`relative flex flex-col w-full h-full text-black/80 pb-2 ${isGridMode ? 'overflow-y-auto overflow-x-hidden pr-1.5' : 'overflow-hidden'}`}>

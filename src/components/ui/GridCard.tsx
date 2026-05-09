@@ -9,6 +9,7 @@ import { t, useLang } from '../../utils/i18n';
 import { RarityBadge } from './RarityBadge';
 import { PostcardChin } from './PostcardChin';
 import { PostcardBack } from '../PostcardBack';
+import { useNavigateToExplore } from '../../hooks/useNavigateToExplore';
 
 import type { CardLayout } from './cardLayout';
 
@@ -56,6 +57,12 @@ export const GridCard = React.memo(function GridCard({
 
   const [loaded, setLoaded] = React.useState(false);
   const lang = useLang();
+
+  const { navigateToExplore, isChecking: isTravelChecking } = useNavigateToExplore({
+    onUnavailable: () => {
+      // Silently swallow, preflight handles it
+    },
+  });
 
   const [isFlipped, setIsFlipped] = React.useState(false);
 
@@ -227,6 +234,8 @@ export const GridCard = React.memo(function GridCard({
             isTriviaLocked={!hasOwner && !!item.generation_metadata?.trivia}
             onClick={onClick}
             onClaim={onClaimPostcard ? (rarity) => onClaimPostcard(item.id, rarity) : undefined}
+            onTravelHere={() => navigateToExplore(item)}
+            isTravelChecking={isTravelChecking}
           />
         </div>
 

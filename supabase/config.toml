@@ -229,6 +229,10 @@ otp_expiry = 3600
 subject = "Tu código de PostalPeek"
 content_path = "./supabase/templates/otp_email.html"
 
+[auth.email.template.confirmation]
+subject = "Tu código de PostalPeek"
+content_path = "./supabase/templates/otp_email.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
@@ -480,6 +484,9 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+[functions.postalpeek-illustrate]
+enabled = true
+verify_jwt = false
 
 [functions.validate-location]
 enabled = true

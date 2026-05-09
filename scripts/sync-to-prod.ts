@@ -47,7 +47,7 @@ const LOCAL_URL =
 
 // Production Supabase (target)
 const PROD_URL = loadEnvValue(appEnvProdPath, 'VITE_SUPABASE_URL');
-const PROD_SERVICE_ROLE_KEY = loadEnvValue(infraEnvPath, 'SUPABASE_SERVICE_ROLE_KEY');
+const PROD_SERVICE_ROLE_KEY = loadEnvValue(appEnvProdPath, 'SUPABASE_SERVICE_ROLE_KEY');
 
 if (!PROD_URL) {
   console.error('❌ VITE_SUPABASE_URL not found in .env.production');

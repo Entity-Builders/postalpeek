@@ -25,14 +25,7 @@ import { analytics } from '../../lib/analytics';
 import { MapPinOff } from 'lucide-react';
 
 function pickRandomWithPano(items: any[]) {
-  // Prefer items with verified pano_id
-  const withPano = items.filter(
-    (i) => i.streetview_pov?.pano_id && i.lat != null && i.lng != null,
-  );
-  if (withPano.length > 0) {
-    return withPano[Math.floor(Math.random() * withPano.length)];
-  }
-  // Fallback: any item with coordinates
+  // Any item with coordinates
   const withCoords = items.filter((i) => i.lat != null && i.lng != null);
   if (withCoords.length > 0) {
     return withCoords[Math.floor(Math.random() * withCoords.length)];

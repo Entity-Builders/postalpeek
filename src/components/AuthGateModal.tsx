@@ -37,15 +37,6 @@ export function AuthGateModal({
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-
-  React.useEffect(() => {
-    // Reveal form after user has time to read the Walker text
-    const timer = setTimeout(() => {
-      setShowForm(true);
-    }, 2000); 
-    return () => clearTimeout(timer);
-  }, []);
 
   const effectiveItems = viewedItems.length >= 3 ? viewedItems : FALLBACK_ITEMS;
   const heroCards = effectiveItems.slice(0, 3);
@@ -168,7 +159,7 @@ export function AuthGateModal({
       style={{ width: '100vw', height: '100dvh' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.6 }}
+      transition={{ duration: 0.3 }}
     >
       <div className='w-full h-full flex flex-col items-center select-none overflow-hidden'>
         {onClose && (
@@ -185,7 +176,7 @@ export function AuthGateModal({
           className='flex-[4] w-full flex items-center justify-center relative min-h-0 overflow-hidden pt-4'
           initial={{ opacity: 0, y: -120, scale: 1.05 }}
           animate={{ opacity: 0.9, y: 0, scale: 1 }}
-          transition={{ duration: 1.0, ease, delay: 0.2 }}
+          transition={{ duration: 0.6, ease, delay: 0.1 }}
         >
           <div className='relative h-[85%] aspect-[3/4] max-w-[55%]'>
             {/* Card 3 (back) — continuous sway */}
@@ -262,7 +253,7 @@ export function AuthGateModal({
           className='flex-[5] w-full flex flex-col items-center px-6 min-h-0'
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease, delay: 0.5 }}
+          transition={{ duration: 0.5, ease, delay: 0.2 }}
         >
           {/* Walker copy */}
           <p className='text-stone-400 text-[10px] sm:text-[11px] font-mono tracking-[0.25em] uppercase mb-2 text-center'>
@@ -279,11 +270,10 @@ export function AuthGateModal({
 
           {/* Auth form — warm palette */}
           <div className='w-full max-w-sm min-h-[240px]'>
-            {showForm && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease }}
+                transition={{ duration: 0.4, ease, delay: 0.3 }}
                 className='w-full'
               >
                 {error && (
@@ -425,7 +415,6 @@ export function AuthGateModal({
               </form>
             )}
               </motion.div>
-            )}
           </div>
         </motion.div>
 
