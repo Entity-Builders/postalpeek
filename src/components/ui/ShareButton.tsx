@@ -4,74 +4,101 @@ import { cn } from '../../utils/cn';
 import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { analytics } from '../../lib/analytics';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface ShareButtonProps {
   postcardId: string;
   country: string;
+  isUserPostcard?: boolean;
 }
 
-export function ShareButton({ postcardId, country }: ShareButtonProps) {
+export function ShareButton({ postcardId, country, isUserPostcard }: ShareButtonProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
   return (
-    <button
-      className={cn(
-        'p-2 md:p-2.5 rounded-full transition-colors',
-        isCopied
-          ? 'bg-indigo-50 text-indigo-500'
-          : 'bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500',
-      )}
-      disabled={isSharing}
-      onClick={async (e) => {
-        e.stopPropagation();
-        if (isSharing) return;
-        setIsSharing(true);
+    <div className="relative flex items-center justify-center">
+      <button
+        className={cn(
+          'p-2 md:p-2.5 rounded-full transition-colors',
+          isCopied
+            ? 'bg-indigo-50 text-indigo-500'
+            : 'bg-stone-100/80 hover:bg-blue-50 text-stone-400 hover:text-blue-500',
+        )}
+        disabled={isSharing}
+        onClick={async (e) => {
+          e.stopPropagation();
+          if (isSharing) return;
+          setIsSharing(true);
 
-        try {
-          const { data, error } = await supabase
-            .from('postalpeek_shares')
-            .insert({ postcard_id: postcardId })
-            .select('id')
-            .single();
+          try {
+            const insertData = isUserPostcard
+              ? { user_postcard_id: postcardId }
+              : { postcard_id: postcardId };
 
-          if (error) throw error;
-          if (!data) throw new Error('No share record created');
+            const { data, error } = await supabase
+              .from('postalpeek_shares')
+              .insert(insertData)
+              .select('id')
+              .single();
 
-          const shortHash = encodeUuidToHash(data.id);
-          const shareLink = `${window.location.origin}/${shortHash}`;
+            if (error) throw error;
+            if (!data) throw new Error('No share record created');
 
-          await navigator.clipboard.writeText(shareLink);
-          setIsCopied(true);
-          setTimeout(() => setIsCopied(false), 2000);
+            const shortHash = encodeUuidToHash(data.id);
+            const shareLink = `${window.location.origin}/${shortHash}`;
 
-          analytics.track('postcard_shared', {
-            postcard_id: postcardId,
-            country,
-            share_link: shareLink,
-          });
-        } catch (err) {
-          console.log('Share failed:', err);
-          analytics.captureError(
-            err instanceof Error ? err : new Error(String(err)),
-            {
-              event_type: 'share_failed',
+            await navigator.clipboard.writeText(shareLink);
+            
+            if (navigator.vibrate) {
+              navigator.vibrate(50);
+            }
+
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+
+            analytics.track('postcard_shared', {
               postcard_id: postcardId,
-            },
-          );
-          alert('Failed to generate share link. Please try again.');
-        } finally {
-          setIsSharing(false);
-        }
-      }}
-    >
-      {isSharing ? (
-        <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
-      ) : isCopied ? (
-        <Check className='w-4 h-4 md:w-5 md:h-5 scale-110 transition-transform' />
-      ) : (
-        <Share2 className='w-4 h-4 md:w-5 md:h-5 transition-transform' />
-      )}
-    </button>
+              country,
+              share_link: shareLink,
+            });
+          } catch (err) {
+            console.log('Share failed:', err);
+            analytics.captureError(
+              err instanceof Error ? err : new Error(String(err)),
+              {
+                event_type: 'share_failed',
+                postcard_id: postcardId,
+              },
+            );
+            alert('Failed to generate share link. Please try again.');
+          } finally {
+            setIsSharing(false);
+          }
+        }}
+      >
+        {isSharing ? (
+          <Loader2 className='w-4 h-4 md:w-5 md:h-5 animate-spin' />
+        ) : isCopied ? (
+          <Check className='w-4 h-4 md:w-5 md:h-5 scale-110 transition-transform' />
+        ) : (
+          <Share2 className='w-4 h-4 md:w-5 md:h-5 transition-transform' />
+        )}
+      </button>
+
+      <AnimatePresence>
+        {isCopied && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.9 }}
+            className="absolute bottom-[110%] left-1/2 -translate-x-1/2 px-3 py-1.5 bg-stone-800 text-white text-[11px] font-bold tracking-wide rounded-lg shadow-lg whitespace-nowrap pointer-events-none"
+          >
+            ¡Enlace copiado!
+            <div className="absolute top-[98%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-stone-800" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

@@ -87,6 +87,7 @@ function buildFeedItem(
       pano_id: pov.panoId,
     } : sourceItem.streetview_pov,
     generation_metadata: postcard.generation_metadata || {},
+    is_user_generated: true,
   };
 }
 

@@ -210,7 +210,11 @@ export function PostcardChin({
 
           {/* Share */}
           {!hideActions && (
-            <ShareButton postcardId={item.id} country={item.country} />
+            <ShareButton 
+              postcardId={item.id} 
+              country={item.country} 
+              isUserPostcard={item.is_user_generated}
+            />
           )}
 
           {/* Business coupon */}

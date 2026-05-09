@@ -62,6 +62,7 @@ export interface FeedItem {
   stamp_cost?: number;
   /** Anonymous display name set by the creator during MVP onboarding */
   creator_name?: string | null;
+  is_user_generated?: boolean;
   game_stats?: {
     hp: number;
     attack: number;
