@@ -589,7 +589,7 @@ export function ViewfinderPanel({
 
       {/* ─── Bottom Toolbar — single CameraFAB that captures directly ─── */}
       {step === 'viewfinder' && !isMapFullscreen && (
-        <div className="absolute top-[60vh] -translate-y-1/2 left-0 right-0 z-30 flex flex-col items-center pointer-events-none">
+        <div className="absolute bottom-12 left-0 right-0 z-30 flex flex-col items-center pointer-events-none">
           <div className="pointer-events-auto">
             <CameraFAB onClick={triggerCapture} />
           </div>
