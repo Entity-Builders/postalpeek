@@ -17,9 +17,11 @@ import { getDeviceId } from '../utils/deviceId';
 import {
   createUserPostcard,
   enrichPostcardMetadata,
+  fetchLocationMetadata,
   type UserPostcard,
   type CreateUserPostcardParams,
   type CreateUserPostcardResult,
+  type LocationMetadata,
 } from '../services/userPostcardService';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 import type { FeedItem } from '../components/Postcard';
@@ -62,6 +64,8 @@ export interface UseViewfinderReturn {
   tripRemaining: number;
   /** Daily trip limit */
   tripLimit: number;
+  /** Metadata fetched in parallel during illustration (for progressive loading) */
+  loadingMetadata: LocationMetadata | null;
   reset: () => void;
 }
 
@@ -166,6 +170,7 @@ export function useViewfinder(
   const [isSaving, setIsSaving] = useState(false);
   const [tripRemaining, setTripRemaining] = useState(5);
   const [tripLimit, setTripLimit] = useState(5);
+  const [loadingMetadata, setLoadingMetadata] = useState<LocationMetadata | null>(null);
 
   // Load persisted creator name from localStorage
   const [creatorName, setCreatorNameState] = useState<string>(
@@ -220,7 +225,33 @@ export function useViewfinder(
         style: randomStyle,
       };
 
-      const result = await createUserPostcard(params);
+      // ─── PARALLEL PIPELINE ───
+      // 1. Illustration (~10s) — the main generation
+      // 2. Location metadata (~2-3s) — fast text-only enrichment for progressive loading
+      setLoadingMetadata(null);
+
+      const metadataPromise = fetchLocationMetadata(
+        povToUse.lat,
+        povToUse.lng,
+        sourceItem.city || '',
+        sourceItem.country || '',
+        sourceItem.location_name,
+      ).then((meta) => {
+        if (meta) {
+          setLoadingMetadata(meta);
+          console.log('[Viewfinder] Location metadata arrived (fast path)');
+        }
+        return meta;
+      });
+
+      const illustrationPromise = createUserPostcard(params);
+
+      // Wait for BOTH to settle (illustration is what we need; metadata is best-effort)
+      const [result, locationMeta] = await Promise.all([
+        illustrationPromise,
+        metadataPromise.catch(() => null),
+      ]);
+
       const postcard = result.postcard;
 
       // Update trip counter from edge function response
@@ -232,6 +263,18 @@ export function useViewfinder(
       // Build FeedItem for the <Postcard> / <PostcardBack> components
       const savedName = localStorage.getItem(CREATOR_NAME_KEY) || undefined;
       const feedItem = buildFeedItem(postcard, sourceItem, povToUse, savedName);
+
+      // If location metadata arrived, merge it into the feedItem immediately
+      if (locationMeta) {
+        feedItem.rarity = (locationMeta.rarity as FeedItem['rarity']) || feedItem.rarity;
+        feedItem.generation_metadata = {
+          ...feedItem.generation_metadata,
+          storytelling: locationMeta.storytelling,
+          stats: locationMeta.stats,
+          ...(locationMeta.trivia ? { trivia: locationMeta.trivia } : {}),
+        };
+      }
+
       setCapturedFeedItem(feedItem);
       
       // If user already has a name saved, skip naming step
@@ -245,12 +288,11 @@ export function useViewfinder(
         country: sourceItem.country,
       });
 
-      // Fire metadata enrichment in the background (non-blocking)
-      // This adds storytelling, stats, trivia to the postcard back
+      // Fire image-based metadata enrichment in the background (non-blocking)
+      // This refines the text-only metadata with image-specific facts
       enrichPostcardMetadata(postcard.id).then((enrichResult) => {
         if (enrichResult) {
-          console.log('[Viewfinder] Metadata enrichment completed:', enrichResult);
-          // Update the FeedItem with enriched metadata so PostcardBack re-renders
+          console.log('[Viewfinder] Image-based metadata enrichment completed:', enrichResult);
           setCapturedFeedItem(prev => {
             if (!prev) return prev;
             return {
@@ -389,6 +431,7 @@ export function useViewfinder(
     creatorName,
     tripRemaining,
     tripLimit,
+    loadingMetadata,
     setCreatorName,
     setIllustrationStyle,
     handleSnapshot,

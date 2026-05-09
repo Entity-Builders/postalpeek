@@ -186,3 +186,58 @@ export async function enrichPostcardMetadata(
     return null;
   }
 }
+
+// ─── Location-only metadata (fast path for progressive loading) ──
+
+export interface LocationMetadata {
+  storytelling: {
+    did_you_know: { es: string; en: string };
+    fact_type: string;
+  };
+  stats: {
+    history: number;
+    nature: number;
+    urban: number;
+    vibe: number;
+  };
+  trivia: unknown;
+  rarity: string;
+}
+
+/**
+ * Fetch metadata for a location using text-only AI (no image needed).
+ * This is the fast path (~2-3s) used during the illustration loading screen
+ * to show facts, stats, and rarity while the illustration is still generating.
+ */
+export async function fetchLocationMetadata(
+  lat: number,
+  lng: number,
+  city: string,
+  country: string,
+  locationName?: string,
+): Promise<LocationMetadata | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      'postalpeek-enrich-metadata',
+      {
+        body: {
+          lat,
+          lng,
+          city,
+          country,
+          location_name: locationName || `${city}, ${country}`,
+        },
+      },
+    );
+
+    if (error) {
+      console.warn('[LocationMeta] Edge function error:', error);
+      return null;
+    }
+
+    return data as LocationMetadata;
+  } catch (err) {
+    console.warn('[LocationMeta] Failed to fetch location metadata:', err);
+    return null;
+  }
+}

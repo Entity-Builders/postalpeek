@@ -33,6 +33,7 @@ import { DynamicMiniMap } from './DynamicMiniMap';
 import { CameraFAB } from './CameraFAB';
 import { ViewfinderOnboarding } from './ViewfinderOnboarding';
 import { TripCounter } from '../ui/TripCounter';
+import { LoadingMetadata } from './LoadingMetadata';
 
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
@@ -101,6 +102,7 @@ export function ViewfinderPanel({
     handleSave,
     tripRemaining,
     tripLimit,
+    loadingMetadata,
     reset,
   } = useViewfinder(userId, sourceItem, userIsAnonymous);
 
@@ -417,9 +419,9 @@ export function ViewfinderPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 22, stiffness: 120 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6 overflow-y-auto"
           >
-            <div className="relative w-[85vw] max-w-[420px] bg-[#F9F8F4] p-3 pb-14 shadow-[0_30px_60px_rgba(0,0,0,0.6)] rounded-sm" style={{ transform: 'rotate(-1.5deg)' }}>
+            <div className="relative w-[85vw] max-w-[420px] bg-[#F9F8F4] p-3 pb-14 shadow-[0_30px_60px_rgba(0,0,0,0.6)] rounded-sm flex-shrink-0" style={{ transform: 'rotate(-1.5deg)' }}>
               <div className="relative aspect-square w-full bg-[#E5E5E5] overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)]">
                 {/* Captured Photo */}
                 <img 
@@ -460,6 +462,13 @@ export function ViewfinderPanel({
                 </motion.div>
               </div>
             </div>
+
+            {/* ─── Progressive Metadata Reveal ─── */}
+            <LoadingMetadata
+              metadata={loadingMetadata}
+              city={sourceItem.city}
+              country={sourceItem.country}
+            />
           </motion.div>
         )}
       </AnimatePresence>
