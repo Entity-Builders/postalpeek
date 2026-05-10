@@ -51,7 +51,7 @@ export function TripCounter({ remaining, limit }: TripCounterProps) {
       />
 
       <AnimatePresence mode="wait">
-        {isExhausted ? (
+        {isExhausted && limit !== 9999 ? (
           <motion.span
             key="exhausted"
             initial={{ opacity: 0 }}
@@ -60,6 +60,16 @@ export function TripCounter({ remaining, limit }: TripCounterProps) {
             className="text-red-300 text-[11px] font-semibold"
           >
             {t({ es: 'Volvé mañana', en: 'Come back tomorrow' }, lang)}
+          </motion.span>
+        ) : limit === 9999 ? (
+          <motion.span
+            key="unlimited"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-white/80 text-[16px] font-bold leading-none translate-y-[1px]"
+          >
+            ∞
           </motion.span>
         ) : (
           <motion.span

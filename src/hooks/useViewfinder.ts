@@ -13,6 +13,7 @@
 import { useState, useCallback } from 'react';
 import { t, useLang } from '../utils/i18n';
 import { supabase } from '@eb-packages/logic/src/supabase';
+import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
 import { getDeviceId } from '../utils/deviceId';
 import {
   createUserPostcard,
@@ -158,6 +159,7 @@ export function useViewfinder(
   userIsAnonymous: boolean = false,
 ): UseViewfinderReturn {
   const lang = useLang();
+  const { isAdmin } = useAuth();
   const [step, setStep] = useState<ViewfinderStep>('viewfinder');
   const [capturedPostcard, setCapturedPostcard] = useState<UserPostcard | null>(
     null,
@@ -168,8 +170,8 @@ export function useViewfinder(
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [illustrationStyle, setIllustrationStyle] = useState('watercolor');
   const [isSaving, setIsSaving] = useState(false);
-  const [tripRemaining, setTripRemaining] = useState(5);
-  const [tripLimit, setTripLimit] = useState(5);
+  const [tripRemaining, setTripRemaining] = useState(isAdmin ? 9999 : 5);
+  const [tripLimit, setTripLimit] = useState(isAdmin ? 9999 : 5);
   const [loadingMetadata, setLoadingMetadata] = useState<LocationMetadata | null>(null);
 
   // Load persisted creator name from localStorage
@@ -270,7 +272,7 @@ export function useViewfinder(
         feedItem.generation_metadata = {
           ...feedItem.generation_metadata,
           storytelling: locationMeta.storytelling,
-          stats: locationMeta.stats,
+          spotted_objects: locationMeta.spotted_objects,
           ...(locationMeta.trivia ? { trivia: locationMeta.trivia } : {}),
         };
       }

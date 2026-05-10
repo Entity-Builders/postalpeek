@@ -27,54 +27,6 @@ const RARITY_CONFIG = {
   legendary: { label: 'Legendary', color: '#FBBF24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.3)'  },
 };
 
-const STAT_LABELS: Record<string, { icon: string; label: { es: string; en: string } }> = {
-  history: { icon: '🏛️', label: { es: 'Historia', en: 'History' } },
-  nature:  { icon: '🌿', label: { es: 'Naturaleza', en: 'Nature' } },
-  urban:   { icon: '🏙️', label: { es: 'Urbano', en: 'Urban' } },
-  vibe:    { icon: '✨', label: { es: 'Vibe', en: 'Vibe' } },
-};
-
-function StatBar({ statKey, value, delay, lang }: { statKey: string; value: number; delay: number; lang: Lang }) {
-  const info = STAT_LABELS[statKey];
-  if (!info) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, type: 'spring', damping: 20 }}
-      className="flex items-center gap-2"
-    >
-      <span className="text-[10px] w-3 text-center">{info.icon}</span>
-      <span className="text-[9px] text-white/50 w-14 truncate uppercase tracking-wider font-semibold">
-        {t(info.label, lang)}
-      </span>
-      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ delay: delay + 0.2, duration: 0.8, ease: 'easeOut' }}
-          className="h-full rounded-full"
-          style={{
-            background: value >= 80
-              ? 'linear-gradient(90deg, #FBBF24, #F59E0B)'
-              : value >= 50
-              ? 'linear-gradient(90deg, #60A5FA, #3B82F6)'
-              : 'linear-gradient(90deg, #6B7280, #9CA3AF)',
-          }}
-        />
-      </div>
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: delay + 0.6 }}
-        className="text-[9px] text-white/40 w-5 text-right tabular-nums font-mono"
-      >
-        {value}
-      </motion.span>
-    </motion.div>
-  );
-}
 
 export function LoadingMetadata({ metadata, city, country }: LoadingMetadataProps) {
   const lang = useLang();
@@ -165,23 +117,30 @@ export function LoadingMetadata({ metadata, city, country }: LoadingMetadataProp
               </p>
             </motion.div>
 
-            {/* ─── Stats Bars ─── */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className="flex flex-col gap-1.5 px-1"
-            >
-              {(['history', 'nature', 'urban', 'vibe'] as const).map((key, i) => (
-                <StatBar
-                  key={key}
-                  statKey={key}
-                  value={metadata.stats[key]}
-                  delay={0.9 + i * 0.15}
-                  lang={lang}
-                />
-              ))}
-            </motion.div>
+            {/* ─── Spotted Objects ─── */}
+            {metadata.spotted_objects && metadata.spotted_objects.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 }}
+                className="flex flex-wrap gap-1.5 px-1 mt-1"
+              >
+                {metadata.spotted_objects.map((obj, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.9 + i * 0.1, type: 'spring', damping: 20 }}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-white/10 border border-white/10 rounded-lg backdrop-blur-sm"
+                  >
+                    <span className="text-[12px]">{obj.emoji}</span>
+                    <span className="text-[10px] text-white/80 font-medium whitespace-nowrap">
+                      {lang === 'es' ? obj.name.es : obj.name.en}
+                    </span>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

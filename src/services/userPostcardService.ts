@@ -194,12 +194,10 @@ export interface LocationMetadata {
     did_you_know: { es: string; en: string };
     fact_type: string;
   };
-  stats: {
-    history: number;
-    nature: number;
-    urban: number;
-    vibe: number;
-  };
+  spotted_objects: {
+    emoji: string;
+    name: { es: string; en: string };
+  }[];
   trivia: unknown;
   rarity: string;
 }
