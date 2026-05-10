@@ -260,7 +260,7 @@ export function PostcardFront({
 
     // Fetch postcards for this album
     supabase
-      .from('postalpeek_postcards')
+      .from('postcards')
       .select('*')
       .eq('album_id', item.album_id)
       .not('illustration_url', 'is', null)

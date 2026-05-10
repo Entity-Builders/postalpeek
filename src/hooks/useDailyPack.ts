@@ -32,7 +32,7 @@ export function useDailyPack(userId: string | null | undefined) {
         // Check if user already opened a pack today
         const today = new Date().toISOString().split('T')[0];
         const { data, error } = await supabase
-          .from('postalpeek_daily_packs')
+          .from('daily_packs')
           .select('id, postcard_ids')
           .eq('user_id', userId)
           .gte('opened_at', `${today}T00:00:00`)

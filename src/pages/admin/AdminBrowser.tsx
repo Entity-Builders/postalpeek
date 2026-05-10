@@ -137,7 +137,7 @@ function PostcardDetailPanel({ postcardId, onClose }: { postcardId: string; onCl
     const fetch = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select('id, city, country, location_name, category, description, visual_tags, detailed_tags, illustration_tags, aesthetic_vibes, architecture_style, color_palette, scene_type, time_of_day, weather, human_activity, original_image_url, illustration_url, generation_metadata, game_stats, created_at, ig_media_id, ig_published_at')
         .eq('id', postcardId)
         .single();
@@ -558,11 +558,11 @@ function PostcardsBrowser({ onSelectPostcard }: { onSelectPostcard: (id: string)
     const offset = reset ? 0 : offsetRef.current;
     try {
       if (reset || totalCount === null) {
-        const { count } = await supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true });
+        const { count } = await supabase.from('postcards').select('id', { count: 'exact', head: true });
         setTotalCount(count ?? 0);
       }
       let query = supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select('id, created_at, city, country, illustration_url, category, detailed_tags, illustration_tags, generation_metadata, ig_media_id')
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);

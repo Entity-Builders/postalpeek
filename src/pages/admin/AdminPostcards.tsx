@@ -70,7 +70,7 @@ export function AdminPostcards() {
     if (!confirm(`Delete postcard ${postcardId}? This is permanent.`)) return;
     setPostcardStatus({ status: 'loading', message: 'Deleting…' });
     try {
-      const { error } = await supabase.rpc('postalpeek_admin_delete_postcard', { p_postcard_id: postcardId.trim() });
+      const { error } = await supabase.rpc('admin_delete_postcard', { p_postcard_id: postcardId.trim() });
       if (error) throw error;
       setPostcardStatus({ status: 'success', message: 'Deleted' });
       setPostcardId('');
@@ -84,7 +84,7 @@ export function AdminPostcards() {
     setDetectStatus({ status: 'loading', message: 'Fetching postcard…' });
     setDetectedTags([]); setSegments([]);
     try {
-      const { data: pc, error } = await supabase.from('postalpeek_postcards').select('original_image_url, illustration_url').eq('id', postcardId.trim()).single();
+      const { data: pc, error } = await supabase.from('postcards').select('original_image_url, illustration_url').eq('id', postcardId.trim()).single();
       if (error || !pc?.original_image_url) throw new Error('Postcard not found');
       setPipelinePhotoUrl(pc.original_image_url);
       if (pc.illustration_url) setPipelineIllustrationUrl(pc.illustration_url);
@@ -94,7 +94,7 @@ export function AdminPostcards() {
       setDetectedTags(tags);
       setSegments(tags.map((t: PipelineTag) => ({ label: t.label, mask_url: '', status: 'pending' as const })));
       setDetectStatus({ status: 'loading', message: `Saving ${tags.length} tags to DB…` });
-      const { error: saveErr } = await supabase.from('postalpeek_postcards').update({ illustration_tags: tags }).eq('id', postcardId.trim());
+      const { error: saveErr } = await supabase.from('postcards').update({ illustration_tags: tags }).eq('id', postcardId.trim());
       if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
       setDetectStatus({ status: 'success', message: `${tags.length} objects found (real photo) & saved` });
     } catch (err: unknown) {
@@ -107,7 +107,7 @@ export function AdminPostcards() {
     setDetectStatus({ status: 'loading', message: 'Fetching postcard…' });
     setDetectedTags([]); setSegments([]);
     try {
-      const { data: pc, error } = await supabase.from('postalpeek_postcards').select('illustration_url').eq('id', postcardId.trim()).single();
+      const { data: pc, error } = await supabase.from('postcards').select('illustration_url').eq('id', postcardId.trim()).single();
       if (error || !pc?.illustration_url) throw new Error('No illustration found');
       setPipelineIllustrationUrl(pc.illustration_url);
       setDetectStatus({ status: 'loading', message: 'Analyzing illustration with Gemini Pro…' });
@@ -157,14 +157,14 @@ export function AdminPostcards() {
     setGsamStatus({ status: 'loading', message: 'Fetching postcard…' });
     setGsamResult(null);
     try {
-      const { data: pc, error } = await supabase.from('postalpeek_postcards').select('original_image_url, illustration_url').eq('id', postcardId.trim()).single();
+      const { data: pc, error } = await supabase.from('postcards').select('original_image_url, illustration_url').eq('id', postcardId.trim()).single();
       if (error || !pc?.original_image_url) throw new Error('Postcard not found');
       setPipelinePhotoUrl(pc.original_image_url);
       if (pc.illustration_url) setPipelineIllustrationUrl(pc.illustration_url);
       setGsamStatus({ status: 'loading', message: 'Calling Grounded SAM on real photo (~16s)…' });
       const data = await callEdgeFn('postalpeek-grounded-sam', { image_url: pc.original_image_url, labels: STICKER_LABELS });
       setGsamResult(data);
-      const { error: updateErr } = await supabase.from('postalpeek_postcards').update({
+      const { error: updateErr } = await supabase.from('postcards').update({
         segmentation_annotated_url:      data.annotated_url || null,
         segmentation_mask_url:           data.mask_url || null,
         segmentation_inverted_mask_url:  data.inverted_mask_url || null,

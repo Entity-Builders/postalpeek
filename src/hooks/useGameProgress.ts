@@ -98,7 +98,7 @@ export function useGameProgress(
       setIsLoading(true);
       try {
         const { data, error } = await supabase
-          .from('postalpeek_game_progress')
+          .from('game_progress')
           .select('game_type, completed_at, time_seconds, won')
           .eq('user_id', userId!)
           .eq('postcard_id', postcardId!);
@@ -135,7 +135,7 @@ export function useGameProgress(
 
       try {
         const { error: upsertError } = await supabase
-          .from('postalpeek_game_progress')
+          .from('game_progress')
           .upsert({
             user_id: userId,
             postcard_id: postcardId,
@@ -181,7 +181,7 @@ export function useGameProgress(
     setIsEarning(true);
     try {
       const { error } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .update({ owner_id: userId })
         .eq('id', postcardId)
         .is('owner_id', null); // Only claim if not already owned

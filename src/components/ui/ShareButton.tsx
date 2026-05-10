@@ -54,7 +54,7 @@ export function ShareButton({ postcardId, country, isUserPostcard }: ShareButton
               : { postcard_id: postcardId };
 
             const { data, error } = await supabase
-              .from('postalpeek_shares')
+              .from('shares')
               .insert(insertData)
               .select('id')
               .single();

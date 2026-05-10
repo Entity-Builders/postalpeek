@@ -27,7 +27,7 @@ export function AdminStamps() {
     const actionLabel = isDeduct ? 'Deducting' : 'Granting';
     setStampStatus({ status: 'loading', message: `${actionLabel} ${amount} ${stampRarity} stamps for ${stampTargetEmail.trim()}…` });
     try {
-      const { error } = await supabase.rpc('postalpeek_admin_manage_typed_stamps', {
+      const { error } = await supabase.rpc('admin_manage_typed_stamps', {
         p_user_email: stampTargetEmail.trim(),
         p_rarity: stampRarity,
         p_amount: finalAmount,

@@ -47,7 +47,7 @@ export function useDiscoveries(userId?: string) {
     fetchedRef.current = true;
 
     supabase
-      .from('postalpeek_discoveries')
+      .from('discoveries')
       .select('*')
       .eq('user_id', userId)
       .order('discovered_at', { ascending: false })

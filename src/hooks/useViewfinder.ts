@@ -19,10 +19,12 @@ import {
   createUserPostcard,
   enrichPostcardMetadata,
   fetchLocationMetadata,
+  detectObjectsFromUrl,
   type UserPostcard,
   type CreateUserPostcardParams,
   type CreateUserPostcardResult,
   type LocationMetadata,
+  type PipelineTag,
 } from '../services/userPostcardService';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 import type { FeedItem } from '../components/Postcard';
@@ -67,6 +69,8 @@ export interface UseViewfinderReturn {
   tripLimit: number;
   /** Metadata fetched in parallel during illustration (for progressive loading) */
   loadingMetadata: LocationMetadata | null;
+  /** Bounding-box tags detected by Gemini vision on the captured photo */
+  detectedTags: PipelineTag[];
   reset: () => void;
 }
 
@@ -173,6 +177,7 @@ export function useViewfinder(
   const [tripRemaining, setTripRemaining] = useState(isAdmin ? 9999 : 5);
   const [tripLimit, setTripLimit] = useState(isAdmin ? 9999 : 5);
   const [loadingMetadata, setLoadingMetadata] = useState<LocationMetadata | null>(null);
+  const [detectedTags, setDetectedTags] = useState<PipelineTag[]>([]);
 
   // Load persisted creator name from localStorage
   const [creatorName, setCreatorNameState] = useState<string>(
@@ -184,7 +189,7 @@ export function useViewfinder(
   }, []);
 
   // Step 2: User confirms preview → generate AI illustration (now triggered automatically)
-  const handleGenerate = useCallback(async (overridePov?: StreetViewPOV) => {
+  const handleGenerate = useCallback(async (overridePov?: StreetViewPOV, dataUrl?: string | null) => {
     const povToUse = overridePov || capturedPov;
 
     if (!sourceItem || !povToUse) {
@@ -198,6 +203,20 @@ export function useViewfinder(
 
     setStep('illustrating');
     setErrorMessage(null);
+    setDetectedTags([]); // Clear previous detection
+
+    // ─── FIRE-AND-FORGET: Object detection on the captured image ──────────
+    // capturedDataUrl here is the Street View Static API URL string.
+    // Detection resolves ~3-4s, well before the illustration (~12-15s).
+    // Never awaited — must not delay the main illustration pipeline.
+    if (dataUrl) {
+      detectObjectsFromUrl(dataUrl).then((tags) => {
+        if (tags.length > 0) {
+          setDetectedTags(tags);
+          console.log(`[Viewfinder] Detection: ${tags.length} objects found`);
+        }
+      });
+    }
 
     analytics.track('viewfinder_capture_started', {
       source_postcard_id: sourceItem.id,
@@ -357,8 +376,8 @@ export function useViewfinder(
         pitch: pov.pitch,
       });
       
-      // Immediately start generation flow
-      handleGenerate(pov);
+      // Immediately start generation flow, passing the static URL for detection
+      handleGenerate(pov, dataUrl);
     },
     [sourceItem, handleGenerate],
   );
@@ -378,7 +397,7 @@ export function useViewfinder(
     // Update the postcard in the DB with the creator name
     if (capturedPostcard && trimmed) {
       supabase
-        .from('postalpeek_user_postcards')
+        .from('user_postcards')
         .update({ creator_name: trimmed })
         .eq('id', capturedPostcard.id)
         .then(({ error }) => {
@@ -419,6 +438,7 @@ export function useViewfinder(
     setCapturedPov(null);
     setCapturedDataUrl(null);
     setErrorMessage(null);
+    setDetectedTags([]);
   }, []);
 
   return {
@@ -434,6 +454,7 @@ export function useViewfinder(
     tripRemaining,
     tripLimit,
     loadingMetadata,
+    detectedTags,
     setCreatorName,
     setIllustrationStyle,
     handleSnapshot,

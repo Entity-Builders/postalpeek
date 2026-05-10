@@ -29,7 +29,7 @@ export function useAlbums(userId?: string) {
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('postalpeek_get_albums_with_progress');
+      const { data, error } = await supabase.rpc('get_albums_with_progress');
       if (error) {
         console.error('Failed to fetch albums:', error);
         return;

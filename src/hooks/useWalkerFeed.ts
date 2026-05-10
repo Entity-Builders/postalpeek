@@ -75,7 +75,7 @@ export function useWalkerFeed() {
       if (!isUnderFeed && segments[0] === 'postcard' && segments[1]) {
         // /postcard/:id — direct public postcard view
         if (segments[1].length === 36) {
-          const { data: pData } = await supabase.from('postalpeek_postcards').select('*').eq('id', segments[1]).maybeSingle();
+          const { data: pData } = await supabase.from('postcards').select('*').eq('id', segments[1]).maybeSingle();
           if (pData) { sharedCard = pData; setHasSharedCard(true); } else setHasSharedCard(false);
         } else {
           sharedCardPrefix = decodeHashToUuidPrefix(segments[1]);
@@ -87,7 +87,7 @@ export function useWalkerFeed() {
         const maxUuid = `${sharedCardPrefix}-ffff-ffff-ffff-ffffffffffff`;
 
         const { data: shareData, error: shareError } = await supabase
-          .from('postalpeek_shares')
+          .from('shares')
           .select('id, postcard_id, user_postcard_id')
           .gte('id', minUuid)
           .lte('id', maxUuid)
@@ -99,11 +99,11 @@ export function useWalkerFeed() {
         const targetUserPostcardId: string | null = shareData?.user_postcard_id || null;
 
         if (shareData && !shareError) {
-          supabase.from('postalpeek_shares').update({ is_used: true }).eq('id', shareData.id).then();
+          supabase.from('shares').update({ is_used: true }).eq('id', shareData.id).then();
         }
 
         if (targetUserPostcardId) {
-           const { data: uData } = await supabase.from('postalpeek_user_postcards')
+           const { data: uData } = await supabase.from('user_postcards')
              .select('*, source:source_postcard_id(*)')
              .eq('id', targetUserPostcardId)
              .maybeSingle();
@@ -134,10 +134,10 @@ export function useWalkerFeed() {
               setHasSharedCard(true);
            } else setHasSharedCard(false);
         } else if (targetPostcardId) {
-           const { data: pData } = await supabase.from('postalpeek_postcards').select('*').eq('id', targetPostcardId).maybeSingle();
+           const { data: pData } = await supabase.from('postcards').select('*').eq('id', targetPostcardId).maybeSingle();
            if (pData) { sharedCard = pData; setHasSharedCard(true); } else setHasSharedCard(false);
         } else {
-           const { data: pData } = await supabase.from('postalpeek_postcards').select('*').gte('id', minUuid).lte('id', maxUuid).limit(1).maybeSingle();
+           const { data: pData } = await supabase.from('postcards').select('*').gte('id', minUuid).lte('id', maxUuid).limit(1).maybeSingle();
            if (pData) { sharedCard = pData; setHasSharedCard(true); } else setHasSharedCard(false);
         }
       } else if (!sharedCard) {

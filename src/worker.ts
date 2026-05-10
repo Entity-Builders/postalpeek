@@ -82,7 +82,7 @@ async function queryPostcard(
   const shares = await supabaseGet(
     supabaseUrl,
     supabaseKey,
-    `/rest/v1/postalpeek_shares?select=postcard_id&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
+    `/rest/v1/shares?select=postcard_id&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
   );
 
   if (shares && shares.length > 0 && shares[0].postcard_id) {
@@ -90,7 +90,7 @@ async function queryPostcard(
     const postcards = await supabaseGet(
       supabaseUrl,
       supabaseKey,
-      `/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=eq.${shares[0].postcard_id}&limit=1`,
+      `/rest/v1/postcards?select=id,illustration_url,category,description,city,country&id=eq.${shares[0].postcard_id}&limit=1`,
     );
     if (postcards && postcards.length > 0) return postcards[0];
   }
@@ -99,7 +99,7 @@ async function queryPostcard(
   const directMatch = await supabaseGet(
     supabaseUrl,
     supabaseKey,
-    `/rest/v1/postalpeek_postcards?select=id,illustration_url,category,description,city,country&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
+    `/rest/v1/postcards?select=id,illustration_url,category,description,city,country&id=gte.${minUuid}&id=lte.${maxUuid}&limit=1`,
   );
   return directMatch && directMatch.length > 0 ? directMatch[0] : null;
 }

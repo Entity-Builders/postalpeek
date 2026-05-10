@@ -25,7 +25,7 @@ export function GamePage() {
       setError(false);
       
       const { data, error } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select('*')
         .eq('id', shortcode)
         .single();

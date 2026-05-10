@@ -49,20 +49,20 @@ export function AdminDashboard() {
         todaySuccessRes, todayRateLimitedRes, weekRes, monthRes, configRes, blockedRes,
       ] = await Promise.all([
         userId
-          ? supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).eq('owner_id', userId)
+          ? supabase.from('postcards').select('id', { count: 'exact', head: true }).eq('owner_id', userId)
           : Promise.resolve({ count: 0 }),
-        supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }),
-        supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).is('detailed_tags', null),
-        supabase.from('postalpeek_postcards').select('id', { count: 'exact', head: true }).not('illustration_url', 'is', null).or('illustration_tags.is.null,illustration_tags.eq.[]'),
-        supabase.from('postalpeek_albums').select('id', { count: 'exact', head: true }),
-        supabase.from('postalpeek_album_progress').select('album_id', { count: 'exact', head: true }).not('completed_at', 'is', null),
+        supabase.from('postcards').select('id', { count: 'exact', head: true }),
+        supabase.from('postcards').select('id', { count: 'exact', head: true }).is('detailed_tags', null),
+        supabase.from('postcards').select('id', { count: 'exact', head: true }).not('illustration_url', 'is', null).or('illustration_tags.is.null,illustration_tags.eq.[]'),
+        supabase.from('albums').select('id', { count: 'exact', head: true }),
+        supabase.from('album_progress').select('album_id', { count: 'exact', head: true }).not('completed_at', 'is', null),
         // Usage stats
-        supabase.from('postalpeek_usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', todayIso),
-        supabase.from('postalpeek_usage_logs').select('id', { count: 'exact', head: true }).in('status', ['rate_limited', 'circuit_open']).gte('created_at', todayIso),
-        supabase.from('postalpeek_usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', weekAgo),
-        supabase.from('postalpeek_usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', monthAgo),
-        supabase.from('postalpeek_config').select('key, value').in('key', ['max_daily_global', 'cost_per_generation']),
-        supabase.from('postalpeek_usage_logs').select('ip_address').in('status', ['rate_limited', 'circuit_open']).gte('created_at', todayIso).limit(50),
+        supabase.from('usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', todayIso),
+        supabase.from('usage_logs').select('id', { count: 'exact', head: true }).in('status', ['rate_limited', 'circuit_open']).gte('created_at', todayIso),
+        supabase.from('usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', weekAgo),
+        supabase.from('usage_logs').select('id', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', monthAgo),
+        supabase.from('config').select('key, value').in('key', ['max_daily_global', 'cost_per_generation']),
+        supabase.from('usage_logs').select('ip_address').in('status', ['rate_limited', 'circuit_open']).gte('created_at', todayIso).limit(50),
       ]);
 
       setStats({

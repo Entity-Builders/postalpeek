@@ -79,7 +79,7 @@ export async function createUserPostcard(
 
   // 4. Save to postalpeek_user_postcards
   const { data, error } = await supabase
-    .from('postalpeek_user_postcards')
+    .from('user_postcards')
     .insert({
       user_id: params.userId || null,
       device_id: params.deviceId || null,
@@ -122,7 +122,7 @@ export async function getUserPostcards(
   limit = 20,
 ): Promise<UserPostcard[]> {
   const { data, error } = await supabase
-    .from('postalpeek_user_postcards')
+    .from('user_postcards')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -146,7 +146,7 @@ export async function getNearbyUserPostcards(
   const lngDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
 
   const { data, error } = await supabase
-    .from('postalpeek_user_postcards')
+    .from('user_postcards')
     .select('*')
     .eq('is_public', true)
     .gte('lat', lat - latDelta)
@@ -172,7 +172,7 @@ export async function enrichPostcardMetadata(
   try {
     const { data, error } = await supabase.functions.invoke(
       'postalpeek-enrich-metadata',
-      { body: { postcard_id: postcardId, table: 'postalpeek_user_postcards' } },
+      { body: { postcard_id: postcardId, table: 'user_postcards' } },
     );
 
     if (error) {
@@ -201,6 +201,37 @@ export interface LocationMetadata {
   trivia: unknown;
   rarity: string;
 }
+
+// ─── Object Detection (vision pass on real photo) ──────────────────────────
+
+/**
+ * Bounding-box tag returned by postalpeek-detect-objects.
+ * box_2d: [y_min, x_min, y_max, x_max] normalized to 0-1000.
+ */
+export interface PipelineTag {
+  label: string;
+  type: string;
+  box_2d: [number, number, number, number];
+}
+
+/**
+ * Detect objects in a public image URL using Gemini vision.
+ * Calls the postalpeek-detect-objects edge function.
+ * Always resolves (returns [] on any failure) — designed to be fire-and-forget.
+ */
+export async function detectObjectsFromUrl(imageUrl: string): Promise<PipelineTag[]> {
+  try {
+    const { data, error } = await supabase.functions.invoke('postalpeek-detect-objects', {
+      body: { image_url: imageUrl },
+    });
+    if (error || !data?.tags) return [];
+    return (data.tags as PipelineTag[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Location-only metadata (fast path for progressive loading) ──
 
 /**
  * Fetch metadata for a location using text-only AI (no image needed).

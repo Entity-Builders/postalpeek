@@ -18,7 +18,7 @@ export function AdminSettings() {
     if (!user?.id) return;
     setUserStatus({ status: 'loading', message: 'Resetting daily pack…' });
     try {
-      const { error } = await supabase.rpc('postalpeek_admin_reset_daily_pack', { p_user_id: user.id });
+      const { error } = await supabase.rpc('admin_reset_daily_pack', { p_user_id: user.id });
       if (error) throw error;
       setUserStatus({ status: 'success', message: 'Daily pack reset ✅' });
     } catch (err: unknown) {
@@ -30,7 +30,7 @@ export function AdminSettings() {
     if (!user?.id) return;
     setUserStatus({ status: 'loading', message: 'Resetting claim limits…' });
     try {
-      const { error } = await supabase.rpc('postalpeek_admin_reset_claims', { p_user_id: user.id });
+      const { error } = await supabase.rpc('admin_reset_claims', { p_user_id: user.id });
       if (error) throw error;
       setUserStatus({ status: 'success', message: 'Claim limits reset ✅' });
     } catch (err: unknown) {

@@ -103,6 +103,7 @@ export function ViewfinderPanel({
     tripRemaining,
     tripLimit,
     loadingMetadata,
+    detectedTags,
     reset,
   } = useViewfinder(userId, sourceItem, userIsAnonymous);
 
@@ -433,8 +434,11 @@ export function ViewfinderPanel({
                 {/* Overlay to fade photo slightly */}
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px]" />
 
-                {/* Watercolor blobs animation */}
-                <div className="absolute inset-0 flex items-center justify-center mix-blend-hard-light opacity-80">
+                {/* Watercolor blobs — fade when detection arrives */}
+                <div
+                  className="absolute inset-0 flex items-center justify-center mix-blend-hard-light transition-opacity duration-700"
+                  style={{ opacity: detectedTags.length > 0 ? 0.2 : 0.8 }}
+                >
                   <motion.div
                     animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0.8, 0.4] }}
                     transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
@@ -451,6 +455,61 @@ export function ViewfinderPanel({
                     className="absolute w-36 h-36 bg-yellow-300 rounded-full blur-3xl -translate-y-8 translate-x-4"
                   />
                 </div>
+
+                {/* ─── AI Scanner Overlay ─── */}
+                <AnimatePresence>
+                  {detectedTags.length > 0 && (
+                    <motion.div
+                      key="scanner-overlay"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 pointer-events-none"
+                    >
+                      {detectedTags.map((tag, i) => {
+                        // box_2d is [y_min, x_min, y_max, x_max] normalized 0–1000
+                        // Image is 600×640 but container is aspect-square with object-cover object-top
+                        // The bottom ~6% is cropped — compensate Y coords accordingly
+                        const CROP_Y = 0.94;
+                        const [yMin, xMin, yMax, xMax] = tag.box_2d;
+                        const top    = (yMin / 1000) * CROP_Y * 100;
+                        const left   = (xMin / 1000) * 100;
+                        const height = ((yMax - yMin) / 1000) * CROP_Y * 100;
+                        const width  = ((xMax - xMin) / 1000) * 100;
+                        return (
+                          <motion.div
+                            key={tag.label}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: i * 0.07, type: 'spring', damping: 18, stiffness: 160 }}
+                            className="absolute"
+                            style={{
+                              top: `${top}%`,
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              height: `${height}%`,
+                            }}
+                          >
+                            {/* Box outline */}
+                            <div className="absolute inset-0 border border-yellow-400/60 rounded-[2px]" />
+                            {/* Corner accents */}
+                            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-yellow-400" />
+                            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-yellow-400" />
+                            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-yellow-400" />
+                            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-yellow-400" />
+                            {/* Label pill */}
+                            <div
+                              className="absolute -top-4 left-0 bg-yellow-400 text-black text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[2px] whitespace-nowrap leading-tight"
+                              style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            >
+                              {tag.label}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <div className="absolute bottom-0 left-0 right-0 h-14 flex items-center justify-center px-4">
                 <motion.div 

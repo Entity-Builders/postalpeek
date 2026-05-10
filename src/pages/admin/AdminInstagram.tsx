@@ -28,7 +28,7 @@ export function AdminInstagram() {
     try {
       // 1. Fetch pending (ready but not published)
       const { data: pendData } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select('id, location_name, country, illustration_url, ig_media_id, ig_published_at, created_at')
         .not('illustration_url', 'is', null)
         .is('ig_media_id', null)
@@ -39,7 +39,7 @@ export function AdminInstagram() {
 
       // 2. Fetch published
       const { data: pubData } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select('id, location_name, country, illustration_url, ig_media_id, ig_published_at, created_at')
         .not('ig_media_id', 'is', null)
         .order('ig_published_at', { ascending: false })

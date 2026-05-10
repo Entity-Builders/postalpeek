@@ -50,7 +50,7 @@ export function useStamps(userId: string | null | undefined) {
     }
 
     supabase
-      .rpc('postalpeek_get_stamp_balance')
+      .rpc('get_stamp_balance')
       .then(({ data, error }) => {
         if (!error && data) {
           setBalance(data as StampBalance);
@@ -60,7 +60,7 @@ export function useStamps(userId: string | null | undefined) {
 
   const refreshStamps = useCallback(async () => {
     if (!userId) return;
-    const { data, error } = await supabase.rpc('postalpeek_get_stamp_balance');
+    const { data, error } = await supabase.rpc('get_stamp_balance');
     if (!error && data) {
       setBalance(data as StampBalance);
     }
@@ -92,7 +92,7 @@ export function useStamps(userId: string | null | undefined) {
   const claimDailyStamps = useCallback(async (): Promise<DailyClaimResult> => {
     if (!userId) return { success: false };
 
-    const { data, error } = await supabase.rpc('postalpeek_claim_daily_stamps');
+    const { data, error } = await supabase.rpc('claim_daily_stamps');
     if (error || !data) return { success: false };
 
     const result = data as DailyClaimResult;
@@ -128,7 +128,7 @@ export function useStamps(userId: string | null | undefined) {
       setIsLoading(true);
 
       try {
-        const { data, error } = await supabase.rpc('postalpeek_spend_stamps', {
+        const { data, error } = await supabase.rpc('spend_stamps', {
           p_amount: amount,
           p_postcard_id: postcardId,
         });

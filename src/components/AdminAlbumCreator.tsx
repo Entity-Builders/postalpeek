@@ -235,7 +235,7 @@ function PostcardPicker({
       const offset = reset ? 0 : offsetRef.current;
       try {
         let query = supabase
-          .from('postalpeek_postcards')
+          .from('postcards')
           .select('id, city, country, illustration_url, category')
           .not('illustration_url', 'is', null)
           .order('created_at', { ascending: false })
@@ -604,7 +604,7 @@ export function AdminAlbumCreator() {
     setAlbumsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('postalpeek_albums')
+        .from('albums')
         .select('id, title, description, category, country, city, difficulty, reward_claims, cover_image_url, is_active, source, created_at')
         .order('created_at', { ascending: false });
 
@@ -669,7 +669,7 @@ export function AdminAlbumCreator() {
     // Fetch postcard details for each slot
     const postcardIds = slotsData.map((s) => s.postcard_id).filter(Boolean);
     const { data: postcards } = await supabase
-      .from('postalpeek_postcards')
+      .from('postcards')
       .select('id, illustration_url, city, country')
       .in('id', postcardIds);
 
@@ -783,7 +783,7 @@ export function AdminAlbumCreator() {
       if (editingAlbumId) {
         // Update existing album
         const { error } = await supabase
-          .from('postalpeek_albums')
+          .from('albums')
           .update(albumPayload)
           .eq('id', editingAlbumId);
         if (error) throw error;
@@ -798,7 +798,7 @@ export function AdminAlbumCreator() {
       } else {
         // Insert new album
         const { data, error } = await supabase
-          .from('postalpeek_albums')
+          .from('albums')
           .insert(albumPayload)
           .select('id')
           .single();
@@ -852,7 +852,7 @@ export function AdminAlbumCreator() {
     setDeleteStatus({ status: 'loading', message: 'Deleting…' });
     try {
       const { error } = await supabase
-        .from('postalpeek_albums')
+        .from('albums')
         .delete()
         .eq('id', editingAlbumId);
       if (error) throw error;

@@ -257,7 +257,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
       const tags: any[] = data.tags || [];
       
       // Save directly to illustration_tags in the DB so it persists
-      const { error: saveErr } = await supabase.from('postalpeek_postcards')
+      const { error: saveErr } = await supabase.from('postcards')
         .update({ illustration_tags: tags })
         .eq('id', postcard.id);
       if (saveErr) throw saveErr;
@@ -305,7 +305,7 @@ function InteractiveIllustrationPanel({ postcard }: { postcard: PostcardDetail }
 
     // Persist to DB
     try {
-      const { error } = await supabase.from('postalpeek_postcards')
+      const { error } = await supabase.from('postcards')
         .update({ illustration_tags: updated })
         .eq('id', postcard.id);
       if (error) throw error;
@@ -620,7 +620,7 @@ function DiscoveriesSection({ postcard }: { postcard: PostcardDetail }) {
   const fetchDiscoveries = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
-      .from('postalpeek_discoveries')
+      .from('discoveries')
       .select('*')
       .eq('postcard_id', postcard.id)
       .order('discovered_at', { ascending: false });
@@ -997,7 +997,7 @@ function GameStatsSection({ postcard, onUpdate }: { postcard: PostcardDetail; on
       });
 
       const { error } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .update({ game_stats: derived })
         .eq('id', postcard.id);
 
@@ -1123,7 +1123,7 @@ export function PostcardDetailPage() {
 
       // Re-fetch the postcard to get updated data
       const { data: refreshed, error: refreshErr } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select(`
           id, created_at, city, country, location_name, lat, lng,
           illustration_url, original_image_url,
@@ -1177,7 +1177,7 @@ export function PostcardDetailPage() {
 
       if (isUuid) {
         const res = await supabase
-          .from('postalpeek_postcards')
+          .from('postcards')
           .select(selectFields)
           .eq('id', id)
           .single();
@@ -1191,7 +1191,7 @@ export function PostcardDetailPage() {
           const maxUuid = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
 
           const res = await supabase
-            .from('postalpeek_postcards')
+            .from('postcards')
             .select(selectFields)
             .gte('id', minUuid)
             .lte('id', maxUuid)

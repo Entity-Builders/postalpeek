@@ -166,7 +166,7 @@ export function FeedLayout({
         if (!response.ok) throw new Error(`Search failed: ${response.status}`);
         const smartResult: SmartSearchResult = await response.json();
 
-        const { data, error } = await supabase.rpc('postalpeek_spotlight_search_v2', {
+        const { data, error } = await supabase.rpc('spotlight_search_v2', {
             p_tags: smartResult.tags,
             p_time_of_day: smartResult.time_of_day,
             p_weather: smartResult.weather,

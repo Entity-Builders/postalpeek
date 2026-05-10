@@ -45,7 +45,7 @@ export function useGenerationLog(pollingIntervalMs = 15_000) {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('postalpeek_postcards')
+        .from('postcards')
         .select(
           'id, created_at, city, country, lat, lng, streetview_pov, illustration_url, category, generation_metadata, detailed_tags',
         )

@@ -52,12 +52,12 @@ export function AlbumCover({
     const fetchAlbumData = async () => {
       const [metaResult, postsResult] = await Promise.all([
         supabase
-          .from('postalpeek_albums')
+          .from('albums')
           .select('title, itinerary_summary')
           .eq('id', item.album_id!)
           .single(),
         supabase
-          .from('postalpeek_postcards')
+          .from('postcards')
           .select('id, illustration_url, album_sequence')
           .eq('album_id', item.album_id!)
           .not('illustration_url', 'is', null)
