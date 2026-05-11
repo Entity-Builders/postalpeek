@@ -18,6 +18,7 @@ interface LoadingMetadataProps {
   metadata: LocationMetadata | null;
   city?: string;
   country?: string;
+  detectedTags?: { label: string }[];
 }
 
 const RARITY_CONFIG = {
@@ -28,7 +29,7 @@ const RARITY_CONFIG = {
 };
 
 
-export function LoadingMetadata({ metadata, city, country }: LoadingMetadataProps) {
+export function LoadingMetadata({ metadata, city, country, detectedTags = [] }: LoadingMetadataProps) {
   const lang = useLang();
 
   return (
@@ -59,6 +60,29 @@ export function LoadingMetadata({ metadata, city, country }: LoadingMetadataProp
                 style={{ width: `${70 + i * 10}%` }}
               />
             ))}
+
+            {/* ─── Progressive Object Detection Reveal ─── */}
+            {detectedTags.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-wrap gap-1.5 px-1 mt-2"
+              >
+                {detectedTags.map((tag, i) => (
+                  <motion.div
+                    key={tag.label + i}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.1, type: 'spring', damping: 20 }}
+                    className="flex items-center px-2 py-1 bg-yellow-400/10 border border-yellow-400/20 rounded-lg backdrop-blur-sm"
+                  >
+                    <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider">
+                      {tag.label}
+                    </span>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
           </motion.div>
         ) : (
           /* Actual metadata with staggered reveal */

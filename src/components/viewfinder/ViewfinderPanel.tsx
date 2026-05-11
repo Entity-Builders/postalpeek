@@ -527,6 +527,7 @@ export function ViewfinderPanel({
               metadata={loadingMetadata}
               city={sourceItem.city}
               country={sourceItem.country}
+              detectedTags={detectedTags}
             />
           </motion.div>
         )}
