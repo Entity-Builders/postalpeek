@@ -38,7 +38,7 @@ export function useWalkerFeed() {
   useEffect(() => {
     async function fetchCountries() {
       try {
-        const { data, error } = await supabase.rpc('postalpeek_get_distinct_countries');
+        const { data, error } = await supabase.rpc('get_distinct_countries');
         if (!error && data) {
           setAvailableCountries(data.map((row: { country: string }) => row.country));
         }
@@ -144,7 +144,7 @@ export function useWalkerFeed() {
         setHasSharedCard(false);
       }
 
-      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
+      const { data, error } = await supabase.rpc('get_random_feed', {
         p_limit: PAGE_SIZE,
         p_country: country,
       });
@@ -211,7 +211,7 @@ export function useWalkerFeed() {
     try {
       const excludeIds = itemsRef.current.map((i) => i.id);
 
-      const { data, error } = await supabase.rpc('postalpeek_get_random_feed', {
+      const { data, error } = await supabase.rpc('get_random_feed', {
         p_limit: PAGE_SIZE,
         p_exclude_ids: excludeIds,
         p_country: selectedCountryRef.current,

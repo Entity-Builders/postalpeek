@@ -70,7 +70,7 @@ export function useDailyPack(userId: string | null | undefined) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc('postalpeek_open_daily_pack');
+      const { data, error } = await supabase.rpc('open_daily_pack');
 
       if (error) throw error;
 

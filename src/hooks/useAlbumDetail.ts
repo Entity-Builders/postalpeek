@@ -53,7 +53,7 @@ export function useAlbumDetail() {
   const fetchDetail = useCallback(async (albumId: string) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('postalpeek_get_album_detail', {
+      const { data, error } = await supabase.rpc('get_album_detail', {
         p_album_id: albumId,
       });
       if (error) {

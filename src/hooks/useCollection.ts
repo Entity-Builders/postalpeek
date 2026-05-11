@@ -15,7 +15,7 @@ export function useCollection(userId: string | null | undefined) {
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('postalpeek_get_user_collection', {
+      const { data, error } = await supabase.rpc('get_user_collection', {
         p_user_id: userId,
       });
 

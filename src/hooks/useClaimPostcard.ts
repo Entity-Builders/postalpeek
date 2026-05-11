@@ -51,7 +51,7 @@ export function useClaimPostcard(
     }
 
     supabase
-      .rpc('postalpeek_get_claim_status')
+      .rpc('get_claim_status')
       .then(({ data, error }) => {
         if (!error && data) {
           setClaimStatus(data as ClaimStatus);
@@ -60,7 +60,7 @@ export function useClaimPostcard(
 
     // Also fetch user's claimed postcards IDs
     supabase
-      .rpc('postalpeek_get_user_collection', { p_user_id: userId })
+      .rpc('get_user_collection', { p_user_id: userId })
       .then(({ data, error }) => {
         if (!error && data) {
           setClaimedIds(new Set((data as { id: string }[]).map((p) => p.id)));
@@ -89,7 +89,7 @@ export function useClaimPostcard(
       }
 
       try {
-        const { data, error } = await supabase.rpc('postalpeek_claim_postcard', {
+        const { data, error } = await supabase.rpc('claim_postcard', {
           p_postcard_id: postcardId,
         });
 

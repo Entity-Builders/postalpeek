@@ -151,7 +151,7 @@ export function useGameProgress(
 
         if (won) {
           // Try to claim the stamp reward securely
-          const { data: rewardData, error: rewardError } = await supabase.rpc('postalpeek_claim_game_reward', {
+          const { data: rewardData, error: rewardError } = await supabase.rpc('claim_game_reward', {
             p_postcard_id: postcardId,
             p_game_type: gameType
           });
