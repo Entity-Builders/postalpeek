@@ -73,8 +73,8 @@ const skipConfirm = args.includes('--yes') || args.includes('-y');
 const skipBiz = args.includes('--skip-biz');
 
 // ─── Clients ─────────────────────────────────────────────────────
-const local = createClient(LOCAL_URL, LOCAL_SERVICE_ROLE_KEY);
-const prod = createClient(PROD_URL, PROD_SERVICE_ROLE_KEY);
+const local = createClient(LOCAL_URL, LOCAL_SERVICE_ROLE_KEY, { db: { schema: 'postalpeek' } });
+const prod = createClient(PROD_URL, PROD_SERVICE_ROLE_KEY, { db: { schema: 'postalpeek' } });
 
 // ─── Enrichment columns to sync ─────────────────────────────────
 const ENRICHMENT_COLUMNS = [
@@ -131,7 +131,7 @@ async function main() {
   const selectCols = ['id', 'city', 'country', 'location_name', ...ENRICHMENT_COLUMNS].join(', ');
 
   const { data: localPostcards, error: localErr } = await local
-    .from('postalpeek_postcards')
+    .from('postcards')
     .select(selectCols)
     .not('detailed_tags', 'is', null)
     .limit(limit)
@@ -159,7 +159,7 @@ async function main() {
   for (let i = 0; i < localIds.length; i += BATCH_SIZE) {
     const batch = localIds.slice(i, i + BATCH_SIZE);
     const { data: prodBatch, error: batchErr } = await prod
-      .from('postalpeek_postcards')
+      .from('postcards')
       .select('id, detailed_tags')
       .in('id', batch)
       .limit(BATCH_SIZE);
@@ -251,7 +251,7 @@ async function main() {
     }
 
     const { error: updateErr } = await prod
-      .from('postalpeek_postcards')
+      .from('postcards')
       .update(update)
       .eq('id', pc.id);
 
@@ -274,7 +274,7 @@ async function main() {
     console.log('🏪 Syncing businesses...');
 
     const { data: localBiz, error: bizErr } = await local
-      .from('eb_businesses')
+      .from('businesses')
       .select('*');
 
     if (bizErr) {
@@ -291,7 +291,7 @@ async function main() {
         }
 
         const { error: upsertErr } = await prod
-          .from('eb_businesses')
+          .from('businesses')
           .upsert(biz, { onConflict: 'google_place_id' });
 
         if (upsertErr) {
@@ -310,7 +310,7 @@ async function main() {
       console.log('🔗 Syncing business links...');
 
       const { data: localLinks, error: linkErr } = await local
-        .from('postalpeek_business_links')
+        .from('business_links')
         .select('*');
 
       if (linkErr) {
@@ -327,7 +327,7 @@ async function main() {
           for (let i = 0; i < relevantLinks.length; i += 100) {
             const batch = relevantLinks.slice(i, i + 100);
             const { error: batchErr } = await prod
-              .from('postalpeek_business_links')
+              .from('business_links')
               .upsert(batch, { onConflict: 'business_id,postcard_id' });
 
             if (batchErr) {

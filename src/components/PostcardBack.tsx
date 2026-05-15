@@ -186,17 +186,7 @@ export function PostcardBack({
                   </p>
                 </div>
                 
-                {/* Did You Know Fact (If any) */}
-                {item.generation_metadata?.storytelling && (
-                   <div className='bg-amber-50/50 rounded-xl p-3 border border-amber-100/60 shrink-0'>
-                     <p className='text-[9px] text-amber-700 font-bold uppercase tracking-wider mb-1.5'>
-                       💡 ¿Sabías que...?
-                     </p>
-                     <p className='text-xs text-stone-700 leading-relaxed'>
-                       {t(item.generation_metadata.storytelling.did_you_know)}
-                     </p>
-                   </div>
-                )}
+
 
                 {/* Visual Stats */}
                 {((simplified ? false : (item.game_stats && item.game_stats.hp !== undefined)) || item.generation_metadata?.stats) && (
@@ -288,17 +278,7 @@ export function PostcardBack({
                 "{t(item.description)}"
               </p>
 
-              {/* Additional Storytelling Fact (if any) */}
-              {item.generation_metadata?.storytelling && (
-                <div className='bg-amber-50/50 rounded-xl p-3 md:p-4 border border-amber-100/60 mb-4 shrink-0 max-h-[140px] overflow-y-auto'>
-                  <p className='text-[9px] md:text-xs text-amber-700 font-bold uppercase tracking-wider mb-2'>
-                    💡 ¿Sabías que...?
-                  </p>
-                  <p className='text-xs md:text-sm text-stone-700 leading-relaxed'>
-                    {t(item.generation_metadata.storytelling.did_you_know)}
-                  </p>
-                </div>
-              )}
+
 
               {/* Visual Stats (TCG style) */}
               {((item.game_stats && item.game_stats.hp !== undefined) || item.generation_metadata?.stats) && (

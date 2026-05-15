@@ -75,11 +75,19 @@ export class RateLimitError extends Error {
 export async function generateIllustration(
   imageUrl: string,
   style?: string,
+  locationContext?: { city?: string; country?: string; locationName?: string },
 ): Promise<IllustrationResult> {
   const { data, error } = await supabase.functions.invoke(
     'postalpeek-illustrate',
     {
-      body: { imageUrl, style, deviceId: getDeviceId() },
+      body: {
+        imageUrl,
+        style,
+        deviceId: getDeviceId(),
+        city: locationContext?.city,
+        country: locationContext?.country,
+        locationName: locationContext?.locationName,
+      },
     },
   );
 
@@ -102,10 +110,16 @@ export async function generateIllustration(
   }
 
   if (data?.illustrationUrl) {
+    const locationFallback = [
+      locationContext?.locationName,
+      locationContext?.city,
+      locationContext?.country,
+    ].filter(Boolean).join(', ');
+
     return {
       illustrationUrl: data.illustrationUrl,
       category: data.category || '🎨 Arte Generado',
-      description: data.description || 'Una vista artística de esta ubicación.',
+      description: data.description || (locationFallback ? `Una vista artística de ${locationFallback}.` : 'Una vista artística de esta ubicación.'),
       remaining: typeof data.remaining === 'number' ? data.remaining : 5,
       limit: typeof data.limit === 'number' ? data.limit : 5,
     };

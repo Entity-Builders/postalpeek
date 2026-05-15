@@ -71,7 +71,11 @@ export async function createUserPostcard(
   const imageUrl = await captureStreetView(params.locationName, params.pov);
 
   // 2. Generate AI illustration (existing Gemini pipeline)
-  const illustration = await generateIllustration(imageUrl, params.style);
+  const illustration = await generateIllustration(imageUrl, params.style, {
+    city: params.city,
+    country: params.country,
+    locationName: params.locationName,
+  });
 
   // 3. Calculate FOV from zoom level (same formula as captureStreetView)
   const fov =
