@@ -16,9 +16,9 @@ export const analytics = new Analytics(new PostHogProvider());
  */
 export function initAnalytics() {
   analytics.init({
-    apiKey: import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '',
+    apiKey: import.meta.env.VITE_POSTHOG_KEY || '',
     apiHost:
-      import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+      import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
     autocapture: true,
     disableSessionRecording: false,
   });
@@ -27,7 +27,7 @@ export function initAnalytics() {
   analytics.setGlobalProperties({
     app: 'postalpeek',
     platform: 'web',
-    environment: import.meta.env.VITE_PUBLIC_POSTHOG_KEY
+    environment: import.meta.env.VITE_POSTHOG_KEY
       ? 'production'
       : 'development',
   });
