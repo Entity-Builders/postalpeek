@@ -62,8 +62,8 @@ export default defineConfig(({ mode }) => {
         env.VITE_SUPABASE_ANON_KEY ||
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
       ),
-      'process.env.VITE_SUPABASE_SCHEMA': JSON.stringify(env.VITE_SUPABASE_SCHEMA || 'public'),
-      'process.env.EXPO_PUBLIC_SUPABASE_SCHEMA': JSON.stringify(env.VITE_SUPABASE_SCHEMA || 'public'),
+      'process.env.VITE_SUPABASE_SCHEMA': JSON.stringify(env.VITE_SUPABASE_SCHEMA || 'postalpeek'),
+      'process.env.EXPO_PUBLIC_SUPABASE_SCHEMA': JSON.stringify(env.VITE_SUPABASE_SCHEMA || 'postalpeek'),
       __DEV__: mode !== 'production',
     },
     resolve: {

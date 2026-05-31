@@ -81,7 +81,7 @@ export function useExplorerRealtime(sessionId: string | null): UseExplorerRealti
         'postgres_changes',
         {
           event: 'INSERT',
-          schema: 'public',
+          schema: process.env.VITE_SUPABASE_SCHEMA || 'postalpeek',
           table: 'postalpeek_scout_progress',
           filter: `session_id=eq.${sessionId}`,
         },
