@@ -11,14 +11,22 @@ import { Analytics, PostHogProvider } from '@eb-packages/analytics';
  */
 export const analytics = new Analytics(new PostHogProvider());
 
+const POSTHOG_KEY =
+  import.meta.env.VITE_POSTHOG_KEY ||
+  import.meta.env.VITE_PUBLIC_POSTHOG_KEY ||
+  '';
+const POSTHOG_HOST =
+  import.meta.env.VITE_POSTHOG_HOST ||
+  import.meta.env.VITE_PUBLIC_POSTHOG_HOST ||
+  'https://us.i.posthog.com';
+
 /**
  * Initialize PostHog. Call once from App.tsx.
  */
 export function initAnalytics() {
   analytics.init({
-    apiKey: import.meta.env.VITE_POSTHOG_KEY || '',
-    apiHost:
-      import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+    apiKey: POSTHOG_KEY,
+    apiHost: POSTHOG_HOST,
     autocapture: true,
     disableSessionRecording: false,
   });
@@ -27,9 +35,7 @@ export function initAnalytics() {
   analytics.setGlobalProperties({
     app: 'postalpeek',
     platform: 'web',
-    environment: import.meta.env.VITE_POSTHOG_KEY
-      ? 'production'
-      : 'development',
+    environment: POSTHOG_KEY ? 'production' : 'development',
   });
 
   // Global error handlers for non-React errors
