@@ -36,6 +36,8 @@ interface StreetViewPanoramaProps {
   initialHeading?: number | null;
   /** Initial pitch in degrees */
   initialPitch?: number | null;
+  /** Initial Google Street View zoom level */
+  initialZoom?: number | null;
   onCapture: (pov: StreetViewPOV) => void;
   isCapturing: boolean;
   /** When true, hides the built-in bottom bar (toolbar manages capture externally) */
@@ -48,7 +50,7 @@ export const StreetViewPanorama = forwardRef<
   StreetViewPanoramaHandle,
   StreetViewPanoramaProps
 >(function StreetViewPanorama(
-  { address, lat, lng, panoId, initialHeading, initialPitch, onCapture, isCapturing, hideControls = false, onPositionChanged, onZoomChanged },
+  { address, lat, lng, panoId, initialHeading, initialPitch, initialZoom, onCapture, isCapturing, hideControls = false, onPositionChanged, onZoomChanged },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +129,7 @@ export const StreetViewPanorama = forwardRef<
       target: { pano?: string; position?: google.maps.LatLng },
       heading: number,
       pitch: number,
+      zoom: number,
     ) => {
       if (!containerRef.current) return;
 
@@ -138,14 +141,14 @@ export const StreetViewPanorama = forwardRef<
             panoramaRef.current.setPosition(target.position);
           }
           panoramaRef.current.setPov({ heading, pitch });
-          panoramaRef.current.setZoom(0);
+          panoramaRef.current.setZoom(zoom);
         } else {
           panoramaRef.current = new window.google.maps.StreetViewPanorama(
             containerRef.current,
             {
               ...(target.pano ? { pano: target.pano } : { position: target.position }),
               pov: { heading, pitch },
-              zoom: 0,
+              zoom,
               addressControl: false,
               showRoadLabels: false,
               linksControl: true,
@@ -207,10 +210,11 @@ export const StreetViewPanorama = forwardRef<
 
     const heading = initialHeading ?? 0;
     const pitch = initialPitch ?? 0;
+    const zoom = initialZoom ?? 0;
 
     // ── Strategy 1: Exact pano ID (best precision) ──────────────────────
     if (panoId) {
-      initPanorama({ pano: panoId }, heading, pitch);
+      initPanorama({ pano: panoId }, heading, pitch, zoom);
       return;
     }
 
@@ -229,7 +233,7 @@ export const StreetViewPanorama = forwardRef<
             setError('No Street View available at these coordinates.');
             return;
           }
-          initPanorama({ position: data.location.latLng }, heading, pitch);
+          initPanorama({ position: data.location.latLng }, heading, pitch, zoom);
         },
       );
       return;
@@ -259,11 +263,11 @@ export const StreetViewPanorama = forwardRef<
             setError('No Street View available for this location.');
             return;
           }
-          initPanorama({ position: data.location.latLng }, heading, pitch);
+          initPanorama({ position: data.location.latLng }, heading, pitch, zoom);
         },
       );
     });
-  }, [address, lat, lng, panoId, initialHeading, initialPitch, initPanorama]);
+  }, [address, lat, lng, panoId, initialHeading, initialPitch, initialZoom, initPanorama]);
 
   return (
     <div className='w-full h-full relative overflow-hidden bg-black/20'>

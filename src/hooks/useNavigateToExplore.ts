@@ -13,6 +13,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkStreetViewAvailability } from '../components/explorer-utils';
 import type { FeedItem } from '../components/Postcard';
+import { getStreetViewPanoId } from '../utils/streetViewPov';
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
 
@@ -35,7 +36,7 @@ export function useNavigateToExplore(options: UseNavigateToExploreOptions = {}) 
       options.onChecking?.();
 
       const available = await checkStreetViewAvailability({
-        panoId: item.streetview_pov?.pano_id,
+        panoId: getStreetViewPanoId(item.streetview_pov),
         lat: item.lat,
         lng: item.lng,
         mapsKey: MAPS_KEY,

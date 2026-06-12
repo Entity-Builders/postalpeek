@@ -23,6 +23,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLang, t } from '../../utils/i18n';
 import { analytics } from '../../lib/analytics';
 import { MapPinOff } from 'lucide-react';
+import { supabase } from '@eb-packages/logic/src/supabase';
+import type { FeedItem } from '../../components/Postcard';
+import {
+  getStreetViewPanoId,
+  type StreetViewPovLike,
+} from '../../utils/streetViewPov';
 
 function pickRandomWithPano(items: any[]) {
   // Any item with coordinates
@@ -31,6 +37,90 @@ function pickRandomWithPano(items: any[]) {
     return withCoords[Math.floor(Math.random() * withCoords.length)];
   }
   return null;
+}
+
+type UserPostcardRow = {
+  id: string;
+  country: string | null;
+  city: string | null;
+  location_name: string | null;
+  lat: number;
+  lng: number;
+  original_image_url: string;
+  illustration_url: string | null;
+  category: string | null;
+  description: string | null;
+  created_at: string;
+  creator_name: string | null;
+  heading: number | null;
+  pitch: number | null;
+  fov: number | null;
+  generation_metadata: Record<string, unknown> | null;
+  source?: Partial<FeedItem> | Partial<FeedItem>[] | null;
+};
+
+function sourceFromUserPostcard(row: UserPostcardRow) {
+  return Array.isArray(row.source) ? row.source[0] : row.source;
+}
+
+function userPostcardToFeedItem(row: UserPostcardRow): FeedItem {
+  const source = sourceFromUserPostcard(row);
+  const storedPov = row.generation_metadata?.streetview_pov as
+    | StreetViewPovLike
+    | undefined;
+  const sourcePov = source?.streetview_pov as StreetViewPovLike | undefined;
+  const panoId = getStreetViewPanoId(storedPov) || getStreetViewPanoId(sourcePov);
+
+  return {
+    id: row.id,
+    country: row.country || source?.country || '',
+    city: row.city || source?.city || '',
+    location_name: row.location_name || source?.location_name,
+    lat: row.lat,
+    lng: row.lng,
+    original_image_url: row.original_image_url,
+    illustration_url: row.illustration_url || '',
+    category: row.category || source?.category || 'Arte generado',
+    description: row.description || source?.description || '',
+    created_at: row.created_at,
+    creator_name: row.creator_name,
+    streetview_pov: {
+      heading: row.heading ?? (storedPov?.heading as number | undefined) ?? sourcePov?.heading,
+      pitch: row.pitch ?? (storedPov?.pitch as number | undefined) ?? sourcePov?.pitch,
+      fov: row.fov ?? (storedPov?.fov as number | undefined) ?? sourcePov?.fov,
+      ...(panoId ? { pano_id: panoId } : {}),
+    },
+    generation_metadata: row.generation_metadata || {},
+    is_user_generated: true,
+  };
+}
+
+async function fetchExploreTarget(targetId: string): Promise<FeedItem | null> {
+  const { data: postcardData, error: postcardError } = await supabase
+    .from('postcards')
+    .select('*')
+    .eq('id', targetId)
+    .maybeSingle();
+
+  if (postcardError) {
+    console.warn('[Explore] Failed to fetch postcard target:', postcardError);
+  }
+
+  if (postcardData) return postcardData as FeedItem;
+
+  const { data: userPostcardData, error: userPostcardError } = await supabase
+    .from('user_postcards')
+    .select('*, source:source_postcard_id(*)')
+    .eq('id', targetId)
+    .maybeSingle();
+
+  if (userPostcardError) {
+    console.warn('[Explore] Failed to fetch user postcard target:', userPostcardError);
+  }
+
+  return userPostcardData
+    ? userPostcardToFeedItem(userPostcardData as UserPostcardRow)
+    : null;
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -225,16 +315,52 @@ export function ExplorePage() {
   const { items, setItems, user, handleAuthRequiredAction } = useFeedContext();
   const [showIntro, setShowIntro] = useState(true);
   const [showOutro, setShowOutro] = useState(false);
+  const [targetLookup, setTargetLookup] = useState<{
+    id: string;
+    target: FeedItem | null;
+  } | null>(null);
 
   const targetId = searchParams.get('id');
 
-  const target = useMemo(() => {
+  const feedTarget = useMemo(() => {
     if (targetId) {
       const found = items.find((i) => i.id === targetId);
       if (found) return found;
     }
-    return pickRandomWithPano(items);
   }, [targetId, items]);
+
+  const lookupResolved = targetLookup?.id === targetId;
+  const resolvedTarget = lookupResolved ? targetLookup.target : null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!targetId || feedTarget || lookupResolved) {
+      return;
+    }
+
+    fetchExploreTarget(targetId)
+      .then((target) => {
+        if (!cancelled) setTargetLookup({ id: targetId, target });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn('[Explore] Target lookup failed:', error);
+          setTargetLookup({ id: targetId, target: null });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [targetId, feedTarget, lookupResolved]);
+
+  const target = useMemo(() => {
+    if (feedTarget) return feedTarget;
+    if (resolvedTarget) return resolvedTarget;
+    if (!targetId) return pickRandomWithPano(items);
+    return null;
+  }, [feedTarget, resolvedTarget, targetId, items]);
 
   const handleBack = (options?: { isFromSuccess?: boolean; newCard?: import('../../components/Postcard').FeedItem }) => {
     // Prepend the newly generated postcard at position 0 so it shows first in the feed
@@ -259,13 +385,15 @@ export function ExplorePage() {
 
   // Loading state while feed items load
   if (!target) {
+    const loadingTarget = targetId ? !lookupResolved : items.length === 0;
+
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0e] gap-4">
-        {items.length === 0 ? (
+        {loadingTarget ? (
           <>
             <div className="w-10 h-10 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
             <p className="text-white/40 text-sm font-medium tracking-wide">
-              {t({ es: 'Cargando destinos...', en: 'Loading destinations...' }, lang)}
+              {t({ es: 'Cargando destino...', en: 'Loading destination...' }, lang)}
             </p>
           </>
         ) : (

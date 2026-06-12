@@ -511,11 +511,7 @@ export function WalkerCarousel({
                         isActive={true}
                         isPriority={slideIndex === currentSlideIndex || (slideIndex - currentSlideIndex) === 1 || !!isFirstShared}
                         onOpenTrip={() => {
-                          setOpenedAlbums((prev) => {
-                            const next = new Set(prev);
-                            next.add(item.album_id!);
-                            return next;
-                          });
+                          navigate(`/album/${item.album_id}`);
                           analytics.track('album_cover_opened', {
                             album_id: item.album_id,
                             postcard_id: item.id,
@@ -612,4 +608,3 @@ export function WalkerCarousel({
     </div>
   );
 }
-

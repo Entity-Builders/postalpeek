@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronRight, Images, MapPin } from 'lucide-react';
 import { supabase } from '@eb-packages/logic/src/supabase';
 import { cn } from '../utils/cn';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
@@ -136,14 +136,9 @@ export function AlbumCover({
     }
   };
 
-  // Compute thumbnail size based on count — fill all available width
   const thumbCount = stopThumbnails.length;
-  const thumbSize =
-    thumbCount <= 3
-      ? 'w-16 h-16 md:w-20 md:h-20'
-      : thumbCount <= 5
-        ? 'w-14 h-14 md:w-16 md:h-16'
-        : 'w-11 h-11 md:w-14 md:h-14';
+  const previewThumbnails = stopThumbnails.slice(0, 6);
+  const hiddenStopCount = Math.max(0, thumbCount - previewThumbnails.length);
 
   return (
     <div
@@ -192,10 +187,11 @@ export function AlbumCover({
           <div className='absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black/60 via-black/25 to-transparent z-20' />
 
           {/* ─── Hero text overlays — always rendered using embedded feed data ─── */}
-          {/* "VIAJE COMPLETO" badge */}
-          <div className='absolute top-12 left-3 z-30'>
-            <span className='bg-black/60 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide flex items-center gap-1.5'>
-              <span className="text-sm">📚</span> {t({ es: 'Álbum Disponible', en: 'Album Available' }, lang)}
+          {/* Album badge */}
+          <div className='absolute top-3 left-3 z-30'>
+            <span className='bg-stone-950/70 text-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-lg tracking-wide flex items-center gap-1.5'>
+              <BookOpen className='w-3.5 h-3.5' />
+              {t({ es: 'Álbum', en: 'Album' }, lang)}
             </span>
           </div>
 
@@ -249,23 +245,22 @@ export function AlbumCover({
         ) : (
           <div className='shrink-0 px-2 md:px-3 pt-3 flex flex-col gap-2'>
             {summary && (
-              <p className='text-xs md:text-sm text-stone-600 leading-relaxed italic'>
+              <p className='text-sm text-stone-600 leading-relaxed line-clamp-3'>
                 {summary}
               </p>
             )}
 
             {stopThumbnails.length > 0 && (
-              <div className='flex items-start justify-around gap-1 py-1'>
-                {stopThumbnails.map((thumb, idx) => (
-                  <div
-                    key={thumb.id}
-                    className='flex flex-col items-center flex-1 min-w-0'
-                  >
+              <div className='flex items-center justify-between gap-3 rounded-xl bg-stone-50/90 border border-stone-200/80 px-3 py-2'>
+                <div className='flex items-center min-w-0'>
+                  {previewThumbnails.map((thumb, idx) => (
                     <div
+                      key={thumb.id}
                       className={cn(
-                        'rounded-full overflow-hidden border-2 border-stone-200 shadow-sm bg-stone-100 mx-auto',
-                        thumbSize,
+                        'relative w-10 h-10 md:w-11 md:h-11 rounded-lg overflow-hidden border-2 border-white shadow-sm bg-stone-100 shrink-0',
+                        idx > 0 && '-ml-3',
                       )}
+                      style={{ zIndex: previewThumbnails.length - idx }}
                     >
                       <img
                         src={cdnImage(thumb.url, {
@@ -278,11 +273,23 @@ export function AlbumCover({
                         loading='lazy'
                       />
                     </div>
-                    <span className='text-[8px] md:text-[9px] text-stone-500 mt-1 text-center w-full truncate font-medium px-0.5'>
-                      {thumb.stop_name || `Stop ${idx + 1}`}
+                  ))}
+                  {hiddenStopCount > 0 && (
+                    <span className='-ml-2 relative z-0 flex h-10 md:h-11 min-w-11 items-center justify-center rounded-lg border-2 border-white bg-stone-800 px-2 text-[11px] font-bold text-white shadow-sm'>
+                      +{hiddenStopCount}
                     </span>
+                  )}
+                </div>
+
+                <div className='min-w-0 text-right'>
+                  <div className='flex items-center justify-end gap-1 text-[10px] font-bold uppercase tracking-widest text-stone-400'>
+                    <Images className='w-3 h-3' />
+                    <span>{t({ es: 'Colección', en: 'Collection' }, lang)}</span>
                   </div>
-                ))}
+                  <p className='text-sm font-semibold text-stone-700'>
+                    {t({ es: `${totalStops} postales`, en: `${totalStops} postcards` }, lang)}
+                  </p>
+                </div>
               </div>
             )}
 

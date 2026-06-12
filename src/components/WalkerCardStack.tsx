@@ -54,7 +54,7 @@ export function WalkerCardStack({
   albumPostcardIds = new Set(),
   onSwipe,
 }: WalkerCardStackProps) {
-  const [openedAlbums, setOpenedAlbums] = useState<Set<string>>(new Set());
+  const [openedAlbums] = useState<Set<string>>(new Set());
   const [heroReadyIds, setHeroReadyIds] = useState<Set<string>>(new Set());
   const [swipedCount, setSwipedCount] = useState(0);
 
@@ -137,7 +137,6 @@ export function WalkerCardStack({
               isClaimLoading={isClaimLoading}
               albumPostcardIds={albumPostcardIds}
               openedAlbums={openedAlbums}
-              setOpenedAlbums={setOpenedAlbums}
               heroReadyIds={heroReadyIds}
               setHeroReadyIds={setHeroReadyIds}
               showWelcome={showWelcome}
@@ -167,7 +166,6 @@ interface SwipeableCardProps {
   isClaimLoading: boolean;
   albumPostcardIds: Set<string>;
   openedAlbums: Set<string>;
-  setOpenedAlbums: React.Dispatch<React.SetStateAction<Set<string>>>;
   heroReadyIds: Set<string>;
   setHeroReadyIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   showWelcome: boolean;
@@ -191,7 +189,6 @@ function SwipeableCard({
   isClaimLoading,
   albumPostcardIds,
   openedAlbums,
-  setOpenedAlbums,
   setHeroReadyIds,
   showWelcome,
   swipedCount,
@@ -310,11 +307,7 @@ function SwipeableCard({
                   isActive={true}
                   isPriority={true}
                   onOpenTrip={() => {
-                    setOpenedAlbums((prev: Set<string>) => {
-                      const next = new Set(prev);
-                      next.add(item.album_id!);
-                      return next;
-                    });
+                    navigate(`/album/${item.album_id}`);
                   }}
                 />
               </div>

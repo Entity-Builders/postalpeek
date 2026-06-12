@@ -29,6 +29,7 @@ import { PostalPeekStampSVG } from './PostalPeekStampSVG';
 import { t, useLang } from '../../utils/i18n';
 import { useNavigate } from 'react-router-dom';
 import { useStampContext } from '../../contexts/StampContext';
+import { getStreetViewPanoId } from '../../utils/streetViewPov';
 
 // ── Fact type helpers ────────────────────────────────────────────────
 const FACT_EMOJI: Record<string, string> = {
@@ -118,6 +119,7 @@ export function PostcardChin({
   const [storyExpanded, setStoryExpanded] = useState(false);
 
   const active = activeItem ?? item;
+  const activePanoId = getStreetViewPanoId(active.streetview_pov);
   const storytelling = active.generation_metadata?.storytelling;
   const albumId = active.album_id || item.album_id;
 
@@ -235,7 +237,7 @@ export function PostcardChin({
       </div>
 
       {/* ── "Viaja aquí" CTA — only when card has verified pano_id ── */}
-      {onTravelHere && !hideActions && item.streetview_pov?.pano_id && (
+      {onTravelHere && !hideActions && activePanoId && (
         <button
           onClick={(e) => {
             e.stopPropagation();

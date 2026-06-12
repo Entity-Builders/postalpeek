@@ -20,6 +20,7 @@ import {
   type StreetViewPOV,
   type StreetViewPanoramaHandle,
 } from '../StreetViewPanorama';
+import { getStreetViewPanoId, getStreetViewZoom } from '../../utils/streetViewPov';
 import { ViewfinderBrackets } from './ViewfinderBrackets';
 import { useViewfinder } from '../../hooks/useViewfinder';
 import type { FeedItem } from '../Postcard';
@@ -244,9 +245,10 @@ export function ViewfinderPanel({
             address={locationLabel}
             lat={sourceItem.lat}
             lng={sourceItem.lng}
-            panoId={sourceItem.streetview_pov?.pano_id}
+            panoId={getStreetViewPanoId(sourceItem.streetview_pov)}
             initialHeading={sourceItem.streetview_pov?.heading}
             initialPitch={sourceItem.streetview_pov?.pitch}
+            initialZoom={getStreetViewZoom(sourceItem.streetview_pov)}
             onCapture={onPanoramaCapture}
             isCapturing={step === 'illustrating'}
             hideControls
