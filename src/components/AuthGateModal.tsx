@@ -8,6 +8,7 @@ import { sway, ease } from '../utils/useWelcomeAnimation';
 import type { FeedItem } from './Postcard';
 import { t } from '../utils/i18n';
 import { analytics } from '../lib/analytics';
+import { createPostalPeekOtpInput } from '../lib/authOtp';
 
 interface AuthGateModalProps {
   onSuccess: () => void;
@@ -67,7 +68,9 @@ export function AuthGateModal({
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const { error } = await supabase.auth.signInWithOtp(
+        createPostalPeekOtpInput(email),
+      );
       if (error) throw error;
       analytics.track('signup_email_submitted', {
         email_domain: email.split('@')[1] || 'unknown',
@@ -142,7 +145,9 @@ export function AuthGateModal({
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const { error } = await supabase.auth.signInWithOtp(
+        createPostalPeekOtpInput(email),
+      );
       if (error) throw error;
       analytics.track('signup_otp_resent');
       setOtpCode('');

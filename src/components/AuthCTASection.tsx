@@ -8,6 +8,7 @@ import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { sway } from '../utils/useWelcomeAnimation';
 import { useLang, t } from '../utils/i18n';
 import { analytics } from '../lib/analytics';
+import { createPostalPeekOtpInput } from '../lib/authOtp';
 
 interface AuthCTASectionProps {
   onSuccess: () => void;
@@ -46,7 +47,9 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const { error } = await supabase.auth.signInWithOtp(
+        createPostalPeekOtpInput(email),
+      );
       if (error) throw error;
       analytics.track('cta_email_submitted', { email_domain: email.split('@')[1] || 'unknown' });
       setStep('otp');
@@ -97,7 +100,9 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const { error } = await supabase.auth.signInWithOtp(
+        createPostalPeekOtpInput(email),
+      );
       if (error) throw error;
       setOtpCode('');
     } catch (err: unknown) {
