@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Mail, ArrowLeft } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
 import type { FeedItem } from './Postcard';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, cdnUrl } from '../utils/imageUtils';
 import { sway } from '../utils/useWelcomeAnimation';
 import { useLang, t } from '../utils/i18n';
-import { analytics } from '../lib/analytics';
-import { createPostalPeekOtpInput } from '../lib/authOtp';
+import { usePostalPeekAccount } from '../hooks/usePostalPeekAccount';
+import { PostalPeekAuthForm } from './PostalPeekAuthForm';
 
 interface AuthCTASectionProps {
   onSuccess: () => void;
@@ -17,11 +15,8 @@ interface AuthCTASectionProps {
 
 export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionProps) {
   const lang = useLang();
-  const [step, setStep] = useState<'email' | 'otp'>('email');
-  const [email, setEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const account = usePostalPeekAccount('feed_cta');
+  const completedRef = useRef(false);
 
   const heroCards = viewedItems.slice(0, 3);
   const mainCard = heroCards[0];
@@ -42,75 +37,12 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
     }
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOtp(
-        createPostalPeekOtpInput(email),
-      );
-      if (error) throw error;
-      analytics.track('cta_email_submitted', { email_domain: email.split('@')[1] || 'unknown' });
-      setStep('otp');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t({ es: 'Algo salió mal', en: 'Something went wrong' }, lang));
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!account.isPermanent || completedRef.current) return;
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      let tokenToVerify = otpCode;
-
-      // DEV BYPASS: accept 123456 on localhost by fetching real OTP from Mailpit
-      if (window.location.hostname === 'localhost' && otpCode === '123456') {
-        try {
-          const searchRes = await fetch(`http://127.0.0.1:54324/api/v1/search?query=to:${encodeURIComponent(email)}&limit=1`);
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            if (searchData.messages?.length > 0) {
-              const msgRes = await fetch(`http://127.0.0.1:54324/api/v1/message/${searchData.messages[0].ID}`);
-              if (msgRes.ok) {
-                const msgData = await msgRes.json();
-                const match = (msgData.Snippet + ' ' + (msgData.Text || '')).match(/\b\d{6}\b/);
-                if (match) tokenToVerify = match[0];
-              }
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      const { error } = await supabase.auth.verifyOtp({ email, token: tokenToVerify, type: 'email' });
-      if (error) throw error;
-      analytics.track('cta_otp_verified');
-      onSuccess();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t({ es: 'Código inválido. Intentá de nuevo.', en: 'Invalid code. Try again.' }, lang));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOtp(
-        createPostalPeekOtpInput(email),
-      );
-      if (error) throw error;
-      setOtpCode('');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t({ es: 'No se pudo reenviar', en: 'Could not resend' }, lang));
-    } finally {
-      setLoading(false);
-    }
-  };
+    completedRef.current = true;
+    onSuccess();
+  }, [account.isPermanent, onSuccess]);
 
   return (
     <motion.div
@@ -174,87 +106,21 @@ export function AuthCTASection({ onSuccess, viewedItems = [] }: AuthCTASectionPr
           {t({ es: 'te esperan.', en: 'await you.' }, lang)}
         </h2>
         <p className="text-stone-500 text-sm text-center mb-6 font-light leading-relaxed">
-          {step === 'email'
-            ? t({ es: 'Coleccioná, completá álbumes y jugá con Walker gratis.', en: 'Collect, complete albums and play with Walker for free.' }, lang)
-            : t({ es: 'Revisá tu casilla — te enviamos un código de 6 dígitos.', en: 'Check your inbox — we sent you a 6-digit code.' }, lang)}
+          {account.codeSent
+            ? t({ es: 'Revisá tu casilla — te enviamos un código de 6 dígitos.', en: 'Check your inbox — we sent you a 6-digit code.' }, lang)
+            : t({ es: 'Coleccioná, completá álbumes y jugá con Walker gratis.', en: 'Collect, complete albums and play with Walker for free.' }, lang)}
         </p>
 
         {/* Auth form */}
-        <div className="w-full">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-4 text-center">
-              {error}
-            </div>
-          )}
-
-          {step === 'email' ? (
-            <form onSubmit={handleSendOtp} className="flex flex-col gap-3">
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                <input
-                  type="email"
-                  placeholder={t({ es: 'tu@email.com', en: 'you@email.com' }, lang)}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-base placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !email}
-                className="w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : `✉️  ${t({ es: 'Unirme gratis', en: 'Join for free' }, lang)}`}
-              </button>
-              <p className="text-center text-xs text-stone-400">
-                {t({ es: 'Sin contraseña — te enviamos un código mágico.', en: 'No password — we send you a magic code.' }, lang)}
-              </p>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => { setStep('email'); setOtpCode(''); setError(null); }}
-                className="flex items-center gap-1 text-sm text-stone-400 hover:text-stone-600 transition-colors mb-1 self-start"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                {email}
-              </button>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                placeholder={t({ es: 'Código de 6 dígitos', en: '6-digit code' }, lang)}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                required
-                autoFocus
-                className="w-full px-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-center text-xl tracking-[0.5em] font-mono placeholder:text-stone-400 placeholder:tracking-normal placeholder:text-base focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm"
-              />
-              <button
-                type="submit"
-                disabled={loading || otpCode.length < 6}
-                className="w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t({ es: 'Verificar código', en: 'Verify code' }, lang)}
-              </button>
-              <button
-                type="button"
-                onClick={handleResend}
-                disabled={loading}
-                className="text-sm text-stone-400 hover:text-stone-600 transition-colors text-center"
-              >
-                {t({ es: '¿No llegó? Reenviar', en: 'Didn\'t arrive? Resend' }, lang)}
-              </button>
-            </form>
-          )}
-        </div>
+        <PostalPeekAuthForm
+          account={account}
+          emailPlaceholder={t({ es: 'tu@email.com', en: 'you@email.com' }, lang)}
+          requestLabel={`✉️  ${t({ es: 'Unirme gratis', en: 'Join for free' }, lang)}`}
+          helperText={t({ es: 'Sin contraseña — te enviamos un código mágico.', en: 'No password — we send you a magic code.' }, lang)}
+          codePlaceholder={t({ es: 'Código de 6 dígitos', en: '6-digit code' }, lang)}
+          verifyLabel={t({ es: 'Verificar código', en: 'Verify code' }, lang)}
+          resendLabel={t({ es: '¿No llegó? Reenviar', en: "Didn't arrive? Resend" }, lang)}
+        />
       </div>
     </motion.div>
   );

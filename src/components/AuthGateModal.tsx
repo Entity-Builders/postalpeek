@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Mail, ArrowLeft, X } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { X } from 'lucide-react';
 import { cdnUrl, WIDTHS } from '../utils/imageUtils';
 import { useSignedImage } from '../utils/useSignedImage';
 import { sway, ease } from '../utils/useWelcomeAnimation';
 import type { FeedItem } from './Postcard';
 import { t } from '../utils/i18n';
-import { analytics } from '../lib/analytics';
-import { createPostalPeekOtpInput } from '../lib/authOtp';
+import { usePostalPeekAccount } from '../hooks/usePostalPeekAccount';
+import { PostalPeekAuthForm } from './PostalPeekAuthForm';
 
 interface AuthGateModalProps {
   onSuccess: () => void;
@@ -33,20 +32,22 @@ export function AuthGateModal({
   onClose,
   viewedItems = [],
 }: AuthGateModalProps) {
-  const [step, setStep] = useState<'email' | 'otp'>('email');
-  const [email, setEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const account = usePostalPeekAccount('auth_gate');
+  const completedRef = useRef(false);
 
   const effectiveItems = viewedItems.length >= 3 ? viewedItems : FALLBACK_ITEMS;
   const heroCards = effectiveItems.slice(0, 3);
   const mainCard = heroCards[0];
 
-  // Feature flag to disable social logins for now
-  const ENABLE_SOCIAL_LOGINS = false;
-
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!account.isPermanent || completedRef.current) return;
+
+    completedRef.current = true;
+    localStorage.removeItem('postalpeek_anon_gen_count');
+    onSuccess();
+  }, [account.isPermanent, onSuccess]);
 
   const baseImgUrl2 = useSignedImage(heroCards[2]?.illustration_url, { width: WIDTHS.thumb });
   const baseImgUrl1 = useSignedImage(heroCards[1]?.illustration_url, { width: WIDTHS.thumb });
@@ -59,102 +60,6 @@ export function AuthGateModal({
   const handleImageFallback = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     if (e.currentTarget.src.includes('/cdn-cgi/image/')) {
       setFallbackEnabled(true);
-    }
-  };
-
-  /** Step 1: Send OTP to email */
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOtp(
-        createPostalPeekOtpInput(email),
-      );
-      if (error) throw error;
-      analytics.track('signup_email_submitted', {
-        email_domain: email.split('@')[1] || 'unknown',
-      });
-      setStep('otp');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** Step 2: Verify OTP code */
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      let tokenToVerify = otpCode;
-
-      // DEV BYPASS: always accept 123456 on localhost by fetching the real OTP from local Mailpit
-      if (window.location.hostname === 'localhost' && otpCode === '123456') {
-        try {
-          // Supabase replaced Inbucket with Mailpit
-          const searchRes = await fetch(`http://127.0.0.1:54324/api/v1/search?query=to:${encodeURIComponent(email)}&limit=1`);
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            if (searchData.messages && searchData.messages.length > 0) {
-              const latestId = searchData.messages[0].ID;
-              const msgRes = await fetch(`http://127.0.0.1:54324/api/v1/message/${latestId}`);
-              if (msgRes.ok) {
-                const msgData = await msgRes.json();
-                // Check Snippet, HTML, or Text for the 6-digit code
-                const textToSearch = msgData.Snippet + ' ' + (msgData.Text || '') + ' ' + (msgData.HTML || '');
-                const match = textToSearch.match(/\b\d{6}\b/);
-                if (match) {
-                  tokenToVerify = match[0];
-                  console.log('Dev Bypass: Substituted 123456 with real OTP from Mailpit');
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('Mailpit dev bypass failed:', err);
-        }
-      }
-
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: tokenToVerify,
-        type: 'email',
-      });
-      if (error) throw error;
-      analytics.track('signup_otp_verified');
-      
-      // Clear the anonymous rate limit upon successful login
-      localStorage.removeItem('postalpeek_anon_gen_count');
-      
-      onSuccess();
-    } catch (err: unknown) {
-      analytics.track('signup_otp_failed', {
-        error: err instanceof Error ? err.message : 'unknown',
-      });
-      setError(err instanceof Error ? err.message : 'Invalid code. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** Resend OTP */
-  const handleResend = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOtp(
-        createPostalPeekOtpInput(email),
-      );
-      if (error) throw error;
-      analytics.track('signup_otp_resent');
-      setOtpCode('');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not resend code');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -268,9 +173,9 @@ export function AuthGateModal({
             Walker never stops walking.
           </h2>
           <p className='text-stone-500 text-sm mb-5 font-light text-center'>
-            {step === 'email'
-              ? 'Ya coleccionaste tu primera postal 🃏 Iniciá sesión para seguir coleccionando.'
-              : 'Revisá tu casilla — te enviamos un código de 6 dígitos.'}
+            {account.codeSent
+              ? 'Revisá tu casilla — te enviamos un código de 6 dígitos.'
+              : 'Ya coleccionaste tu primera postal 🃏 Iniciá sesión para seguir coleccionando.'}
           </p>
 
           {/* Auth form — warm palette */}
@@ -281,144 +186,15 @@ export function AuthGateModal({
                 transition={{ duration: 0.4, ease, delay: 0.3 }}
                 className='w-full'
               >
-                {error && (
-              <div className='bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-4 text-center'>
-                {error}
-              </div>
-            )}
-
-            {step === 'email' ? (
-              <div className='flex flex-col'>
-                <form onSubmit={handleSendOtp} className='flex flex-col gap-3'>
-                  <div className='relative'>
-                    <Mail className='absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400' />
-                    <input
-                      type='email'
-                      name='email'
-                      placeholder='Email'
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoComplete='email'
-                      autoCapitalize='none'
-                      autoCorrect='off'
-                      spellCheck={false}
-                      className='w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-base placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm'
-                    />
-                  </div>
-
-                  <button
-                    type='submit'
-                    disabled={loading || !email}
-                    className='w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 disabled:text-white/50 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20'
-                  >
-                    {loading ? (
-                      <Loader2 className='w-4 h-4 animate-spin' />
-                    ) : (
-                      'Continue with Email'
-                    )}
-                  </button>
-
-                  <p className='text-center text-xs text-stone-400 mt-1 mb-2'>
-                    No password needed — we'll send you a code.
-                  </p>
-                </form>
-
-                {/* Feature flag: Social logins temporarily disabled */}
-                {(() => {
-                  if (!ENABLE_SOCIAL_LOGINS) return null;
-                  return (
-                    <>
-                      <div className='flex items-center gap-3 my-4'>
-                      <div className='flex-1 h-px bg-stone-300'></div>
-                      <span className='text-stone-400 text-[10px] font-semibold uppercase tracking-wider'>or</span>
-                      <div className='flex-1 h-px bg-stone-300'></div>
-                    </div>
-
-                    <div className='flex flex-col gap-3'>
-                      <button
-                        type='button'
-                        onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })}
-                        className='w-full py-3.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 active:scale-[0.98] text-stone-700 text-sm font-semibold transition-all flex items-center justify-center gap-3 shadow-sm'
-                      >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24">
-                          <title>Sign in with Google</title>
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                        </svg>
-                        Continue with Google
-                      </button>
-
-                      <button
-                        type='button'
-                        onClick={() => supabase.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: window.location.origin } })}
-                        className='w-full py-3.5 rounded-xl bg-black hover:bg-zinc-800 border border-transparent active:scale-[0.98] text-white text-sm font-semibold transition-all flex items-center justify-center gap-3 shadow-sm'
-                      >
-                        <svg className="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M16.365 21.493c-1.312.932-2.779.883-4.043.08-1.127-.723-2.126-.64-3.411.08-1.124.644-2.483.743-3.702-.132C3.12 19.689 1.139 16.035 2.146 11.832c.504-2.115 1.942-3.791 4.093-3.868 1.488-.073 2.721.902 3.52 1.05 1.05.215 2.508-.949 3.998-.908 1.474.04 2.83.659 3.652 1.832-3.085 1.761-2.583 5.922.378 7.279-.769 1.908-1.745 3.51-2.909 4.376-1.077.781-2.17.653-3.042.062z"/>
-                          <path d="M11.666 7.641c-.08 1.96-1.572 3.754-3.407 3.844-.199-2.08 1.344-3.924 3.407-3.844z"/>
-                        </svg>
-                        Continue with Apple
-                      </button>
-                    </div>
-                  </>
-                  );
-                })()}
-              </div>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className='flex flex-col gap-3'>
-                <button
-                  type='button'
-                  onClick={() => {
-                    setStep('email');
-                    setOtpCode('');
-                    setError(null);
-                  }}
-                  className='flex items-center gap-1 text-sm text-stone-400 hover:text-stone-600 transition-colors mb-1 self-start'
-                >
-                  <ArrowLeft className='w-3.5 h-3.5' />
-                  {email}
-                </button>
-
-                <input
-                  type='text'
-                  inputMode='numeric'
-                  pattern='[0-9]*'
-                  maxLength={6}
-                  placeholder='6-digit code'
-                  value={otpCode}
-                  onChange={(e) =>
-                    setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                  }
-                  required
-                  autoFocus
-                  className='w-full px-4 py-3.5 rounded-xl border border-stone-300 bg-white/80 text-stone-800 text-center text-xl tracking-[0.5em] font-mono placeholder:text-stone-400 placeholder:tracking-normal placeholder:text-base focus:outline-none focus:ring-2 focus:ring-stone-400/40 focus:border-stone-400 transition-all shadow-sm'
+                <PostalPeekAuthForm
+                  account={account}
+                  emailPlaceholder='Email'
+                  requestLabel='Continue with Email'
+                  helperText="No password needed — we'll send you a code."
+                  codePlaceholder='6-digit code'
+                  verifyLabel='Verify Code'
+                  resendLabel="Didn't get the code? Resend"
                 />
-
-                <button
-                  type='submit'
-                  disabled={loading || otpCode.length < 6}
-                  className='w-full py-3.5 rounded-xl bg-stone-800 hover:bg-stone-900 active:scale-[0.98] disabled:bg-stone-400 disabled:text-white/50 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-stone-800/20'
-                >
-                  {loading ? (
-                    <Loader2 className='w-4 h-4 animate-spin' />
-                  ) : (
-                    'Verify Code'
-                  )}
-                </button>
-
-                <button
-                  type='button'
-                  onClick={handleResend}
-                  disabled={loading}
-                  className='text-sm text-stone-400 hover:text-stone-600 transition-colors mt-1 text-center'
-                >
-                  Didn't get the code? Resend
-                </button>
-              </form>
-            )}
               </motion.div>
           </div>
         </motion.div>
