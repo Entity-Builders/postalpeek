@@ -1,7 +1,7 @@
 /**
  * useRiddles.ts — Fetch or generate riddles for a postcard's Find Objects game.
  *
- * 1. Checks postalpeek_riddles table for cached riddles
+ * 1. Checks riddles table for cached riddles
  * 2. If none → calls postalpeek-generate-riddles edge function
  * 3. Returns a Map<objectLabel, { riddle, difficulty }> + loading state
  */
@@ -51,7 +51,7 @@ export function useRiddles(postcardId: string): UseRiddlesResult {
       try {
         // 1. Try cached riddles in DB
         const { data: cached } = await supabase
-          .from('postalpeek_riddles')
+          .from('riddles')
           .select('object_label, riddle, difficulty')
           .eq('postcard_id', postcardId);
 

@@ -613,7 +613,7 @@ export function AdminAlbumCreator() {
       // Get slot counts in a separate query
       const albumIds = (data || []).map((a) => a.id);
       const { data: slotCounts } = await supabase
-        .from('postalpeek_album_slots')
+        .from('album_slots')
         .select('album_id')
         .in('album_id', albumIds);
 
@@ -656,7 +656,7 @@ export function AdminAlbumCreator() {
 
     // Load slots
     const { data: slotsData, error } = await supabase
-      .from('postalpeek_album_slots')
+      .from('album_slots')
       .select('id, postcard_id, slot_label, slot_order, target_lat, target_lng')
       .eq('album_id', album.id)
       .order('slot_order', { ascending: true });
@@ -791,7 +791,7 @@ export function AdminAlbumCreator() {
 
         // Delete existing slots and re-insert
         const { error: delError } = await supabase
-          .from('postalpeek_album_slots')
+          .from('album_slots')
           .delete()
           .eq('album_id', editingAlbumId);
         if (delError) throw delError;
@@ -818,7 +818,7 @@ export function AdminAlbumCreator() {
         }));
 
         const { error: slotError } = await supabase
-          .from('postalpeek_album_slots')
+          .from('album_slots')
           .insert(slotPayloads);
         if (slotError) throw slotError;
       }

@@ -4,7 +4,7 @@
  * Sections:
  *   1. Cron Controls   — manually trigger the walker cron locally
  *   2. Pending Slots   — list of pending album slots (the queue)
- *   3. Cron Log        — live feed of postalpeek_cron_log table
+ *   3. Cron Log        — live feed of cron_log table
  */
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
@@ -48,7 +48,7 @@ interface PendingSlot {
     landmark_precision?: boolean;
     pipeline_config?: unknown;
   } | null;
-  postalpeek_albums: { title: string } | null;
+  albums: { title: string } | null;
 }
 
 interface CronLogEntry {
@@ -248,7 +248,7 @@ export function AdminQueue() {
   const fetchWalkerState = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from("postalpeek_system_config")
+        .from("system_config")
         .select("value")
         .eq("key", "walker_state")
         .maybeSingle();
@@ -265,7 +265,7 @@ export function AdminQueue() {
     try {
       const newState = !walkerPaused;
       await supabase
-        .from("postalpeek_system_config")
+        .from("system_config")
         .upsert({ key: "walker_state", value: { paused: newState } });
       setWalkerPaused(newState);
     } catch (e) {
@@ -280,7 +280,7 @@ export function AdminQueue() {
     setSlotsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("postalpeek_album_slots")
+        .from("album_slots")
         .select(
           `
           id,
@@ -292,7 +292,7 @@ export function AdminQueue() {
           heading,
           stop_description,
           generation_metadata_override,
-          postalpeek_albums ( title )
+          albums ( title )
         `,
         )
         .eq("stop_status", "pending")
@@ -316,7 +316,7 @@ export function AdminQueue() {
     setLogLoading(true);
     try {
       const { data, error } = await supabase
-        .from("postalpeek_cron_log")
+        .from("cron_log")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50);
@@ -472,7 +472,7 @@ export function AdminQueue() {
       };
 
       const { error } = await supabase
-        .from("postalpeek_album_slots")
+        .from("album_slots")
         .update({ generation_metadata_override: newOverride })
         .eq("id", slot.id);
 
@@ -488,7 +488,7 @@ export function AdminQueue() {
     if (!confirm("Are you sure you want to delete this pending slot?")) return;
     try {
       const { error } = await supabase
-        .from("postalpeek_album_slots")
+        .from("album_slots")
         .delete()
         .eq("id", slotId);
 
@@ -513,7 +513,7 @@ export function AdminQueue() {
         camera_override: overrides,
       };
       const { error } = await supabase
-        .from("postalpeek_album_slots")
+        .from("album_slots")
         .update({
           heading: overrides.heading,
           generation_metadata_override: newOverride,
@@ -801,7 +801,7 @@ export function AdminQueue() {
 
                         {/* Album */}
                         <td className="px-4 py-3 text-white/45 text-xs align-top">
-                          {slot.postalpeek_albums?.title || "—"}
+                          {slot.albums?.title || "—"}
                         </td>
 
                         {/* Coords + heading + Street View toggle */}

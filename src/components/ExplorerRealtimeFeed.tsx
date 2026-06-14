@@ -2,7 +2,7 @@
  * ExplorerRealtimeFeed.tsx
  *
  * Same visual design as ExplorerLiveFeed but subscribes to
- * postalpeek_scout_progress via Supabase Realtime instead of SSE.
+ * scout_progress via Supabase Realtime instead of SSE.
  * Used when the real cron-walker is triggered from AdminQueue.
  *
  * Visual flow:

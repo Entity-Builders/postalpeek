@@ -286,7 +286,7 @@ export function PostcardFront({
 
     // Fetch stop metadata (names, descriptions)
     supabase
-      .from('postalpeek_album_slots')
+      .from('album_slots')
       .select('slot_order, slot_label, stop_description')
       .eq('album_id', item.album_id)
       .order('slot_order', { ascending: true })

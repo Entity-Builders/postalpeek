@@ -1,7 +1,7 @@
 /**
  * useExplorerRealtime.ts
  *
- * Hook that subscribes to postalpeek_scout_progress via Supabase Realtime
+ * Hook that subscribes to scout_progress via Supabase Realtime
  * and returns events in the same format as the SSE-based ExplorerLiveFeed.
  *
  * Usage:
@@ -74,7 +74,7 @@ export function useExplorerRealtime(sessionId: string | null): UseExplorerRealti
       setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
 
-    // Subscribe to INSERT events on postalpeek_scout_progress for this session
+    // Subscribe to INSERT events on scout_progress for this session
     const channel = supabase
       .channel(`scout-progress-${sessionId}`)
       .on(
@@ -82,7 +82,7 @@ export function useExplorerRealtime(sessionId: string | null): UseExplorerRealti
         {
           event: 'INSERT',
           schema: process.env.VITE_SUPABASE_SCHEMA || 'postalpeek',
-          table: 'postalpeek_scout_progress',
+          table: 'scout_progress',
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {

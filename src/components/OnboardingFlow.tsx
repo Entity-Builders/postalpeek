@@ -143,7 +143,7 @@ export function OnboardingFlow() {
           try {
             const { supabase } = await import('@eb-packages/logic/src/supabase');
             const { data } = await supabase
-              .from('postalpeek_album_slots')
+              .from('album_slots')
               .select('album_id')
               .eq('postcard_id', claimedId)
               .limit(1)

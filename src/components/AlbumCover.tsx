@@ -78,7 +78,7 @@ export function AlbumCover({
             postsResult.data.map((d) => d.illustration_url).filter(Boolean),
           ),
           supabase
-            .from('postalpeek_album_slots')
+            .from('album_slots')
             .select('slot_order, slot_label')
             .eq('album_id', item.album_id!)
             .order('slot_order', { ascending: true }),
