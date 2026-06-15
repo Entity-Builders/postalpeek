@@ -95,6 +95,7 @@ export function FeedLayout({
   const lang = useLang();
   const navigate = useNavigate();
   const location = useLocation();
+  const feedEnteredTrackedRef = useRef(false);
   const [viewMode, setViewMode] = useState<'grid' | 'feed'>('grid');
   const [statusBarGameOpen, setStatusBarGameOpen] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -211,6 +212,17 @@ export function FeedLayout({
   }, []);
 
   const [showWelcome, setShowWelcome] = useState(() => !hasSeenWelcome());
+
+  useEffect(() => {
+    if (feedEnteredTrackedRef.current) return;
+
+    feedEnteredTrackedRef.current = true;
+    analytics.track('feed_entered', {
+      auth_status: user ? (user.is_anonymous ? 'anonymous' : 'authenticated') : 'guest',
+      route: location.pathname,
+      view_mode: viewMode,
+    });
+  }, [location.pathname, user, viewMode]);
 
   useEffect(() => {
     const handleWelcomeSeen = () => setShowWelcome(false);
@@ -474,4 +486,3 @@ export function FeedLayout({
     </div>
   );
 }
-

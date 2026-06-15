@@ -9,7 +9,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminPage } from './pages/AdminPage';
 import { PostcardDetailPage } from './pages/PostcardDetailPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { initAnalytics, analytics } from './lib/analytics';
+import { analytics, resetAnalyticsIdentity } from './lib/analytics';
 import { AlbumPage } from './pages/AlbumPage';
 import { GameModeProvider } from './contexts/GameModeContext';
 import { StampProvider } from './contexts/StampContext';
@@ -119,11 +119,6 @@ function ShareRedirect() {
 function App() {
   const { user, isAdmin, loading, signOut } = useAuth();
 
-  // Initialize PostHog analytics once on mount
-  useEffect(() => {
-    initAnalytics();
-  }, []);
-
   // Identify user in PostHog when auth state changes
   useEffect(() => {
     // If auth loading finished and we have no user, we rely on deviceId for guest tracking
@@ -134,7 +129,7 @@ function App() {
 
     if (user) {
       analytics.identify(user.id, {
-        email: user.email,
+        account_kind: user.is_anonymous ? 'anonymous' : 'permanent',
         created_at: user.created_at,
       });
       
@@ -143,7 +138,7 @@ function App() {
         localStorage.removeItem('postalpeek_anon_gen_count');
       }
     } else {
-      analytics.reset();
+      resetAnalyticsIdentity();
     }
   }, [user]);
 
