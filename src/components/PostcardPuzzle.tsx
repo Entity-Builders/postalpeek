@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Star, Puzzle } from 'lucide-react';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
-import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@entity-builders/logic/src/hooks/useMiniGameEngine';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { GameTimerBar } from './GameTimerBar';

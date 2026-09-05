@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Search, Loader, MapPin, Cloud, Sun, Eye, Star, Target, Lightbulb } from 'lucide-react';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
-import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@entity-builders/logic/src/hooks/useMiniGameEngine';
 import type { FeedItem } from './Postcard';
 import { NextGameCountdown } from './NextGameCountdown';
 import { t, getLang } from '../utils/i18n';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { useRiddles } from '../hooks/useRiddles';
 import { GameTimerBar } from './GameTimerBar';
 

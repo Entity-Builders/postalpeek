@@ -12,8 +12,8 @@
 
 import { useState, useCallback } from 'react';
 import { t, useLang } from '../utils/i18n';
-import { supabase } from '@eb-packages/logic/src/supabase';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { supabase } from '@entity-builders/logic/src/supabase';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
 import { getDeviceId } from '../utils/deviceId';
 import {
   createUserPostcard,

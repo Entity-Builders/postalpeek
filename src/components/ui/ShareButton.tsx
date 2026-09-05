@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Share2, Check, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { encodeUuidToHash } from '@entity-builders/logic/src/hash';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { analytics } from '../../lib/analytics';
 import { AnimatePresence, motion } from 'framer-motion';
 

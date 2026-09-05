@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFeedContext } from './FeedLayout';
 import { CollectionGrid } from '../../components/CollectionGrid';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { encodeUuidToHash } from '@entity-builders/logic/src/hash';
 
 export function CollectionPage() {
   const navigate = useNavigate();

@@ -30,8 +30,8 @@ import {
   CheckCircle,
   Scissors,
 } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
-import { encodeUuidToHash, decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
+import { supabase } from '@entity-builders/logic/src/supabase';
+import { encodeUuidToHash, decodeHashToUuidPrefix } from '@entity-builders/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
 import { deriveGameStats, hasValidGameStats, type GameStats } from '../utils/deriveGameStats';

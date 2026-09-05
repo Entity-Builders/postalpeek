@@ -25,7 +25,7 @@ import {
   Target,
   Trash2,
 } from "lucide-react";
-import { supabase } from "@eb-packages/logic/src/supabase";
+import { supabase } from "@entity-builders/logic/src/supabase";
 import { StreetViewInspector } from "./StreetViewInspector";
 import { ExplorerRealtimeFeed } from "./ExplorerRealtimeFeed";
 

@@ -1,4 +1,4 @@
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 import { getDeviceId } from '../utils/deviceId';
 

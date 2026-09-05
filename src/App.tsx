@@ -3,8 +3,8 @@ import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-do
 import './index.css';
 // WalkerFeed was replaced with FeedLayout + Pages
 import { useMouseIdle } from './hooks/useMouseIdle';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminPage } from './pages/AdminPage';
 import { PostcardDetailPage } from './pages/PostcardDetailPage';

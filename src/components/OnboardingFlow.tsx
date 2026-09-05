@@ -141,7 +141,7 @@ export function OnboardingFlow() {
 
           // Look up the album this postcard belongs to (dynamic, works in all envs)
           try {
-            const { supabase } = await import('@eb-packages/logic/src/supabase');
+            const { supabase } = await import('@entity-builders/logic/src/supabase');
             const { data } = await supabase
               .from('album_slots')
               .select('album_id')

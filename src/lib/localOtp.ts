@@ -1,4 +1,4 @@
-import type { EmailOtpTokenPreparationInput } from '@eb-packages/auth';
+import type { EmailOtpTokenPreparationInput } from '@entity-builders/auth';
 
 type MailpitSearchResponse = {
   messages?: Array<{ ID?: string }>;

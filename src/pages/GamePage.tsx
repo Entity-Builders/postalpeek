@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { Postcard, type FeedItem } from '../components/Postcard';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useLang, t } from '../utils/i18n';
 

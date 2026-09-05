@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Camera, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { Postcard } from './Postcard';
 import type { FeedItem } from './Postcard';
 import { analytics } from '../lib/analytics';

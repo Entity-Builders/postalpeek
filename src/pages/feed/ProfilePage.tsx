@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User as UserIcon, LogOut, ChevronLeft, Globe } from 'lucide-react';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
 import { useStampContext } from '../../contexts/StampContext';
 import { useLang, t, toggleLang } from '../../utils/i18n';
 import { analytics } from '../../lib/analytics';

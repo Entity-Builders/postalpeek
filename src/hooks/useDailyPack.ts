@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import type { FeedItem } from '../components/Postcard';
 import { analytics } from '../lib/analytics';
 import { preSignUrls } from '../utils/imageUtils';

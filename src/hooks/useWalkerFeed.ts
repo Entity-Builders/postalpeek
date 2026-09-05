@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@eb-packages/logic/src/supabase';
-import { decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
+import { supabase } from '@entity-builders/logic/src/supabase';
+import { decodeHashToUuidPrefix } from '@entity-builders/logic/src/hash';
 import { analytics } from '../lib/analytics';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
 import type { FeedItem } from '../components/Postcard';

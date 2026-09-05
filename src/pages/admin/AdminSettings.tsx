@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { ActionBtn, StatusMsg } from '../../components/admin/AdminUI';
 import type { ActionStatus } from '../../components/admin/AdminUI';
 import type { AdminOutletContext } from './types';

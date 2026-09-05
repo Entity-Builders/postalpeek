@@ -19,7 +19,7 @@ import {
   Loader,
   Goal,
 } from "lucide-react";
-import { supabase } from "@eb-packages/logic/src/supabase";
+import { supabase } from "@entity-builders/logic/src/supabase";
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 

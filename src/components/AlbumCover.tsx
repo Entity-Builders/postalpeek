@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, ChevronRight, Images, MapPin } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { cn } from '../utils/cn';
 import { cdnImage, WIDTHS, preSignUrls } from '../utils/imageUtils';
 import {

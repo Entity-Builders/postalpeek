@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useAuth } from '@eb-packages/logic/src/hooks/useAuth';
-import { useMiniGameEngine } from '@eb-packages/logic/src/hooks/useMiniGameEngine';
+import { useAuth } from '@entity-builders/logic/src/hooks/useAuth';
+import { useMiniGameEngine } from '@entity-builders/logic/src/hooks/useMiniGameEngine';
 import type { FeedItem } from '../components/Postcard';
 
 // ── Seeded random from string (deterministic positions per postcard) ────

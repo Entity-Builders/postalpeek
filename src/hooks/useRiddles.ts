@@ -6,7 +6,7 @@
  * 3. Returns a Map<objectLabel, { riddle, difficulty }> + loading state
  */
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { getLang } from '../utils/i18n';
 
 interface RiddleEntry {

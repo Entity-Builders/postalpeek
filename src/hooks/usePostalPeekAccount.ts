@@ -1,9 +1,9 @@
 import {
   useSupabaseAccountAccess,
   type SupabaseAuthAccessClient,
-} from '@eb-packages/auth';
+} from '@entity-builders/auth';
 import { useMemo } from 'react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { analytics } from '../lib/analytics';
 import { postalpeekAuthConfig } from '../lib/auth-config';
 import { preparePostalPeekEmailOtpToken } from '../lib/localOtp';

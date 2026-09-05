@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Loader, RefreshCw, TrendingUp, ShieldAlert, DollarSign } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import type { AdminOutletContext } from './types';
 
 interface UserStats {

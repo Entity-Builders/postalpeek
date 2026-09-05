@@ -21,10 +21,10 @@
     "db:push:prod": "npx supabase link --project-ref xfcvuzcxvdpzkqpnahyx && npx supabase db push"
   },
   "dependencies": {
-    "@eb-packages/analytics": "*",
-    "@eb-packages/app-registry": "workspace:*",
-    "@eb-packages/auth": "workspace:*",
-    "@eb-packages/logic": "*",
+    "@entity-builders/analytics": "*",
+    "@entity-builders/app-registry": "workspace:*",
+    "@entity-builders/auth": "workspace:*",
+    "@entity-builders/logic": "*",
     "@lottiefiles/dotlottie-react": "^0.18.6",
     "@react-native-async-storage/async-storage": "^3.0.1",
     "canvas-confetti": "^1.9.4",

@@ -3,7 +3,7 @@ import {
   Maximize2,
   X,
 } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameProgress, gameModeToDb, type DbGameType } from '../hooks/useGameProgress';
 import { cn } from '../utils/cn';

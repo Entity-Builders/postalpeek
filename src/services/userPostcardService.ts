@@ -9,7 +9,7 @@
  * ref #94
  */
 
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import { captureStreetView, generateIllustration } from './googleMaps';
 import type { StreetViewPOV } from '../components/StreetViewPanorama';
 

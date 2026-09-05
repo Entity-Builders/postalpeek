@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@eb-packages/logic/src/supabase';
+import { supabase } from '@entity-builders/logic/src/supabase';
 import type { BilingualText } from '../utils/i18n';
 
 export interface AlbumSlot {

@@ -1,4 +1,4 @@
-import { decodeHashToUuidPrefix } from '@eb-packages/logic/src/hash';
+import { decodeHashToUuidPrefix } from '@entity-builders/logic/src/hash';
 
 /**
  * Cloudflare Worker that intercepts requests from social media crawlers

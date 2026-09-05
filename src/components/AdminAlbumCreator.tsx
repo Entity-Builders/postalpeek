@@ -29,8 +29,8 @@ import {
   Library,
   Eye,
 } from 'lucide-react';
-import { supabase } from '@eb-packages/logic/src/supabase';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { supabase } from '@entity-builders/logic/src/supabase';
+import { encodeUuidToHash } from '@entity-builders/logic/src/hash';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS, preSignUrls } from '../utils/imageUtils';
 

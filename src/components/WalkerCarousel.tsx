@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { encodeUuidToHash } from '@entity-builders/logic/src/hash';
 import { analytics } from '../lib/analytics';
 import { t } from '../utils/i18n';
 import { Postcard, FeedItem } from './Postcard';

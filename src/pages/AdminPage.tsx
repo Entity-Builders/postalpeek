@@ -27,7 +27,7 @@ import {
   Instagram,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import { encodeUuidToHash } from '@eb-packages/logic/src/hash';
+import { encodeUuidToHash } from '@entity-builders/logic/src/hash';
 import { useGenerationLog } from '../hooks/useGenerationLog';
 import { useSignedImage } from '../utils/useSignedImage';
 import { WIDTHS } from '../utils/imageUtils';
