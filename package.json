@@ -21,10 +21,10 @@
     "db:push:prod": "npx supabase link --project-ref xfcvuzcxvdpzkqpnahyx && npx supabase db push"
   },
   "dependencies": {
-    "@entity-builders/analytics": "*",
-    "@entity-builders/app-registry": "workspace:*",
-    "@entity-builders/auth": "workspace:*",
-    "@entity-builders/logic": "*",
+    "@entity-builders/analytics": "^1.0.0",
+    "@entity-builders/app-registry": "^0.1.0",
+    "@entity-builders/auth": "^0.1.0",
+    "@entity-builders/logic": "^1.0.0",
     "@lottiefiles/dotlottie-react": "^0.18.6",
     "@react-native-async-storage/async-storage": "^3.0.1",
     "canvas-confetti": "^1.9.4",
@@ -69,5 +69,10 @@
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
     "wrangler": "^4.77.0"
+  },
+  "packageManager": "yarn@4.13.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Entity-Builders/postalpeek.git"
   }
 }
